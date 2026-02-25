@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { supabase } from '../src/lib/supabase'
 
 function formatNY(iso: string) {
@@ -12,6 +14,8 @@ function formatNY(iso: string) {
 }
 
 export default async function Home() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '(missing)'
+
   const { data: events, error } = await supabase
     .from('events')
     .select('id,title,start_at,status')
@@ -21,6 +25,11 @@ export default async function Home() {
     <main style={{ padding: "2rem", fontFamily: "sans-serif" }}>
       <h1>Utica Community Board</h1>
       <p style={{ opacity: 0.7 }}>All times shown in America/New_York.</p>
+
+      <hr style={{ margin: "1rem 0" }} />
+      <p style={{ fontSize: 12, opacity: 0.7 }}>
+        Connected to: <code>{supabaseUrl}</code>
+      </p>
 
       {error && (
         <pre style={{ whiteSpace: "pre-wrap" }}>
