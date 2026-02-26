@@ -28,6 +28,7 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
+    (message.includes('invalid input value for enum') && message.includes('on_board')) ||
     message.includes('recurrence_rule') ||
     message.includes('is_recurring') ||
     message.includes('seen_at_label') ||
@@ -54,7 +55,7 @@ export async function GET() {
   const primary = await supabase
     .from('events')
     .select('id,title,location,start_at,status,created_at,is_recurring,recurrence_rule')
-    .eq('status', 'on_board')
+    .in('status', ['on_board', 'published'])
     .order('start_at', { ascending: true })
 
   let events: EventRow[] = []
@@ -64,7 +65,7 @@ export async function GET() {
     const fallback = await supabase
       .from('events')
       .select('id,title,location,start_at,status,created_at')
-      .eq('status', 'on_board')
+      .eq('status', 'published')
       .order('start_at', { ascending: true })
 
     if (fallback.error) return jsonError(fallback.error.message, 500)

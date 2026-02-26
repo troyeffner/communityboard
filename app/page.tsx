@@ -46,6 +46,11 @@ function isMissingOptionalEventColumns(message: string) {
   )
 }
 
+function isStatusEnumMismatch(message: string) {
+  const lower = message.toLowerCase()
+  return lower.includes('invalid input value for enum') && lower.includes('on_board')
+}
+
 function nyDateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/New_York',
@@ -80,7 +85,11 @@ export default async function Home() {
   let errorMessage: string | null = null
 
   if (primary.error) {
-    if (primary.error.code !== '42703' && !isMissingOptionalEventColumns(primary.error.message || '')) {
+    if (
+      primary.error.code !== '42703' &&
+      !isMissingOptionalEventColumns(primary.error.message || '') &&
+      !isStatusEnumMismatch(primary.error.message || '')
+    ) {
       errorMessage = primary.error.message
     } else {
       const fallback = await supabase

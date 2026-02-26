@@ -18,6 +18,11 @@ type EventRow = {
   event_location_name?: string | null
 }
 
+function isStatusEnumMismatch(message: string) {
+  const lower = message.toLowerCase()
+  return lower.includes('invalid input value for enum') && lower.includes('on_board')
+}
+
 type LinkRow = {
   event_id: string
   created_at: string
@@ -61,11 +66,20 @@ export async function GET(req: Request) {
   const selectedAudience = audience.filter((tag) => audSet.has(tag))
 
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
-  const eventsResult = await supabase
+  const primaryEvents = await supabase
     .from('events')
     .select('id,title,location,description,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name')
-    .eq('status', 'published')
+    .in('status', ['on_board', 'published'])
     .order('start_at', { ascending: true })
+
+  let eventsResult = primaryEvents
+  if (primaryEvents.error && isStatusEnumMismatch(primaryEvents.error.message || '')) {
+    eventsResult = await supabase
+      .from('events')
+      .select('id,title,location,description,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name')
+      .eq('status', 'published')
+      .order('start_at', { ascending: true })
+  }
 
   if (eventsResult.error) return jsonError(eventsResult.error.message, 500)
 
