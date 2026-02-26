@@ -30,6 +30,22 @@ type LinkRow = {
   poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null }[] | null
 }
 
+function isMissingOptionalEventColumns(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes('published_by') ||
+    lower.includes('published_at') ||
+    lower.includes('event_category') ||
+    lower.includes('event_attributes') ||
+    lower.includes('event_audience') ||
+    lower.includes('event_location_name') ||
+    lower.includes('description') ||
+    lower.includes('is_recurring') ||
+    lower.includes('recurrence_rule') ||
+    lower.includes('schema cache')
+  )
+}
+
 function nyDateKey(date: Date) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/New_York',
@@ -57,20 +73,20 @@ export default async function Home() {
   const primary = await supabase
     .from('events')
     .select('id, title, location, description, start_at, status, created_at, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name,published_by,published_at')
-    .eq('status', 'on_board')
+    .in('status', ['on_board', 'published'])
     .order('start_at', { ascending: true })
 
   let events: EventRow[] = []
   let errorMessage: string | null = null
 
   if (primary.error) {
-    if (primary.error.code !== '42703') {
+    if (primary.error.code !== '42703' && !isMissingOptionalEventColumns(primary.error.message || '')) {
       errorMessage = primary.error.message
     } else {
       const fallback = await supabase
         .from('events')
-        .select('id, title, location, description, start_at, status, created_at,published_by,published_at')
-        .eq('status', 'on_board')
+        .select('id, title, location, start_at, status, created_at')
+        .in('status', ['on_board', 'published'])
         .order('start_at', { ascending: true })
 
       if (fallback.error) {
@@ -78,8 +94,15 @@ export default async function Home() {
       } else {
         events = ((fallback.data || []) as EventRow[]).map((row) => ({
           ...row,
+          description: null,
           is_recurring: false,
           recurrence_rule: null,
+          event_category: null,
+          event_attributes: [],
+          event_audience: [],
+          event_location_name: null,
+          published_by: null,
+          published_at: null,
         }))
       }
     }
