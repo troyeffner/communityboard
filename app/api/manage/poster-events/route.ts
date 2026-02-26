@@ -58,7 +58,7 @@ export async function GET(req: Request) {
     .eq('poster_upload_id', poster_upload_id)
     .order('created_at', { ascending: false })
 
-  let data = primary.data
+  let data: LinkRow[] | null = (primary.data || null) as LinkRow[] | null
   if (primary.error) {
     if (!isMissingRecurrenceColumnError(primary.error)) return jsonError(primary.error.message, 500)
 
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
 
     if (fallback.error) return jsonError(fallback.error.message, 500)
-    data = fallback.data
+    data = (fallback.data || null) as LinkRow[] | null
   }
 
   const rows = ((data || []) as LinkRow[])
