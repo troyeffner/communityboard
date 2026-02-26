@@ -5,6 +5,11 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
+function isMissingSeenAtName(error: { code?: string; message?: string } | null | undefined) {
+  const message = (error?.message || '').toLowerCase()
+  return error?.code === '42703' || message.includes('seen_at_name') || message.includes('schema cache')
+}
+
 export async function PATCH(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
@@ -29,16 +34,28 @@ export async function PATCH(req: Request) {
   if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
 
-  const result = await supabase
+  let result = await supabase
     .from('poster_uploads')
     .update(updates)
     .eq('id', posterUploadId)
     .select('id,file_path,status,created_at,seen_at_name,done,is_done,processed_at')
     .maybeSingle()
 
+  if (result.error && isMissingSeenAtName(result.error)) {
+    const fallbackUpdates = { ...updates }
+    delete fallbackUpdates.seen_at_name
+    if (Object.keys(fallbackUpdates).length === 0) return jsonError('seen_at_name column is missing on this environment', 500)
+
+    result = await supabase
+      .from('poster_uploads')
+      .update(fallbackUpdates)
+      .eq('id', posterUploadId)
+      .select('id,file_path,status,created_at,done,is_done,processed_at')
+      .maybeSingle()
+  }
+
   if (result.error) return jsonError(result.error.message, 500)
   if (!result.data) return jsonError('Poster not found', 404)
 
   return NextResponse.json({ ok: true, row: result.data })
 }
-

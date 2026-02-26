@@ -21,6 +21,7 @@ function isMissingDoneColumns(error: { code?: string; message?: string } | null 
     message.includes('done') ||
     message.includes('is_done') ||
     message.includes('processed_at') ||
+    message.includes('seen_at_name') ||
     message.includes('schema cache')
   )
 }
@@ -52,13 +53,28 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(100)
 
-    if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 })
-    uploads = ((fallback.data || []) as UploadRow[]).map((row) => ({
-      ...row,
-      done: false,
-      is_done: false,
-      processed_at: null,
-    }))
+    if (!fallback.error) {
+      uploads = ((fallback.data || []) as UploadRow[]).map((row) => ({
+        ...row,
+        done: false,
+        is_done: false,
+        processed_at: null,
+      }))
+    } else {
+      const fallbackNoSeenAt = await supabase
+        .from('poster_uploads')
+        .select('id,file_path,status,created_at')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (fallbackNoSeenAt.error) return NextResponse.json({ error: fallbackNoSeenAt.error.message }, { status: 500 })
+      uploads = ((fallbackNoSeenAt.data || []) as UploadRow[]).map((row) => ({
+        ...row,
+        seen_at_name: null,
+        done: false,
+        is_done: false,
+        processed_at: null,
+      }))
+    }
   }
   const uploadIds = uploads.map((u) => u.id)
 

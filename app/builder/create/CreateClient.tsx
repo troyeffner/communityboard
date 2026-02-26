@@ -474,8 +474,17 @@ export default function BuilderCreatePage({
               accept="image/*"
               capture="environment"
               onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-              style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}
+              style={{ display: 'none' }}
             />
+            <button
+              type="button"
+              data-variant="secondary"
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={uploadingPoster}
+            >
+              {uploadFile ? 'Change photo' : 'Choose file'}
+            </button>
+            {uploadFile ? <div style={{ fontSize: 12, color: '#166534' }}>Photo selected</div> : null}
             <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
               {uploadingPoster ? 'Uploading...' : 'Upload and select'}
             </button>
