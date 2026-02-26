@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireBuilder } from '@/lib/builder-auth'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
 export async function POST(req: Request) {
-  const auth = await requireBuilder(req)
-  if (!auth.ok) return auth.response
-
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
   const eventId = String(body.event_id || '').trim()
@@ -27,7 +23,7 @@ export async function POST(req: Request) {
 
   await supabase
     .from('event_activity_log')
-    .insert([{ event_id: eventId, action: 'removed', user_id: auth.identity.id }])
+    .insert([{ event_id: eventId, action: 'removed', user_id: null }])
 
   return NextResponse.json({ ok: true })
 }

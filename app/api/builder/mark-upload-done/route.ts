@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireBuilder } from '@/lib/builder-auth'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
 export async function POST(req: Request) {
-  const auth = await requireBuilder(req)
-  if (!auth.ok) return auth.response
-
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
   const posterUploadId = String(body.poster_upload_id || '').trim()
