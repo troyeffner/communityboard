@@ -10,8 +10,8 @@ function jsonError(message: string, status = 400) {
 }
 
 export async function POST(req: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const supabase = createClient(url, serviceKey)
@@ -23,20 +23,10 @@ export async function POST(req: Request) {
   if (!file || !(file instanceof File)) return jsonError('Missing file (field name: file)')
   if (!file.type.startsWith('image/')) return jsonError('File must be an image')
 
-  const seen_at_type = String(form.get('seen_at_type') || '').trim().toLowerCase() || null
   const object_typeRaw = String(form.get('object_type') || 'event_poster').trim().toLowerCase()
-  const seen_at_label = String(form.get('seen_at_label') || form.get('seen_at_name') || '').trim() || null
-  const seen_at_notes = String(form.get('seen_at_notes') || '').trim() || null
-  const seen_at_confidence = String(form.get('seen_at_confidence') || '').trim().toLowerCase() || 'unknown'
+  const seen_at_name = String(form.get('seen_at_name') || '').trim() || null
   const objectTypeSet = toSet(OBJECT_TYPES)
   const object_type = objectTypeSet.has(object_typeRaw) ? object_typeRaw : 'event_poster'
-
-  const latRaw = String(form.get('seen_at_lat') || '').trim()
-  const lngRaw = String(form.get('seen_at_lng') || '').trim()
-  const seen_at_lat = latRaw ? Number(latRaw) : null
-  const seen_at_lng = lngRaw ? Number(lngRaw) : null
-  if (latRaw && Number.isNaN(seen_at_lat)) return jsonError('seen_at_lat must be numeric')
-  if (lngRaw && Number.isNaN(seen_at_lng)) return jsonError('seen_at_lng must be numeric')
 
   // Read file into a Buffer
   const arrayBuffer = await file.arrayBuffer()
@@ -66,13 +56,7 @@ export async function POST(req: Request) {
   const insertPayload = {
     file_path: filePath,
     status: 'uploaded',
-    seen_at_type,
-    seen_at_label,
-    seen_at_name: seen_at_label,
-    seen_at_notes,
-    seen_at_lat,
-    seen_at_lng,
-    seen_at_confidence,
+    seen_at_name,
     object_type,
     is_done: false,
   }
@@ -87,28 +71,22 @@ export async function POST(req: Request) {
   let insertErr = insert.error
   if (insertErr) {
     const message = (insertErr.message || '').toLowerCase()
-    const missingSeenAtLabel =
+    const missingSeenAtName =
       insertErr.code === '42703' ||
-      message.includes('seen_at_label') ||
+      message.includes('seen_at_name') ||
       message.includes('schema cache')
 
-    if (!missingSeenAtLabel && !message.includes('seen_at_') && !message.includes('done')) {
+    if (!missingSeenAtName && !message.includes('seen_at_') && !message.includes('done')) {
       return jsonError(insertErr.message, 500)
     }
 
-    // Backward-compatible retry when seen_at_label is not present yet.
     const fallbackWithoutLabel = await supabase
       .from('poster_uploads')
       .insert([
         {
           file_path: filePath,
           status: 'uploaded',
-          seen_at_name: seen_at_label,
-          seen_at_type,
-          seen_at_notes,
-          seen_at_lat,
-          seen_at_lng,
-          seen_at_confidence,
+          seen_at_name,
         },
       ])
       .select('id')

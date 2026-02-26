@@ -50,6 +50,7 @@ Optional (only if adding client-side Supabase usage):
 - `file_path` (text)
 - `status` (text)
 - `created_at` (timestamptz)
+- `seen_at_name` (text, nullable)
 
 ### `events`
 - `id` (uuid, PK)
@@ -71,12 +72,17 @@ Optional (only if adding client-side Supabase usage):
 - `POST /api/submit/upload`
 - Accepts multipart file upload.
 - Stores file in `posters` bucket.
-- Inserts `poster_uploads` row.
+- Inserts `poster_uploads` row (`seen_at_name` optional via form field).
 - Returns `{ ok: true, id }`.
 
 ### Manage: list uploads
 - `GET /api/manage/list-uploads`
-- Returns recent uploads with computed `public_url`.
+- Returns recent uploads with computed `public_url`, `seen_at_name`, and linked event counts.
+
+### Manage: update poster metadata
+- `PATCH /api/manage/update-poster`
+- Body: `{ poster_upload_id, seen_at_name?, status? }`
+- Updates `poster_uploads` only.
 
 ### Manage: create event from poster
 - `POST /api/manage/create-event-from-poster`
@@ -100,3 +106,19 @@ Optional (only if adding client-side Supabase usage):
 - Preferred non-port checks:
 - `npm run lint`
 - `npm run build`
+
+## Seen-at Curl Checks
+
+Upload with seen-at:
+
+```bash
+curl -X POST http://localhost:3000/api/submit/upload \
+  -F "file=@/absolute/path/to/poster.jpg" \
+  -F "seen_at_name=Emmerson Cafe Community Board"
+```
+
+List uploads (verify `seen_at_name` + `linked_events_count`):
+
+```bash
+curl http://localhost:3000/api/manage/list-uploads
+```

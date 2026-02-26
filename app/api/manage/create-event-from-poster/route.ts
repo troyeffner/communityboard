@@ -28,16 +28,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   )
 }
 
-function isMissingSeenAtColumnError(error: { code?: string; message?: string } | null | undefined) {
-  const message = (error?.message || '').toLowerCase()
-  return (
-    error?.code === '42703' ||
-    message.includes('seen_at_label') ||
-    message.includes('seen_at_name') ||
-    message.includes('schema cache')
-  )
-}
-
 function defaultNy2pmLocalIso() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -63,7 +53,6 @@ export async function POST(req: Request) {
     title,
     location,
     description,
-    source_place,
     start_at,
     status,
     bbox,
@@ -79,7 +68,6 @@ export async function POST(req: Request) {
     title?: string
     location?: string
     description?: string
-    source_place?: string
     start_at?: string
     status?: EventStatus
     bbox?: BBoxPoint
@@ -122,39 +110,12 @@ export async function POST(req: Request) {
   const resolvedStartAt = start_at?.trim() || defaultNy2pmLocalIso()
   const nyIsoGuess = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
 
-  let resolvedSourcePlace = source_place?.trim() || null
-  if (!resolvedSourcePlace) {
-    const uploadLookupPrimary = await supabase
-      .from('poster_uploads')
-      .select('seen_at_label')
-      .eq('id', poster_upload_id)
-      .limit(1)
-      .single()
-
-    if (!uploadLookupPrimary.error) {
-      const row = uploadLookupPrimary.data as { seen_at_label?: string | null } | null
-      resolvedSourcePlace = row?.seen_at_label?.trim() || null
-    } else if (isMissingSeenAtColumnError(uploadLookupPrimary.error)) {
-      const uploadLookupFallback = await supabase
-        .from('poster_uploads')
-        .select('seen_at_name')
-        .eq('id', poster_upload_id)
-        .limit(1)
-        .single()
-
-      if (!uploadLookupFallback.error) {
-        const row = uploadLookupFallback.data as { seen_at_name?: string | null } | null
-        resolvedSourcePlace = row?.seen_at_name?.trim() || null
-      }
-    }
-  }
-
   const eventPayload = {
     title: title.trim(),
     location: location?.trim() || null,
     description: description?.trim() || null,
     source_type: null,
-    source_place: resolvedSourcePlace,
+    source_place: null,
     source_detail: null,
     start_at: nyIsoGuess,
     status,
@@ -209,20 +170,6 @@ export async function POST(req: Request) {
   ])
 
   if (linkErr) return jsonError(linkErr.message, 500)
-
-  if (resolvedSourcePlace) {
-    const updateLabel = await supabase
-      .from('poster_uploads')
-      .update({ seen_at_label: resolvedSourcePlace })
-      .eq('id', poster_upload_id)
-
-    if (updateLabel.error && isMissingSeenAtColumnError(updateLabel.error)) {
-      await supabase
-        .from('poster_uploads')
-        .update({ seen_at_name: resolvedSourcePlace })
-        .eq('id', poster_upload_id)
-    }
-  }
 
   return NextResponse.json({ ok: true, event_id: eventId })
 }

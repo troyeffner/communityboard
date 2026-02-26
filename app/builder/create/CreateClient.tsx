@@ -7,9 +7,10 @@ type Upload = {
   created_at: string
   status: string
   public_url?: string
-  seen_at_label?: string | null
+  seen_at_name?: string | null
   is_done?: boolean
   event_count: number
+  linked_count?: number
 }
 
 type PosterEventRow = {
@@ -81,8 +82,15 @@ export default function BuilderCreatePage({
 
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const stageRef = useRef<HTMLDivElement | null>(null)
+  const imageRef = useRef<HTMLImageElement | null>(null)
+  const [imageNatural, setImageNatural] = useState({ width: 1, height: 1 })
   const dragRef = useRef<{ x: number; y: number } | null>(null)
   const didDragRef = useRef(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteMode, setDeleteMode] = useState<'unlink' | 'delete_with_events'>('unlink')
+  const [deletingPoster, setDeletingPoster] = useState(false)
+  const [savingSeenAt, setSavingSeenAt] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -120,7 +128,7 @@ export default function BuilderCreatePage({
   useEffect(() => {
     if (!manualMode) return
     try {
-      const savedSeenAt = window.localStorage.getItem('submit_seen_at_label') || ''
+      const savedSeenAt = window.localStorage.getItem('submit_seen_at_name') || ''
       if (savedSeenAt && !seenAtName) setSeenAtName(savedSeenAt)
     } catch {
       // ignore localStorage failures
@@ -141,7 +149,7 @@ export default function BuilderCreatePage({
     setStartAt(defaultStartAt2pmLocal())
     setIsRecurring(false)
     setRecurrenceRule('')
-    setSeenAtName(upload?.seen_at_label || '')
+    setSeenAtName(upload?.seen_at_name || '')
     setZoom(1)
     setPan({ x: 0, y: 0 })
     await loadRows(posterId)
@@ -157,7 +165,7 @@ export default function BuilderCreatePage({
     setStartAt(toDateTimeLocal(row.event.start_at))
     setIsRecurring(Boolean(row.event.is_recurring))
     setRecurrenceRule(row.event.recurrence_rule || '')
-    setSeenAtName(selectedUpload?.seen_at_label || '')
+    setSeenAtName(selectedUpload?.seen_at_name || '')
   }
 
   function resetFormToNew() {
@@ -172,26 +180,32 @@ export default function BuilderCreatePage({
   }
 
   async function saveSeenAt() {
-    if (!selectedPosterId) return true
-    const res = await fetch('/api/builder/set-upload-seen-at', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        poster_upload_id: selectedPosterId,
-        seen_at_name: seenAtName,
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      setError(data?.error || 'Failed to save Seen at')
-      return false
-    }
+    if (!selectedPosterId || !seenAtName.trim()) return true
+    setSavingSeenAt(true)
     try {
-      window.localStorage.setItem('submit_seen_at_label', seenAtName.trim())
-    } catch {
-      // ignore localStorage failures
+      const res = await fetch('/api/manage/update-poster', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poster_upload_id: selectedPosterId,
+          seen_at_name: seenAtName,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data?.error || 'Failed to save Seen at')
+        return false
+      }
+      try {
+        window.localStorage.setItem('submit_seen_at_name', seenAtName.trim())
+      } catch {
+        // ignore localStorage failures
+      }
+      await loadUploads()
+      return true
+    } finally {
+      setSavingSeenAt(false)
     }
-    return true
   }
 
   async function saveEvent() {
@@ -203,11 +217,6 @@ export default function BuilderCreatePage({
 
     setSaving(true)
     try {
-      if (selectedPosterId) {
-        const seenAtOk = await saveSeenAt()
-        if (!seenAtOk) return
-      }
-
       if (editingEventId) {
         const res = await fetch('/api/builder/update-event', {
           method: 'PATCH',
@@ -313,6 +322,102 @@ export default function BuilderCreatePage({
     await loadUploads()
   }
 
+  function getStageMetrics() {
+    const stage = stageRef.current
+    if (!stage) return null
+    const stageW = stage.clientWidth || 1
+    const stageH = stage.clientHeight || 1
+    const baseW = stageW
+    const baseH = Math.max(1, stageW * (imageNatural.height / imageNatural.width))
+    return { stageW, stageH, baseW, baseH }
+  }
+
+  function centerOnPoint(pointToCenter: { x: number; y: number }, targetZoom = zoom) {
+    const m = getStageMetrics()
+    if (!m) return
+    const panX = m.stageW / 2 - pointToCenter.x * m.baseW * targetZoom
+    const panY = m.stageH / 2 - pointToCenter.y * m.baseH * targetZoom
+    setZoom(Number(targetZoom.toFixed(2)))
+    setPan({ x: Number(panX.toFixed(1)), y: Number(panY.toFixed(1)) })
+  }
+
+  function fitToPins() {
+    const pins = rows.filter((row) => row.bbox).map((row) => row.bbox!)
+    if (pins.length === 0) return
+    if (pins.length === 1) {
+      centerOnPoint(pins[0], Math.max(1.6, zoom))
+      return
+    }
+
+    const m = getStageMetrics()
+    if (!m) return
+    const minX = Math.min(...pins.map((p) => p.x))
+    const minY = Math.min(...pins.map((p) => p.y))
+    const maxX = Math.max(...pins.map((p) => p.x))
+    const maxY = Math.max(...pins.map((p) => p.y))
+
+    const paddingX = 0.08
+    const paddingY = 0.08
+    const startX = Math.max(0, minX - paddingX)
+    const startY = Math.max(0, minY - paddingY)
+    const boxWidth = Math.max(0.04, Math.min(1, maxX - minX + paddingX * 2))
+    const boxHeight = Math.max(0.04, Math.min(1, maxY - minY + paddingY * 2))
+
+    const boxWpx = boxWidth * m.baseW
+    const boxHpx = boxHeight * m.baseH
+    const targetZoom = Math.max(1, Math.min(5, Math.min(m.stageW / boxWpx, m.stageH / boxHpx)))
+    const centerPoint = {
+      x: Math.min(1, startX + boxWidth / 2),
+      y: Math.min(1, startY + boxHeight / 2),
+    }
+    centerOnPoint(centerPoint, targetZoom)
+  }
+
+  function centerOnActivePin() {
+    const active = rows.find((row) => row.link_id === activeLinkId && row.bbox)?.bbox || point
+    if (!active) return
+    centerOnPoint(active, Math.max(1.8, zoom))
+  }
+
+  async function deletePoster(mode: 'unlink' | 'delete_with_events') {
+    if (!selectedPosterId) return
+    setDeletingPoster(true)
+    setError('')
+    setMessage('')
+    try {
+      const res = await fetch('/api/manage/delete-poster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poster_upload_id: selectedPosterId, mode }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) return setError(data?.error || 'Failed to delete poster')
+
+      setDeleteModalOpen(false)
+      setSelectedPosterId(null)
+      setRows([])
+      setActiveLinkId(null)
+      setEditingEventId(null)
+      setPoint(null)
+      setMessage(mode === 'delete_with_events' ? 'Poster and linked events deleted.' : 'Poster deleted. Linked events were unlinked.')
+      await loadUploads()
+    } finally {
+      setDeletingPoster(false)
+    }
+  }
+
+  async function handleDeletePosterClick() {
+    if (!selectedUpload) return
+    const linkedCount = selectedUpload.linked_count ?? selectedUpload.event_count ?? 0
+    if (linkedCount === 0) {
+      if (!confirm('Delete this poster?')) return
+      await deletePoster('unlink')
+      return
+    }
+    setDeleteMode('unlink')
+    setDeleteModalOpen(true)
+  }
+
   return (
     <main style={{ padding: 16, fontFamily: 'sans-serif', display: 'grid', gridTemplateColumns: '320px 1fr 420px', gap: 12, minHeight: '90vh' }}>
       <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto' }}>
@@ -320,12 +425,31 @@ export default function BuilderCreatePage({
         <div style={{ display: 'grid', gap: 8 }}>
           {uploads.map((u) => (
             <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
-              {u.public_url && <img src={u.public_url} alt="Poster thumb" style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }} />}
-              <div style={{ fontSize: 12, marginTop: 6 }}>{new Date(u.created_at).toLocaleString()}</div>
-              <div style={{ fontSize: 12 }}>{u.is_done ? 'Done' : 'Incomplete'} • Events: {u.event_count}</div>
-              <button data-variant="secondary" onClick={() => selectPoster(u.id)} style={{ marginTop: 6 }}>
-                {selectedPosterId === u.id ? 'Selected' : 'Select'}
-              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr auto', gap: 8, alignItems: 'start' }}>
+                {u.public_url ? (
+                  <img
+                    src={u.public_url}
+                    alt="Poster thumb"
+                    style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
+                  />
+                ) : (
+                  <div style={{ width: 76, height: 76, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc' }} />
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12 }}>{new Date(u.created_at).toLocaleString()}</div>
+                  <div style={{ fontSize: 12, marginTop: 2 }}>
+                    {u.is_done ? 'Done' : 'Incomplete'} • Linked: {u.linked_count ?? u.event_count ?? 0}
+                  </div>
+                  {!!u.seen_at_name && (
+                    <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Seen at: {u.seen_at_name}
+                    </div>
+                  )}
+                </div>
+                <button data-variant="secondary" onClick={() => selectPoster(u.id)}>
+                  {selectedPosterId === u.id ? 'Selected' : 'Select'}
+                </button>
+              </div>
             </div>
           ))}
           {uploads.length === 0 && <p style={{ opacity: 0.7 }}>No incomplete posters.</p>}
@@ -337,7 +461,17 @@ export default function BuilderCreatePage({
         {!selectedUpload?.public_url && <p style={{ opacity: 0.7 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
           <>
+            <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button data-variant="secondary" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom out</button>
+              <button data-variant="secondary" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom in</button>
+              <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
+              <button data-variant="secondary" onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit-to-pins</button>
+              <button data-variant="secondary" onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center active pin</button>
+              <button onClick={markDone}>Mark done</button>
+              <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
+            </div>
             <div
+              ref={stageRef}
               onMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY }; didDragRef.current = false }}
               onMouseMove={(e) => {
                 if (!dragRef.current) return
@@ -353,8 +487,15 @@ export default function BuilderCreatePage({
             >
               <div style={{ position: 'relative', transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'top left', width: '100%' }}>
                 <img
+                  ref={imageRef}
                   src={selectedUpload.public_url}
                   alt="Poster"
+                  onLoad={(e) => {
+                    setImageNatural({
+                      width: Math.max(1, e.currentTarget.naturalWidth || 1),
+                      height: Math.max(1, e.currentTarget.naturalHeight || 1),
+                    })
+                  }}
                   onClick={(e) => {
                     if (didDragRef.current) {
                       didDragRef.current = false
@@ -415,12 +556,6 @@ export default function BuilderCreatePage({
                 )}
               </div>
             </div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button data-variant="secondary" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom +</button>
-              <button data-variant="secondary" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom -</button>
-              <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-              <button onClick={markDone}>Mark done</button>
-            </div>
           </>
         )}
       </section>
@@ -463,7 +598,12 @@ export default function BuilderCreatePage({
 
           <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
             <h4 style={{ margin: '0 0 6px 0' }}>Seen at</h4>
-            <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Seen at" style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Seen at" style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+              <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || !seenAtName.trim() || savingSeenAt}>
+                {savingSeenAt ? 'Saving...' : 'Save'}
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
@@ -474,6 +614,67 @@ export default function BuilderCreatePage({
           {message && <p style={{ margin: 0 }}>{message}</p>}
         </div>
       </section>
+
+      {deleteModalOpen && selectedUpload && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 50,
+            padding: 16,
+          }}
+          onClick={() => !deletingPoster && setDeleteModalOpen(false)}
+        >
+          <div
+            style={{ background: '#fff', width: '100%', maxWidth: 520, borderRadius: 12, border: '1px solid #e5e7eb', padding: 14 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 10px 0' }}>Delete poster</h3>
+            <div style={{ fontSize: 14, marginBottom: 8 }}>
+              <div>Created: {new Date(selectedUpload.created_at).toLocaleString()}</div>
+              {selectedUpload.seen_at_name ? <div>Seen at: {selectedUpload.seen_at_name}</div> : null}
+              <div>Linked events: {selectedUpload.linked_count ?? selectedUpload.event_count ?? 0}</div>
+            </div>
+            <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <input
+                  type="radio"
+                  name="delete_mode"
+                  checked={deleteMode === 'unlink'}
+                  onChange={() => setDeleteMode('unlink')}
+                />
+                <span>
+                  <strong>Delete poster only</strong>
+                  <br />
+                  Unlink linked events and keep events.
+                </span>
+              </label>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <input
+                  type="radio"
+                  name="delete_mode"
+                  checked={deleteMode === 'delete_with_events'}
+                  onChange={() => setDeleteMode('delete_with_events')}
+                />
+                <span>
+                  <strong>Delete poster + linked events</strong>
+                  <br />
+                  Remove this poster and all events linked from it.
+                </span>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button data-variant="secondary" onClick={() => setDeleteModalOpen(false)} disabled={deletingPoster}>Cancel</button>
+              <button data-variant="danger" onClick={() => deletePoster(deleteMode)} disabled={deletingPoster}>
+                {deletingPoster ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

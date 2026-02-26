@@ -44,17 +44,13 @@ export default function SubmitPage() {
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [objectType, setObjectType] = useState('event_poster')
-  const [seenAtLabel, setSeenAtLabel] = useState('')
-  const [seenAtNotes, setSeenAtNotes] = useState('')
+  const [seenAtName, setSeenAtName] = useState('')
   const [reuseSeenAt, setReuseSeenAt] = useState(true)
-  const [seenAtLat, setSeenAtLat] = useState<number | null>(null)
-  const [seenAtLng, setSeenAtLng] = useState<number | null>(null)
-  const [locationStatus, setLocationStatus] = useState('')
   const [lastPosterUploadId, setLastPosterUploadId] = useState<string | null>(null)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('submit_seen_at_label')
-    if (saved) setSeenAtLabel(saved)
+    const saved = window.localStorage.getItem('submit_seen_at_name')
+    if (saved) setSeenAtName(saved)
     const savedObjectType = window.localStorage.getItem('submit_object_type')
     if (savedObjectType) setObjectType(savedObjectType)
   }, [])
@@ -79,17 +75,12 @@ export default function SubmitPage() {
       const form = new FormData()
       form.append('file', resized)
       form.append('object_type', objectType)
-      form.append('seen_at_label', seenAtLabel)
-      form.append('seen_at_notes', seenAtNotes)
-      if (seenAtLat !== null) form.append('seen_at_lat', String(seenAtLat))
-      if (seenAtLng !== null) form.append('seen_at_lng', String(seenAtLng))
-      const confidence = seenAtLat !== null && seenAtLng !== null ? 'gps' : seenAtLabel.trim() ? 'typed' : 'unknown'
-      form.append('seen_at_confidence', confidence)
+      form.append('seen_at_name', seenAtName)
       if (reuseSeenAt) {
-        window.localStorage.setItem('submit_seen_at_label', seenAtLabel.trim())
+        window.localStorage.setItem('submit_seen_at_name', seenAtName.trim())
         window.localStorage.setItem('submit_object_type', objectType)
       } else {
-        window.localStorage.removeItem('submit_seen_at_label')
+        window.localStorage.removeItem('submit_seen_at_name')
       }
 
       setMessage('Uploading...')
@@ -103,11 +94,7 @@ export default function SubmitPage() {
       setMessage('Submitted.')
       setLastPosterUploadId(data?.poster_upload_id || data?.id || null)
       setFile(null)
-      setSeenAtNotes('')
-      setSeenAtLat(null)
-      setSeenAtLng(null)
-      setLocationStatus('')
-      if (!reuseSeenAt) setSeenAtLabel('')
+      if (!reuseSeenAt) setSeenAtName('')
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
     } catch {
@@ -115,27 +102,6 @@ export default function SubmitPage() {
     } finally {
       setSubmitting(false)
     }
-  }
-
-  function captureLocation() {
-    if (!navigator.geolocation) {
-      setLocationStatus('GPS unavailable on this device/browser.')
-      return
-    }
-    setLocationStatus('Capturing location...')
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(6))
-        const lng = Number(pos.coords.longitude.toFixed(6))
-        setSeenAtLat(lat)
-        setSeenAtLng(lng)
-        setLocationStatus(`Location captured (${lat}, ${lng})`)
-      },
-      () => {
-        setLocationStatus('Location not captured. You can still submit without GPS.')
-      },
-      { enableHighAccuracy: true, timeout: 12000 }
-    )
   }
 
   return (
@@ -153,24 +119,17 @@ export default function SubmitPage() {
 
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
           <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Seen at</h3>
-          <label style={{ display: 'block', marginTop: 8 }}>Seen at (where you found this poster)
-            <input value={seenAtLabel} onChange={(e) => setSeenAtLabel(e.target.value)} placeholder="e.g., Emmerson Cafe Community Board" style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+          <label style={{ display: 'block', marginTop: 8 }}>Seen at (optional)
+            <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="e.g., Emmerson Cafe Community Board" style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           </label>
           <label style={{ display: 'block', marginTop: 8 }}>Object type
             <select value={objectType} onChange={(e) => setObjectType(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               {OBJECT_TYPES.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
-          <label style={{ display: 'block', marginTop: 8 }}>Notes (optional)
-            <input value={seenAtNotes} onChange={(e) => setSeenAtNotes(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          </label>
           <label style={{ display: 'block', marginTop: 8, fontSize: 13 }}>
             <input type="checkbox" checked={reuseSeenAt} onChange={(e) => setReuseSeenAt(e.target.checked)} /> Use same seen-at for next submit
           </label>
-          <button type="button" data-variant="secondary" onClick={captureLocation} style={{ marginTop: 10 }}>
-            Use my current location
-          </button>
-          {locationStatus && <p style={{ margin: '8px 0 0 0', fontSize: 13, opacity: 0.8 }}>{locationStatus}</p>}
         </div>
 
         <input

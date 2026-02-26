@@ -18,7 +18,7 @@ type PosterUpload = {
   done?: boolean
   is_done?: boolean
   object_type?: string | null
-  seen_at_label?: string | null
+  seen_at_name?: string | null
 }
 
 type BBoxPoint = { x: number; y: number }
@@ -190,6 +190,7 @@ export default function ManagePage() {
   const [pendingFocusEventId, setPendingFocusEventId] = useState<string | null>(null)
 
   const [savingForm, setSavingForm] = useState(false)
+  const [savingSeenAt, setSavingSeenAt] = useState(false)
   const [updatingDone, setUpdatingDone] = useState(false)
   const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null)
   const [deletingUploadId, setDeletingUploadId] = useState<string | null>(null)
@@ -266,7 +267,7 @@ export default function ManagePage() {
     setTitle('')
     setLocation('')
     setDescription('')
-    setSourcePlace(selectedUpload?.seen_at_label || '')
+    setSourcePlace(selectedUpload?.seen_at_name || '')
     setEventCategory('')
     setEventAttributes([])
     setEventAudience([])
@@ -372,7 +373,7 @@ export default function ManagePage() {
 
   useEffect(() => {
     if (!isEditMode) {
-      setSourcePlace(selectedUpload?.seen_at_label || '')
+      setSourcePlace(selectedUpload?.seen_at_name || '')
     }
   }, [selectedUpload?.id, isEditMode])
 
@@ -518,20 +519,6 @@ export default function ManagePage() {
 
     setSavingForm(true)
     try {
-      const posterUploadIdForSeenAt = selectedPosterId || editingPosterUploadId
-      if (posterUploadIdForSeenAt && sourcePlace.trim()) {
-        const seenAtRes = await fetch('/api/manage/set-upload-seen-at', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            poster_upload_id: posterUploadIdForSeenAt,
-            seen_at_label: sourcePlace.trim(),
-          }),
-        })
-        const seenAtData = await seenAtRes.json().catch(() => ({}))
-        if (!seenAtRes.ok) return setFormError(seenAtData?.error || 'Failed to save Seen at')
-      }
-
       if (isEditMode && editingEventId) {
         const res = await fetch('/api/manage/update-event', {
           method: 'POST',
@@ -543,7 +530,6 @@ export default function ManagePage() {
             location,
             description,
             source_place: sourcePlace,
-            seen_at_label: sourcePlace,
             event_category: eventCategory || null,
             event_attributes: eventAttributes,
             event_audience: eventAudience,
@@ -567,7 +553,6 @@ export default function ManagePage() {
       if (!selectedPosterId) return setFormError('Select a submission first.')
       if (!point) return setFormError('Click on image to place a pin.')
 
-      const effectiveSourcePlace = sourcePlace.trim() || selectedUpload?.seen_at_label || ''
       const res = await fetch('/api/manage/create-event-from-poster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -576,7 +561,6 @@ export default function ManagePage() {
           title,
           location,
           description,
-          source_place: effectiveSourcePlace,
           event_category: eventCategory || null,
           event_attributes: eventAttributes,
           event_audience: eventAudience,
@@ -598,6 +582,31 @@ export default function ManagePage() {
       setMessage('Saved.')
     } finally {
       setSavingForm(false)
+    }
+  }
+
+  async function saveSeenAtForSelectedPoster() {
+    if (!selectedPosterId || !sourcePlace.trim()) return
+    setSavingSeenAt(true)
+    setFormError('')
+    try {
+      const res = await fetch('/api/manage/update-poster', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poster_upload_id: selectedPosterId,
+          seen_at_name: sourcePlace.trim(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setFormError(data?.error || 'Failed to save Seen at')
+        return
+      }
+      await loadUploads()
+      setMessage('Seen at saved.')
+    } finally {
+      setSavingSeenAt(false)
     }
   }
 
@@ -780,9 +789,9 @@ export default function ManagePage() {
               <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 10, padding: 8 }}>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>{formatDateTime(u.created_at)}</div>
                 <div style={{ fontSize: 13 }}>{u.status} • {u.object_type || u.type || 'event_poster'} • events: {u.event_count} • businesses: {u.business_count || 0}</div>
-                {u.seen_at_label && (
+                {u.seen_at_name && (
                   <div style={{ fontSize: 12, marginTop: 2 }}>
-                    Seen at: {u.seen_at_label}
+                    Seen at: {u.seen_at_name}
                   </div>
                 )}
                 {(u.linked_count ?? u.event_count ?? 0) === 0 && (
@@ -811,9 +820,9 @@ export default function ManagePage() {
 
           {selectedUpload?.public_url && (
             <>
-              {selectedUpload.seen_at_label && (
+              {selectedUpload.seen_at_name && (
                 <p style={{ margin: '0 0 8px 0', fontSize: 13 }}>
-                  Seen at: <strong>{selectedUpload.seen_at_label}</strong>
+                  Seen at: <strong>{selectedUpload.seen_at_name}</strong>
                 </p>
               )}
               <div
@@ -889,7 +898,12 @@ export default function ManagePage() {
             <h3 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Seen at</h3>
             <p style={{ fontSize: 12, opacity: 0.7, margin: '0 0 8px 0' }}>Seen at: where you found this poster/business card.</p>
             <label style={{ display: 'block', marginTop: 8 }}>Location name
-              <input value={sourcePlace} onChange={(e) => setSourcePlace(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <input value={sourcePlace} onChange={(e) => setSourcePlace(e.target.value)} style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                <button type="button" data-variant="secondary" onClick={saveSeenAtForSelectedPoster} disabled={!selectedPosterId || !sourcePlace.trim() || savingSeenAt}>
+                  {savingSeenAt ? 'Saving...' : 'Save'}
+                </button>
+              </div>
             </label>
           </div>
 

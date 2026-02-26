@@ -39,7 +39,6 @@ function isMissingSeenAtColumnError(error: { code?: string; message?: string } |
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('seen_at_label') ||
     message.includes('seen_at_name') ||
     message.includes('schema cache')
   )
@@ -49,10 +48,10 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
 
-  const { id, poster_upload_id, seen_at_label, title, location, description, source_type, source_place, source_detail, start_at, status, is_recurring, recurrence_rule } = body as {
+  const { id, poster_upload_id, seen_at_name, title, location, description, source_type, source_place, source_detail, start_at, status, is_recurring, recurrence_rule } = body as {
     id?: string
     poster_upload_id?: string | null
-    seen_at_label?: string | null
+    seen_at_name?: string | null
     title?: string
     location?: string
     description?: string
@@ -141,11 +140,11 @@ export async function POST(req: Request) {
     if (fallback.error) return jsonError(fallback.error.message, 500)
   }
 
-  if (typeof seen_at_label === 'string' && poster_upload_id) {
-    const seenAtValue = seen_at_label.trim() || null
+  if (typeof seen_at_name === 'string' && poster_upload_id) {
+    const seenAtValue = seen_at_name.trim() || null
     const primarySeenAt = await supabase
       .from('poster_uploads')
-      .update({ seen_at_label: seenAtValue })
+      .update({ seen_at_name: seenAtValue })
       .eq('id', poster_upload_id)
 
     if (primarySeenAt.error && isMissingSeenAtColumnError(primarySeenAt.error)) {
@@ -157,7 +156,7 @@ export async function POST(req: Request) {
         return jsonError(fallbackSeenAt.error.message, 500)
       }
       if (fallbackSeenAt.error && isMissingSeenAtColumnError(fallbackSeenAt.error)) {
-        return jsonError('Seen at columns are missing on poster_uploads. Run the DB migration for seen_at_label.', 500)
+        return jsonError('Seen at columns are missing on poster_uploads. Run the DB migration for seen_at_name.', 500)
       }
     } else if (primarySeenAt.error) {
       return jsonError(primarySeenAt.error.message, 500)

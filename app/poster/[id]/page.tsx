@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import PosterViewer from './PosterViewer'
+import PosterTagVoting from './PosterTagVoting'
 
 type PosterRow = {
   id: string
   file_path: string
   created_at?: string
-  seen_at_label?: string | null
   seen_at_name?: string | null
 }
 
@@ -18,6 +18,30 @@ type LinkRow = {
     | { id: string; title: string; start_at: string; location: string | null }
     | { id: string; title: string; start_at: string; location: string | null }[]
     | null
+}
+
+type TagRow = {
+  id: string
+  label: string
+  kind?: string | null
+  slug?: string | null
+}
+
+type EventTagRow = {
+  event_id: string
+  tag_id: string
+  tags: TagRow | TagRow[] | null
+}
+
+type TagVoteRow = {
+  event_id: string
+  tag_id: string
+  tags: TagRow | TagRow[] | null
+}
+
+type EventTagBundle = {
+  official: TagRow[]
+  suggested: Array<TagRow & { votes: number }>
 }
 
 function toGoogleCalendarUrl({
@@ -53,8 +77,8 @@ export default async function PosterPage({
   const { id } = await params
   const { event_id } = await searchParams
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !serviceKey) {
     return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Missing Supabase env vars</main>
@@ -64,7 +88,7 @@ export default async function PosterPage({
 
   const primary = await supabase
     .from('poster_uploads')
-    .select('id,file_path,created_at,seen_at_label,seen_at_name')
+    .select('id,file_path,created_at,seen_at_name')
     .eq('id', id)
     .limit(1)
 
@@ -121,6 +145,87 @@ export default async function PosterPage({
   const selectedEvent =
     (event_id ? pins.find((pin) => pin.event_id === event_id) : pins[0]) || null
 
+  const uniqueEventIds = Array.from(new Set(pins.map((pin) => pin.event_id)))
+  const tagsByEvent: Record<string, EventTagBundle> = {}
+  for (const eventId of uniqueEventIds) tagsByEvent[eventId] = { official: [], suggested: [] }
+
+  if (uniqueEventIds.length > 0) {
+    const [officialRes, votesRes] = await Promise.all([
+      supabase
+        .from('event_tags')
+        .select('event_id,tag_id,tags(id,label,kind,slug)')
+        .in('event_id', uniqueEventIds),
+      supabase
+        .from('tag_votes')
+        .select('event_id,tag_id,tags(id,label,kind,slug)')
+        .in('event_id', uniqueEventIds),
+    ])
+
+    const hasMissingTagTables = (message: string) => {
+      const lower = message.toLowerCase()
+      return (
+        lower.includes('schema cache') ||
+        lower.includes('relation "event_tags"') ||
+        lower.includes('relation "tag_votes"') ||
+        lower.includes('relation "tags"')
+      )
+    }
+
+    if (officialRes.error && !hasMissingTagTables(officialRes.error.message || '')) {
+      return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load tags: {officialRes.error.message}</main>
+    }
+    if (votesRes.error && !hasMissingTagTables(votesRes.error.message || '')) {
+      return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load tags: {votesRes.error.message}</main>
+    }
+
+    const officialRows = (officialRes.data || []) as EventTagRow[]
+    const officialKeySet = new Set<string>()
+    for (const row of officialRows) {
+      const tag = Array.isArray(row.tags) ? row.tags[0] : row.tags
+      if (!tag || !tagsByEvent[row.event_id]) continue
+      const key = `${row.event_id}:${row.tag_id}`
+      officialKeySet.add(key)
+      if (!tagsByEvent[row.event_id].official.some((t) => t.id === tag.id)) {
+        tagsByEvent[row.event_id].official.push({
+          id: tag.id,
+          label: tag.label,
+          kind: tag.kind || null,
+          slug: tag.slug || null,
+        })
+      }
+    }
+
+    const voteRows = (votesRes.data || []) as TagVoteRow[]
+    const voteMap = new Map<string, { event_id: string; tag_id: string; tag: TagRow; votes: number }>()
+    for (const row of voteRows) {
+      const tag = Array.isArray(row.tags) ? row.tags[0] : row.tags
+      if (!tag || !tagsByEvent[row.event_id]) continue
+      const key = `${row.event_id}:${row.tag_id}`
+      if (officialKeySet.has(key)) continue
+      const existing = voteMap.get(key)
+      if (existing) {
+        existing.votes += 1
+      } else {
+        voteMap.set(key, {
+          event_id: row.event_id,
+          tag_id: row.tag_id,
+          tag: { id: tag.id, label: tag.label, kind: tag.kind || null, slug: tag.slug || null },
+          votes: 1,
+        })
+      }
+    }
+    for (const value of voteMap.values()) {
+      tagsByEvent[value.event_id].suggested.push({
+        ...value.tag,
+        votes: value.votes,
+      })
+    }
+    for (const eventId of uniqueEventIds) {
+      tagsByEvent[eventId].suggested.sort((a, b) => b.votes - a.votes || a.label.localeCompare(b.label))
+      tagsByEvent[eventId].official.sort((a, b) => a.label.localeCompare(b.label))
+    }
+  }
+
   const rawPath = (poster.file_path || '').trim()
   const normalizedA = rawPath.replace(/^posters\//, '')
   const normalizedB = normalizedA.replace(/^\//, '')
@@ -128,7 +233,7 @@ export default async function PosterPage({
   const publicUrls = candidates.map((path) => supabase.storage.from('posters').getPublicUrl(path).data.publicUrl)
   const directUrl = rawPath.startsWith('http://') || rawPath.startsWith('https://') ? rawPath : ''
   const imageUrls = Array.from(new Set([directUrl, ...publicUrls].filter(Boolean)))
-  const seenAt = poster.seen_at_label || poster.seen_at_name || null
+  const seenAt = poster.seen_at_name || null
   const sourceLabel = seenAt ? `Seen at: ${seenAt}` : null
 
   return (
@@ -214,6 +319,10 @@ export default async function PosterPage({
       )}
       {sourceLabel && <p style={{ margin: '0 0 8px 0', fontSize: 14 }}>{sourceLabel}</p>}
       <PosterViewer key={`${id}:${event_id || 'none'}`} imageUrls={imageUrls} pins={pins} activeEventId={event_id || null} />
+      <PosterTagVoting
+        events={pins.map((pin) => ({ event_id: pin.event_id, title: pin.title }))}
+        initialTagsByEvent={tagsByEvent}
+      />
     </main>
   )
 }
