@@ -6,7 +6,7 @@ type PublicEventRow = {
   id: string
   title: string
   location: string | null
-  seen_at_label: string | null
+  seen_at_name: string | null
   start_at: string
   status: 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
   created_at: string
@@ -139,9 +139,9 @@ function EventList({
                 {e.event_attributes.slice(0, 4).join(' • ')}
               </div>
             )}
-            {e.seen_at_label && (
+            {e.seen_at_name && (
               <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6 }}>
-                Seen at: {e.seen_at_label}
+                Seen at: {e.seen_at_name}
               </div>
             )}
             <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -208,7 +208,7 @@ function EventList({
                     title: e.title,
                     start_at: e.start_at,
                     location: e.location,
-                    description: [e.description || '', e.seen_at_label ? `Seen at: ${e.seen_at_label}` : ''].filter(Boolean).join('\n'),
+                    description: [e.description || '', e.seen_at_name ? `Seen at: ${e.seen_at_name}` : ''].filter(Boolean).join('\n'),
                   })}
                   target="_blank"
                   rel="noreferrer"

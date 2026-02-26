@@ -20,8 +20,8 @@ export async function POST(req: Request) {
   const voterVid = req.headers.get('x-cb-vid')?.trim() || ''
   if (!voterVid) return jsonError('x-cb-vid header is required')
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })

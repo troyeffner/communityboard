@@ -17,8 +17,8 @@ export async function POST(req: Request) {
   if (!poster_upload_id) return jsonError('poster_upload_id is required')
   if (typeof processed !== 'boolean') return jsonError('processed must be a boolean')
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })

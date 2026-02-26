@@ -14,8 +14,8 @@ type BusinessRow = {
 }
 
 export default async function BusinessesPage() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) {
     return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Missing Supabase env vars</main>
   }

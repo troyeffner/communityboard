@@ -14,30 +14,64 @@ function fingerprintFromRequest(req: Request) {
   return createHash('sha256').update(`${ip}|${ua}`).digest('hex')
 }
 
+function toSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
+
   const eventId = String(body.event_id || '').trim()
-  const tagId = String(body.tag_id || '').trim()
-  if (!eventId || !tagId) return jsonError('event_id and tag_id are required')
+  const rawLabel = String(body.label || '').trim()
+  const kindRaw = String(body.kind || 'attribute').trim().toLowerCase()
+  if (!eventId) return jsonError('event_id is required')
+  if (!rawLabel) return jsonError('label is required')
+  const kind = kindRaw === 'category' || kindRaw === 'audience' ? kindRaw : 'attribute'
+  const slug = toSlug(rawLabel)
+  if (!slug) return jsonError('label must contain letters or numbers')
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
-  const fingerprint = fingerprintFromRequest(req)
 
+  const existingTag = await supabase
+    .from('tags')
+    .select('id,label,kind,slug')
+    .eq('slug', slug)
+    .maybeSingle()
+  if (existingTag.error) return jsonError(existingTag.error.message, 500)
+
+  let tagId = existingTag.data?.id as string | undefined
+  if (!tagId) {
+    const insertTag = await supabase.from('tags').insert([{ label: rawLabel, kind, slug }]).select('id').single()
+    if (insertTag.error) {
+      if (insertTag.error.code === '23505') {
+        const retry = await supabase.from('tags').select('id').eq('slug', slug).single()
+        if (retry.error) return jsonError(retry.error.message, 500)
+        tagId = retry.data?.id as string | undefined
+      } else {
+        return jsonError(insertTag.error.message, 500)
+      }
+    } else {
+      tagId = insertTag.data?.id as string | undefined
+    }
+  }
+  if (!tagId) return jsonError('Failed to resolve tag id', 500)
+
+  const fingerprint = fingerprintFromRequest(req)
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const recentVotes = await supabase
     .from('tag_votes')
     .select('event_id', { count: 'exact', head: true })
     .eq('voter_fingerprint', fingerprint)
     .gte('created_at', cutoff)
-  if (recentVotes.error) {
-    const message = (recentVotes.error.message || '').toLowerCase()
-    if (message.includes('relation "tag_votes"')) return jsonError('Tag voting is not enabled yet. Run migrations.', 500)
-    return jsonError(recentVotes.error.message, 500)
-  }
+  if (recentVotes.error) return jsonError(recentVotes.error.message, 500)
   if ((recentVotes.count || 0) >= 30) return jsonError('Vote limit reached (30 per 24h).', 429)
 
   const insertVote = await supabase
@@ -62,5 +96,10 @@ export async function POST(req: Request) {
     promoted = true
   }
 
-  return NextResponse.json({ ok: true, votes, promoted })
+  return NextResponse.json({
+    ok: true,
+    tag: { id: tagId, label: existingTag.data?.label || rawLabel, kind: existingTag.data?.kind || kind, slug },
+    votes,
+    promoted,
+  })
 }
