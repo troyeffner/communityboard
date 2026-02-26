@@ -124,6 +124,7 @@ export async function POST(req: Request) {
   }
 
   if (insertErr) return jsonError(insertErr.message, 500)
+  if (!row?.id) return jsonError('Failed to create upload record', 500)
 
   return NextResponse.json({ ok: true, id: row.id, poster_upload_id: row.id })
 }
