@@ -16,7 +16,7 @@ function formatNY(iso: string) {
 export default async function Home() {
   const { data: events, error } = await supabase
     .from('events')
-    .select('id,title,start_at,status')
+    .select('id,title,location,start_at,status')
     .order('start_at', { ascending: true })
 
   return (
@@ -36,7 +36,7 @@ export default async function Home() {
         <ul>
           {events.map((e) => (
             <li key={e.id}>
-              <strong>{e.title}</strong> — {formatNY(e.start_at)}
+              <strong>{e.title}</strong> — {formatNY(e.start_at)}{e.location ? ` • ${e.location}` : ''}
             </li>
           ))}
         </ul>
