@@ -12,7 +12,7 @@ export async function PATCH(req: Request) {
   if (!eventId) return jsonError('event_id is required')
 
   const allowed: Record<string, unknown> = {}
-  const fields = ['title', 'description', 'start_at', 'end_at', 'location', 'event_location_name', 'event_location_address', 'is_recurring', 'recurrence_rule', 'status', 'event_category', 'event_attributes', 'event_audience']
+  const fields = ['title', 'description', 'start_at', 'end_at', 'location', 'event_location_name', 'event_location_address', 'status', 'event_category', 'event_attributes', 'event_audience']
   for (const key of fields) {
     if (key in body) allowed[key] = body[key]
   }
@@ -47,7 +47,7 @@ export async function PATCH(req: Request) {
     if (!optionalMissing) return jsonError(update.error.message, 500)
 
     const fallbackAllowed: Record<string, unknown> = {}
-    const fallbackFields = ['title', 'description', 'start_at', 'end_at', 'location', 'is_recurring', 'recurrence_rule', 'status']
+    const fallbackFields = ['title', 'description', 'start_at', 'end_at', 'location', 'status']
     for (const key of fallbackFields) {
       if (key in allowed) fallbackAllowed[key] = allowed[key]
     }

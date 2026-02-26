@@ -2,7 +2,7 @@ export const POSTER_STATUSES = {
   NEW: 'new',
   UPLOADED: 'uploaded',
   TENDING: 'tending',
-  DONE: 'done',
+  DONE: 'processed',
 } as const
 
 export const EVENT_STATUSES = {
@@ -20,6 +20,7 @@ export const EVENT_STATUS_VALUES: EventStatus[] = Object.values(EVENT_STATUSES)
 
 export function normalizePosterStatus(raw: unknown, fallback: PosterStatus = POSTER_STATUSES.NEW): PosterStatus {
   const value = String(raw || '').trim().toLowerCase()
+  if (value === 'done') return POSTER_STATUSES.DONE
   if (POSTER_STATUS_VALUES.includes(value as PosterStatus)) return value as PosterStatus
   return fallback
 }

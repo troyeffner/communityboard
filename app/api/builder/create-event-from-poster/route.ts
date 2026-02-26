@@ -55,8 +55,6 @@ export async function POST(req: Request) {
       description: description || null,
       start_at: nyIsoGuess,
       status: normalizedStatus,
-      is_recurring: Boolean(body.is_recurring),
-      recurrence_rule: body.is_recurring ? String(body.recurrence_rule || '').trim() || null : null,
       event_category: String(body.event_category || '').trim() || null,
       event_attributes: eventAttributes,
       event_audience: Array.isArray(body.event_audience) ? body.event_audience : [],
@@ -76,6 +74,8 @@ export async function POST(req: Request) {
       message.includes('event_category') ||
       message.includes('event_location_name') ||
       message.includes('event_location_address') ||
+      message.includes('recurrence_rule') ||
+      message.includes('is_recurring') ||
       message.includes('schema cache')
 
     if (!optionalMissing) return jsonError(create.error.message, 500)

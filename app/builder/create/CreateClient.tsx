@@ -25,8 +25,6 @@ type PosterEventRow = {
     description?: string | null
     start_at: string
     status: string
-    is_recurring?: boolean | null
-    recurrence_rule?: string | null
   }
 }
 
@@ -54,6 +52,13 @@ function statusLabel(statusValue: string) {
   return statusValue
 }
 
+function friendlyError(message: string | undefined, fallback: string) {
+  const msg = (message || '').toLowerCase()
+  if (msg.includes('enum')) return 'Status value is not supported by this environment yet.'
+  if (msg.includes('schema cache') || msg.includes('column')) return 'Database schema is out of date for this action.'
+  return message || fallback
+}
+
 export default function BuilderCreatePage({
   initialPosterId,
   initialManualMode = false,
@@ -76,10 +81,7 @@ export default function BuilderCreatePage({
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [startAt, setStartAt] = useState(defaultStartAt2pmLocal())
-  const [isRecurring, setIsRecurring] = useState(false)
-  const [recurrenceRule, setRecurrenceRule] = useState('')
   const [seenAtName, setSeenAtName] = useState('')
-  const [eventStatus, setEventStatus] = useState<'draft' | 'published' | 'planted' | 'unpublished'>(EVENT_STATUSES.DRAFT)
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadingPoster, setUploadingPoster] = useState(false)
@@ -102,7 +104,7 @@ export default function BuilderCreatePage({
   async function loadUploads() {
     const res = await fetch('/api/manage/list-uploads-with-counts')
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Failed to load posters')
+    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to load posters'))
     setUploads((data.uploads || []) as Upload[])
   }
 
@@ -113,7 +115,7 @@ export default function BuilderCreatePage({
     }
     const res = await fetch(`/api/manage/poster-events?poster_upload_id=${encodeURIComponent(uploadId)}`)
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Failed to load events on poster')
+    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to load events on poster'))
     setRows((data.rows || []) as PosterEventRow[])
   }
 
@@ -142,7 +144,7 @@ export default function BuilderCreatePage({
   async function goToNextUntendedPoster() {
     const res = await fetch('/api/builder/next-poster')
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Failed to load next poster')
+    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to load next poster'))
     const nextId = data?.poster?.id as string | undefined
     if (!nextId) return setMessage('No untended posters in queue.')
     await loadUploads()
@@ -161,9 +163,6 @@ export default function BuilderCreatePage({
     setLocation('')
     setDescription('')
     setStartAt(defaultStartAt2pmLocal())
-    setIsRecurring(false)
-    setRecurrenceRule('')
-    setEventStatus(EVENT_STATUSES.DRAFT)
     setSeenAtName(upload?.seen_at_name || '')
     setZoom(1)
     setPan({ x: 0, y: 0 })
@@ -178,9 +177,6 @@ export default function BuilderCreatePage({
     setLocation(row.event.location || '')
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
-    setEventStatus(normalizeEventStatus(row.event.status, EVENT_STATUSES.DRAFT))
-    setIsRecurring(Boolean(row.event.is_recurring))
-    setRecurrenceRule(row.event.recurrence_rule || '')
     setSeenAtName(selectedUpload?.seen_at_name || '')
   }
 
@@ -191,9 +187,6 @@ export default function BuilderCreatePage({
     setLocation('')
     setDescription('')
     setStartAt(defaultStartAt2pmLocal())
-    setIsRecurring(false)
-    setRecurrenceRule('')
-    setEventStatus(EVENT_STATUSES.DRAFT)
   }
 
   async function saveSeenAt() {
@@ -210,7 +203,7 @@ export default function BuilderCreatePage({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data?.error || 'Failed to save Seen at')
+        setError(friendlyError(data?.error, 'Failed to save Seen at'))
         return false
       }
       try {
@@ -228,9 +221,9 @@ export default function BuilderCreatePage({
   async function saveEvent() {
     setError('')
     setMessage('')
-    if (!title.trim()) return setError('Title is required.')
     if (!startAt.trim()) return setError('Start time is required.')
     if (!selectedPosterId && !manualMode) return setError('Select a poster first.')
+    const effectiveTitle = title.trim() || 'Untitled draft'
 
     setSaving(true)
     try {
@@ -240,16 +233,14 @@ export default function BuilderCreatePage({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             event_id: editingEventId,
-            title,
+            title: effectiveTitle,
             location,
             description,
             start_at: startAt,
-            is_recurring: isRecurring,
-            recurrence_rule: isRecurring ? recurrenceRule : null,
           }),
         })
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) return setError(data?.error || 'Failed to update event')
+        if (!res.ok) return setError(friendlyError(data?.error, 'Failed to update event'))
         setMessage('Updated.')
         await loadRows(selectedPosterId)
         await loadUploads()
@@ -261,17 +252,14 @@ export default function BuilderCreatePage({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            title,
+            title: effectiveTitle,
             location,
             description,
             start_at: startAt,
-            is_recurring: isRecurring,
-            recurrence_rule: isRecurring ? recurrenceRule : null,
-            status: eventStatus,
           }),
         })
         const manualData = await manualRes.json().catch(() => ({}))
-        if (!manualRes.ok) return setError(manualData?.error || 'Failed to create draft event')
+        if (!manualRes.ok) return setError(friendlyError(manualData?.error, 'Failed to create draft event'))
         setMessage('Saved as draft.')
         resetFormToNew()
         return
@@ -284,17 +272,14 @@ export default function BuilderCreatePage({
         body: JSON.stringify({
           poster_upload_id: selectedPosterId,
           bbox: point,
-          title,
+          title: effectiveTitle,
           location,
           description,
           start_at: startAt,
-          status: eventStatus,
-          is_recurring: isRecurring,
-          recurrence_rule: isRecurring ? recurrenceRule : null,
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) return setError(data?.error || 'Failed to create event')
+      if (!res.ok) return setError(friendlyError(data?.error, 'Failed to create event'))
       setMessage('Saved.')
       setPoint(null)
       resetFormToNew()
@@ -316,7 +301,7 @@ export default function BuilderCreatePage({
       if (seenAtName.trim()) form.append('seen_at_name', seenAtName.trim())
       const res = await fetch('/api/submit/upload', { method: 'POST', body: form })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) return setError(data?.error || 'Upload failed')
+      if (!res.ok) return setError(friendlyError(data?.error, 'Upload failed'))
       const newPosterId = String(data?.poster_upload_id || data?.id || '').trim()
       if (!newPosterId) return setError('Upload succeeded but missing poster ID')
       setMessage('Poster uploaded.')
@@ -345,7 +330,7 @@ export default function BuilderCreatePage({
       body: JSON.stringify({ link_id: row.link_id, mode }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Delete failed')
+    if (!res.ok) return setError(friendlyError(data?.error, 'Delete failed'))
     if (editingEventId === row.event.id) resetFormToNew()
     setPoint(null)
     await loadRows(selectedPosterId)
@@ -360,7 +345,7 @@ export default function BuilderCreatePage({
       body: JSON.stringify({ poster_upload_id: selectedPosterId, is_done: true }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Failed to mark done')
+    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to mark done'))
     setSelectedPosterId(null)
     setRows([])
     await loadUploads()
@@ -435,7 +420,7 @@ export default function BuilderCreatePage({
         body: JSON.stringify({ poster_upload_id: selectedPosterId, mode }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) return setError(data?.error || 'Failed to delete poster')
+      if (!res.ok) return setError(friendlyError(data?.error, 'Failed to delete poster'))
 
       setDeleteModalOpen(false)
       setSelectedPosterId(null)
@@ -528,7 +513,7 @@ export default function BuilderCreatePage({
         </div>
       </section>
 
-      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
         <h2 style={{ marginTop: 0 }}>Poster workspace</h2>
         {!selectedUpload?.public_url && <p style={{ opacity: 0.7 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
@@ -630,35 +615,55 @@ export default function BuilderCreatePage({
               <button onClick={markDone}>Mark Done</button>
               <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
             </div>
+            <div style={{ marginTop: 10, border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>Captured</div>
+              <div style={{ fontSize: 14, marginBottom: 8 }}>{new Date(selectedUpload.created_at).toLocaleString()}</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>Poster status</div>
+              <div style={{ fontSize: 14, marginBottom: 8 }}>{normalizePosterStatus(selectedUpload.status)}</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>Seen at (CNAT)</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <input
+                  value={seenAtName}
+                  onChange={(e) => setSeenAtName(e.target.value)}
+                  placeholder="Seen at"
+                  style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}
+                />
+                <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
+                  {savingSeenAt ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <h3 style={{ margin: '0 0 8px 0' }}>Events on this poster</h3>
+              {rows.length === 0 ? (
+                <p style={{ opacity: 0.75, margin: 0 }}>No events yet. Click image to add a new pin and event.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {rows.map((row) => (
+                    <div key={row.link_id} style={{ border: activeLinkId === row.link_id ? '2px solid #ef4444' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                      <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft event)'}</div>
+                      <div style={{ fontSize: 12, opacity: 0.85 }}>
+                        {new Date(row.event.start_at).toLocaleString()} • {statusLabel(row.event.status)}
+                      </div>
+                      <div style={{ fontSize: 12, opacity: 0.75 }}>linked: {new Date(row.created_at).toLocaleString()}</div>
+                      <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                        <button data-variant="secondary" onClick={() => startEdit(row)}>Edit</button>
+                        <button data-variant="danger" onClick={() => deleteEventRow(row)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
       </section>
 
       <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto' }}>
-        <h2 style={{ marginTop: 0 }}>Events on this poster</h2>
-        {rows.length === 0 ? (
-          <p style={{ opacity: 0.75 }}>No events yet. Click image to add a new pin and event.</p>
-        ) : (
-          <div style={{ display: 'grid', gap: 8 }}>
-            {rows.map((row) => (
-              <div key={row.link_id} style={{ border: activeLinkId === row.link_id ? '2px solid #ef4444' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
-                <div style={{ fontWeight: 600 }}>{row.event.title}</div>
-                <div style={{ fontSize: 12, opacity: 0.85 }}>
-                  {new Date(row.event.start_at).toLocaleString()} • {statusLabel(row.event.status)}
-                </div>
-                <div style={{ fontSize: 12, opacity: 0.75 }}>linked: {new Date(row.created_at).toLocaleString()}</div>
-                <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
-                  <button data-variant="secondary" onClick={() => startEdit(row)}>Edit</button>
-                  <button data-variant="danger" onClick={() => deleteEventRow(row)}>Delete</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
+        <h2 style={{ marginTop: 0 }}>Inspector</h2>
         <h3 style={{ marginTop: 14 }}>{editingEventId ? 'Edit event' : 'Create event'}</h3>
         <div style={{ display: 'grid', gap: 8 }}>
-          <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>New submissions are saved as draft and published later via approval workflow.</p>
+          <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>Select a pin to edit, or click image to create a pinned draft.</p>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           {!editingEventId && (
             <div style={{ fontSize: 12, opacity: 0.75 }}>
@@ -668,25 +673,9 @@ export default function BuilderCreatePage({
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
           <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          <label style={{ fontSize: 13, fontWeight: 600 }}>
-            <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} /> Recurring
-          </label>
-          {isRecurring && (
-            <input value={recurrenceRule} onChange={(e) => setRecurrenceRule(e.target.value)} placeholder="Recurrence rule" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          )}
-
-          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
-            <h4 style={{ margin: '0 0 6px 0' }}>Seen at</h4>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Seen at" style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-              <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || !seenAtName.trim() || savingSeenAt}>
-                {savingSeenAt ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveEvent} disabled={saving || !title.trim()}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Create Draft Event'}</button>
+            <button onClick={saveEvent} disabled={saving}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Create Draft Event'}</button>
             {(editingEventId || point) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
           </div>
           {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}

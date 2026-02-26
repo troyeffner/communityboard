@@ -9,8 +9,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('recurrence_rule') ||
-    message.includes('is_recurring') ||
     message.includes('description') ||
     message.includes('source_type') ||
     message.includes('source_place') ||
@@ -35,8 +33,6 @@ type EventRow = {
   source_detail?: string | null
   start_at: string
   status: EventStatus
-  is_recurring?: boolean | null
-  recurrence_rule?: string | null
   event_category?: string | null
   event_attributes?: string[] | null
   event_audience?: string[] | null
@@ -64,7 +60,7 @@ export async function GET(req: Request) {
 
   const primary = await supabase
     .from('poster_event_links')
-    .select('id, bbox, created_at, events ( id, title, location, description, source_type, source_place, source_detail, start_at, status, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name, event_location_address )')
+    .select('id, bbox, created_at, events ( id, title, location, description, source_type, source_place, source_detail, start_at, status, event_category, event_attributes, event_audience, event_location_name, event_location_address )')
     .eq('poster_upload_id', poster_upload_id)
     .order('created_at', { ascending: false })
 

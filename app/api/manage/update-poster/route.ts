@@ -38,7 +38,7 @@ export async function PATCH(req: Request) {
     .from('poster_uploads')
     .update(updates)
     .eq('id', posterUploadId)
-    .select('id,file_path,status,created_at,seen_at_name,done,is_done,processed_at')
+    .select('id,file_path,status,created_at,seen_at_name')
     .maybeSingle()
 
   if (result.error && isMissingSeenAtName(result.error)) {
@@ -50,7 +50,7 @@ export async function PATCH(req: Request) {
       .from('poster_uploads')
       .update(fallbackUpdates)
       .eq('id', posterUploadId)
-      .select('id,file_path,status,created_at,done,is_done,processed_at')
+      .select('id,file_path,status,created_at')
       .maybeSingle()
   }
 

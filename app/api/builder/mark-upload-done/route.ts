@@ -12,6 +12,7 @@ function isMissingDoneColumns(error: { code?: string; message?: string } | null 
     error?.code === '42703' ||
     message.includes('done') ||
     message.includes('is_done') ||
+    message.includes('processed_at') ||
     message.includes('schema cache')
   )
 }
@@ -28,6 +29,10 @@ export async function POST(req: Request) {
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
+  // Status transition:
+  // new/uploaded -> tending while poster is being worked.
+  // tending -> processed when builder marks poster complete.
+  // We intentionally do not write status='done' to avoid enum drift across environments.
   const nextStatus = isDone ? POSTER_STATUSES.DONE : POSTER_STATUSES.TENDING
 
   let update = await supabase
@@ -38,6 +43,12 @@ export async function POST(req: Request) {
     update = await supabase
       .from('poster_uploads')
       .update({ status: nextStatus, processed_at: isDone ? new Date().toISOString() : null })
+      .eq('id', posterUploadId)
+  }
+  if (update.error && isMissingDoneColumns(update.error)) {
+    update = await supabase
+      .from('poster_uploads')
+      .update({ status: nextStatus })
       .eq('id', posterUploadId)
   }
   if (update.error) return jsonError(update.error.message, 500)

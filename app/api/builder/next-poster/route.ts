@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { POSTER_STATUSES } from '@/lib/statuses'
+import { POSTER_STATUSES, normalizePosterStatus } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -16,11 +16,11 @@ export async function GET() {
   const query = await supabase
     .from('poster_uploads')
     .select('id,created_at,status')
-    .neq('status', POSTER_STATUSES.DONE)
     .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+    .limit(200)
 
   if (query.error) return jsonError(query.error.message, 500)
-  return NextResponse.json({ poster: query.data || null })
+  const rows = (query.data || []) as Array<{ id: string; created_at: string; status: string | null }>
+  const next = rows.find((row) => normalizePosterStatus(row.status || '') !== POSTER_STATUSES.DONE) || null
+  return NextResponse.json({ poster: next })
 }
