@@ -5,13 +5,33 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
+function isMissingRecurrenceColumnError(error: { code?: string; message?: string } | null | undefined) {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '42703' ||
+    message.includes('recurrence_rule') ||
+    message.includes('is_recurring') ||
+    message.includes('description') ||
+    message.includes('source_type') ||
+    message.includes('source_place') ||
+    message.includes('source_detail') ||
+    message.includes('schema cache')
+  )
+}
+
 type EventStatus = 'draft' | 'published'
 type EventRow = {
   id: string
   title: string
   location: string | null
+  description?: string | null
+  source_type?: string | null
+  source_place?: string | null
+  source_detail?: string | null
   start_at: string
   status: EventStatus
+  is_recurring?: boolean | null
+  recurrence_rule?: string | null
 }
 
 type LinkRow = {
@@ -32,13 +52,25 @@ export async function GET(req: Request) {
 
   const supabase = createClient(supabaseUrl, serviceKey)
 
-  const { data, error } = await supabase
+  const primary = await supabase
     .from('poster_event_links')
-    .select('id, bbox, created_at, events ( id, title, location, start_at, status )')
+    .select('id, bbox, created_at, events ( id, title, location, description, source_type, source_place, source_detail, start_at, status, is_recurring, recurrence_rule )')
     .eq('poster_upload_id', poster_upload_id)
     .order('created_at', { ascending: false })
 
-  if (error) return jsonError(error.message, 500)
+  let data = primary.data
+  if (primary.error) {
+    if (!isMissingRecurrenceColumnError(primary.error)) return jsonError(primary.error.message, 500)
+
+    const fallback = await supabase
+      .from('poster_event_links')
+      .select('id, bbox, created_at, events ( id, title, location, description, start_at, status )')
+      .eq('poster_upload_id', poster_upload_id)
+      .order('created_at', { ascending: false })
+
+    if (fallback.error) return jsonError(fallback.error.message, 500)
+    data = fallback.data
+  }
 
   const rows = ((data || []) as LinkRow[])
     .map((r) => {

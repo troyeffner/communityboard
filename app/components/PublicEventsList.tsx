@@ -1,12 +1,11 @@
 'use client'
+import { useState } from 'react'
 
 type PublicEventRow = {
   id: string
   title: string
   location: string | null
-  source_type: string | null
-  source_place: string | null
-  source_detail: string | null
+  seen_at_label: string | null
   start_at: string
   status: 'draft' | 'published'
   created_at: string
@@ -53,14 +52,6 @@ function humanizeRecurrence(rule: string | null, startAt: string) {
   return rule
 }
 
-function sourceTypeLabel(value: string | null) {
-  if (!value) return 'Unknown source'
-  return value
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
 function toGoogleCalendarUrl({
   title,
   start_at,
@@ -93,22 +84,36 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
     <>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {rows.map((e) => (
-          <li key={e.id} style={{ borderBottom: '1px solid #eee', padding: '12px 0' }}>
-            <div>
-              <strong>{e.title}</strong> — {formatNY(e.start_at, { hour: 'numeric', minute: '2-digit' })}
-              {e.location ? ` • ${e.location}` : ''}
-            </div>
-            {e.source_place && (
-              <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>
-                Poster found: {e.source_place} — {sourceTypeLabel(e.source_type)}
-                {e.source_detail ? ` (${e.source_detail})` : ''}
+          <li key={e.id} style={{ marginBottom: 10 }}>
+            <article
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 12,
+                padding: 14,
+                background: '#fff',
+              }}
+            >
+              <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.2 }}>{e.title}</div>
+              <div style={{ marginTop: 6, fontSize: 16, color: '#111827' }}>
+                {formatNY(e.start_at, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </div>
+            {e.location && <div style={{ marginTop: 4, fontSize: 15, color: '#1f2937' }}>Location: {e.location}</div>}
+            {e.seen_at_label && (
+              <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6 }}>
+                Seen at: {e.seen_at_label}
               </div>
             )}
-            <div style={{ fontSize: 13, opacity: 0.7, marginTop: 4 }}>
+            <div style={{ fontSize: 13, opacity: 0.75, marginTop: 6 }}>
               Created: {formatNY(e.created_at)}
             </div>
             {e.is_recurring && (
-              <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>
+              <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
                 {humanizeRecurrence(e.recurrence_rule, e.start_at)}
               </div>
             )}
@@ -126,6 +131,8 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
                       color: '#1d4ed8',
                       fontWeight: 600,
                       textDecoration: 'none',
+                      minHeight: 44,
+                      lineHeight: '30px',
                     }}
                   >
                     View Poster
@@ -136,7 +143,7 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
                     title: e.title,
                     start_at: e.start_at,
                     location: e.location,
-                    description: e.source_place ? `Poster found: ${e.source_place}` : '',
+                    description: e.seen_at_label ? `Seen at: ${e.seen_at_label}` : '',
                   })}
                   target="_blank"
                   rel="noreferrer"
@@ -149,6 +156,8 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
                     color: '#111827',
                     fontWeight: 600,
                     textDecoration: 'none',
+                    minHeight: 44,
+                    lineHeight: '30px',
                   }}
                 >
                   Add to Google Calendar
@@ -164,6 +173,8 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
                     color: '#111827',
                     fontWeight: 600,
                     textDecoration: 'none',
+                    minHeight: 44,
+                    lineHeight: '30px',
                   }}
                 >
                   Download .ics
@@ -189,6 +200,8 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
                     color: '#111827',
                     fontWeight: 600,
                     textDecoration: 'none',
+                    minHeight: 44,
+                    lineHeight: '30px',
                   }}
                 >
                   Add to Google Calendar
@@ -204,12 +217,15 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
                     color: '#111827',
                     fontWeight: 600,
                     textDecoration: 'none',
+                    minHeight: 44,
+                    lineHeight: '30px',
                   }}
                 >
                   Download .ics
                 </a>
               </div>
             )}
+            </article>
           </li>
         ))}
       </ul>
@@ -218,24 +234,38 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
 }
 
 export default function PublicEventsList({ sections }: { sections: Sections }) {
+  const [collapsed, setCollapsed] = useState({
+    today: false,
+    thisWeek: false,
+    upcoming: false,
+    recurring: false,
+  })
+
+  function renderSection(key: 'today' | 'thisWeek' | 'upcoming' | 'recurring', title: string, rows: PublicEventRow[]) {
+    const isCollapsed = collapsed[key]
+    return (
+      <section style={{ border: '1px solid #dbe3f0', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <h2 style={{ margin: 0, fontSize: 22 }}>{title}</h2>
+          <button
+            data-variant="secondary"
+            onClick={() => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))}
+            style={{ minHeight: 40, padding: '6px 10px' }}
+          >
+            {isCollapsed ? 'Show' : 'Hide'}
+          </button>
+        </div>
+        {!isCollapsed && <div style={{ marginTop: 8 }}><EventList rows={rows} /></div>}
+      </section>
+    )
+  }
+
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-        <h2 style={{ marginTop: 0, marginBottom: 8 }}>Today</h2>
-        <EventList rows={sections.today} />
-      </section>
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-        <h2 style={{ marginTop: 0, marginBottom: 8 }}>This Week</h2>
-        <EventList rows={sections.thisWeek} />
-      </section>
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-        <h2 style={{ marginTop: 0, marginBottom: 8 }}>Upcoming</h2>
-        <EventList rows={sections.upcoming} />
-      </section>
-      <section style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-        <h2 style={{ marginTop: 0, marginBottom: 8 }}>Recurring</h2>
-        <EventList rows={sections.recurring} />
-      </section>
+      {renderSection('today', 'Today', sections.today)}
+      {renderSection('thisWeek', 'This Week', sections.thisWeek)}
+      {renderSection('upcoming', 'Upcoming', sections.upcoming)}
+      {renderSection('recurring', 'Recurring', sections.recurring)}
     </div>
   )
 }

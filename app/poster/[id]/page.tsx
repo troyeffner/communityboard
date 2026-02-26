@@ -1,11 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import Link from 'next/link'
 import PosterViewer from './PosterViewer'
 
 type PosterRow = {
   id: string
   file_path: string
+  created_at?: string
+  seen_at_label?: string | null
   seen_at_name?: string | null
-  seen_at_type?: string | null
 }
 
 type LinkRow = {
@@ -16,11 +18,6 @@ type LinkRow = {
     | { id: string; title: string; start_at: string; location: string | null }
     | { id: string; title: string; start_at: string; location: string | null }[]
     | null
-}
-
-function formatSourceType(value?: string | null) {
-  if (!value) return null
-  return value.replace(/_/g, ' ')
 }
 
 function toGoogleCalendarUrl({
@@ -67,7 +64,7 @@ export default async function PosterPage({
 
   const primary = await supabase
     .from('poster_uploads')
-    .select('id,file_path,seen_at_name,seen_at_type')
+    .select('id,file_path,created_at,seen_at_label,seen_at_name')
     .eq('id', id)
     .limit(1)
 
@@ -78,15 +75,24 @@ export default async function PosterPage({
     if (!missingSeen) {
       return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load poster: {primary.error.message}</main>
     }
-    const fallback = await supabase
+    const fallbackWithName = await supabase
       .from('poster_uploads')
-      .select('id,file_path')
+      .select('id,file_path,created_at,seen_at_name')
       .eq('id', id)
       .limit(1)
-    if (fallback.error) {
-      return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load poster: {fallback.error.message}</main>
+    if (!fallbackWithName.error) {
+      poster = (fallbackWithName.data?.[0] || null) as PosterRow | null
+    } else {
+      const fallback = await supabase
+        .from('poster_uploads')
+        .select('id,file_path,created_at')
+        .eq('id', id)
+        .limit(1)
+      if (fallback.error) {
+        return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load poster: {fallback.error.message}</main>
+      }
+      poster = (fallback.data?.[0] || null) as PosterRow | null
     }
-    poster = (fallback.data?.[0] || null) as PosterRow | null
   }
 
   if (!poster) return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Poster not found</main>
@@ -115,22 +121,51 @@ export default async function PosterPage({
   const selectedEvent =
     (event_id ? pins.find((pin) => pin.event_id === event_id) : pins[0]) || null
 
-  const imageUrl = supabase.storage.from('posters').getPublicUrl(poster.file_path).data.publicUrl
-  const sourceLabel = poster.seen_at_name
-    ? `Seen at: ${poster.seen_at_name}${poster.seen_at_type ? ` (${formatSourceType(poster.seen_at_type)})` : ''}`
+  const rawPath = (poster.file_path || '').trim()
+  const normalizedA = rawPath.replace(/^posters\//, '')
+  const normalizedB = normalizedA.replace(/^\//, '')
+  const candidates = [rawPath, normalizedA, normalizedB].filter(Boolean)
+  const publicUrls = candidates.map((path) => supabase.storage.from('posters').getPublicUrl(path).data.publicUrl)
+  const directUrl = rawPath.startsWith('http://') || rawPath.startsWith('https://') ? rawPath : ''
+  const imageUrls = Array.from(new Set([directUrl, ...publicUrls].filter(Boolean)))
+  const seenAt = poster.seen_at_label || poster.seen_at_name || null
+  const sourceLabel = seenAt
+    ? `Seen at: ${seenAt}`
     : null
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <h1 style={{ marginTop: 0, marginBottom: 8 }}>{selectedEvent?.title || 'Poster View'}</h1>
-      {selectedEvent?.start_at && (
-        <p style={{ margin: '0 0 4px 0', opacity: 0.8 }}>
-          {new Date(selectedEvent.start_at).toLocaleString()}
-          {selectedEvent.location ? ` • ${selectedEvent.location}` : ''}
-        </p>
-      )}
+    <main style={{ maxWidth: 900, margin: '0 auto', padding: '16px 16px 24px', fontFamily: 'sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div>
+          <h1 style={{ marginTop: 0, marginBottom: 8, fontSize: 28 }}>{selectedEvent?.title || 'Poster View'}</h1>
+          {selectedEvent?.start_at && (
+            <p style={{ margin: '0 0 4px 0', opacity: 0.85, fontSize: 16 }}>
+              {new Date(selectedEvent.start_at).toLocaleString()}
+              {selectedEvent.location ? ` • ${selectedEvent.location}` : ''}
+            </p>
+          )}
+        </div>
+        <Link
+          href="/"
+          style={{
+            display: 'inline-block',
+            minHeight: 44,
+            padding: '10px 14px',
+            borderRadius: 10,
+            border: '1px solid #cbd5e1',
+            background: '#fff',
+            color: '#111827',
+            textDecoration: 'none',
+            fontWeight: 600,
+            lineHeight: '24px',
+          }}
+        >
+          Close
+        </Link>
+      </div>
+
       {selectedEvent && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 12px' }}>
           <a
             href={toGoogleCalendarUrl({
               title: selectedEvent.title,
@@ -169,8 +204,18 @@ export default async function PosterPage({
           </a>
         </div>
       )}
-      <PosterViewer key={`${id}:${event_id || 'none'}`} imageUrl={imageUrl} pins={pins} activeEventId={event_id || null} />
-      {sourceLabel && <p style={{ marginTop: 10, fontSize: 14 }}>{sourceLabel}</p>}
+      {sourceLabel && <p style={{ margin: '0 0 4px 0', fontSize: 14 }}>{sourceLabel}</p>}
+      {poster.created_at && (
+        <p style={{ margin: '0 0 8px 0', opacity: 0.85, fontSize: 14 }}>
+          Photo taken: {new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          }).format(new Date(poster.created_at))}
+        </p>
+      )}
+      <PosterViewer key={`${id}:${event_id || 'none'}`} imageUrls={imageUrls} pins={pins} activeEventId={event_id || null} />
     </main>
   )
 }

@@ -1,7 +1,5 @@
-export const dynamic = 'force-dynamic'
-
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import PublicEventsList from './components/PublicEventsList'
 
 type EventStatus = 'draft' | 'published'
 
@@ -18,9 +16,23 @@ type EventRow = {
 
 type LinkRow = {
   event_id: string
-  poster_upload_id: string
   created_at: string
   poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }[] | null
+}
+
+function jsonError(message: string, status = 400) {
+  return NextResponse.json({ error: message }, { status })
+}
+
+function isMissingRecurrenceColumnError(error: { code?: string; message?: string } | null | undefined) {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '42703' ||
+    message.includes('recurrence_rule') ||
+    message.includes('is_recurring') ||
+    message.includes('seen_at_label') ||
+    message.includes('schema cache')
+  )
 }
 
 function nyDateKey(date: Date) {
@@ -32,57 +44,43 @@ function nyDateKey(date: Date) {
   }).format(date)
 }
 
-export default async function Home() {
+export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !serviceKey) {
-    return (
-      <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-        <h1>Utica Community Board</h1>
-        <pre style={{ whiteSpace: 'pre-wrap' }}>Error: Missing Supabase env vars</pre>
-      </main>
-    )
-  }
+  if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
 
   const primary = await supabase
     .from('events')
-    .select('id, title, location, start_at, status, created_at, is_recurring, recurrence_rule')
+    .select('id,title,location,start_at,status,created_at,is_recurring,recurrence_rule')
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
   let events: EventRow[] = []
-  let errorMessage: string | null = null
-
   if (primary.error) {
-    if (primary.error.code !== '42703') {
-      errorMessage = primary.error.message
-    } else {
-      const fallback = await supabase
-        .from('events')
-        .select('id, title, location, start_at, status, created_at')
-        .eq('status', 'published')
-        .order('start_at', { ascending: true })
+    if (!isMissingRecurrenceColumnError(primary.error)) return jsonError(primary.error.message, 500)
 
-      if (fallback.error) {
-        errorMessage = fallback.error.message
-      } else {
-        events = ((fallback.data || []) as EventRow[]).map((row) => ({
-          ...row,
-          is_recurring: false,
-          recurrence_rule: null,
-        }))
-      }
-    }
+    const fallback = await supabase
+      .from('events')
+      .select('id,title,location,start_at,status,created_at')
+      .eq('status', 'published')
+      .order('start_at', { ascending: true })
+
+    if (fallback.error) return jsonError(fallback.error.message, 500)
+
+    events = ((fallback.data || []) as EventRow[]).map((row) => ({
+      ...row,
+      is_recurring: false,
+      recurrence_rule: null,
+    }))
   } else {
     events = (primary.data || []) as EventRow[]
   }
 
   const linksPrimary = await supabase
     .from('poster_event_links')
-    .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name)')
+    .select('event_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name)')
     .order('created_at', { ascending: false })
 
   let links = linksPrimary.data as LinkRow[] | null
@@ -93,33 +91,24 @@ export default async function Home() {
       message.includes('seen_at_label') ||
       message.includes('schema cache')
 
-    if (!missingSeenLabel) {
-      errorMessage = errorMessage || linksPrimary.error.message
-      links = []
-    } else {
-      const fallbackLinks = await supabase
-        .from('poster_event_links')
-        .select('event_id, poster_upload_id, created_at, poster_uploads(file_path)')
-        .order('created_at', { ascending: false })
+    if (!missingSeenLabel) return jsonError(linksPrimary.error.message, 500)
 
-      if (fallbackLinks.error) {
-        errorMessage = errorMessage || fallbackLinks.error.message
-        links = []
-      } else {
-        links = (fallbackLinks.data || []) as LinkRow[]
-      }
-    }
+    const fallbackLinks = await supabase
+      .from('poster_event_links')
+      .select('event_id, created_at, poster_uploads(file_path)')
+      .order('created_at', { ascending: false })
+
+    if (fallbackLinks.error) return jsonError(fallbackLinks.error.message, 500)
+    links = (fallbackLinks.data || []) as LinkRow[]
   }
 
   const latestPosterPathByEvent = new Map<string, string>()
-  const latestPosterUploadByEvent = new Map<string, string>()
   const latestSeenAtByEvent = new Map<string, string>()
   for (const row of (links || []) as LinkRow[]) {
     if (latestPosterPathByEvent.has(row.event_id)) continue
     const upload = Array.isArray(row.poster_uploads) ? row.poster_uploads[0] : row.poster_uploads
     if (!upload?.file_path) continue
     latestPosterPathByEvent.set(row.event_id, upload.file_path)
-    latestPosterUploadByEvent.set(row.event_id, row.poster_upload_id)
     const seenAt = upload.seen_at_label || upload.seen_at_name || null
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
   }
@@ -131,11 +120,15 @@ export default async function Home() {
       : null
 
     return {
-      ...event,
+      id: event.id,
+      title: event.title,
+      location: event.location,
+      start_at: event.start_at,
+      status: event.status,
+      created_at: event.created_at,
       is_recurring: Boolean(event.is_recurring),
       recurrence_rule: event.recurrence_rule || null,
       poster_public_url,
-      poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
       seen_at_label: latestSeenAtByEvent.get(event.id) || null,
     }
   })
@@ -149,35 +142,15 @@ export default async function Home() {
 
   const today = oneTime.filter((e) => nyDateKey(new Date(e.start_at)) === todayKey)
   const thisWeek = oneTime.filter((e) => {
-    const t = new Date(e.start_at).getTime()
-    return t > now.getTime() && t <= weekLater.getTime() && nyDateKey(new Date(e.start_at)) !== todayKey
+    const ts = new Date(e.start_at).getTime()
+    return ts > now.getTime() && ts <= weekLater.getTime() && nyDateKey(new Date(e.start_at)) !== todayKey
   })
   const upcoming = oneTime.filter((e) => new Date(e.start_at).getTime() > weekLater.getTime())
 
-  return (
-    <main
-      style={{
-        padding: '16px clamp(16px, 4vw, 28px) 32px',
-        fontFamily: 'sans-serif',
-        maxWidth: 760,
-        margin: '0 auto',
-        fontSize: 16,
-      }}
-    >
-      <h1>Utica Community Board</h1>
-
-      {errorMessage && <pre style={{ whiteSpace: 'pre-wrap' }}>Error: {errorMessage}</pre>}
-
-      {!errorMessage && (
-        <PublicEventsList
-          sections={{
-            today,
-            thisWeek,
-            upcoming,
-            recurring,
-          }}
-        />
-      )}
-    </main>
-  )
+  return NextResponse.json({
+    today,
+    this_week: thisWeek,
+    upcoming,
+    recurring,
+  })
 }
