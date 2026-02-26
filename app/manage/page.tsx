@@ -336,7 +336,7 @@ export default function ManagePage() {
     const res = await fetch('/api/manage/approval-queue')
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      setApprovalError(data?.error || 'Failed to load approval queue')
+      setApprovalError(data?.error || 'Failed to load recently planted events')
       return
     }
     setApprovalQueue((data.rows || []) as ApprovalQueueRow[])
@@ -650,7 +650,7 @@ export default function ManagePage() {
       body: JSON.stringify({ event_id: eventId }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) setApprovalError(data?.error || 'Approve failed')
+    if (!res.ok) setApprovalError(data?.error || 'Publish failed')
     await refreshData()
     setApprovingEventId(null)
   }
@@ -699,10 +699,10 @@ export default function ManagePage() {
     <main style={{ padding: 16, fontFamily: 'sans-serif', height: '100vh', overflow: 'hidden' }}>
       <h1 style={{ margin: '0 0 12px 0' }}>Manage</h1>
       <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, marginBottom: 12 }}>
-        <h2 style={{ margin: '0 0 8px 0' }}>Approval Queue</h2>
+        <h2 style={{ margin: '0 0 8px 0' }}>Recently planted</h2>
         {approvalError && <p style={{ color: 'crimson', marginTop: 0 }}>{approvalError}</p>}
         {approvalQueue.length === 0 ? (
-          <p style={{ margin: 0, opacity: 0.7 }}>No draft events waiting for approval.</p>
+          <p style={{ margin: 0, opacity: 0.7 }}>No recently planted events waiting to publish.</p>
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
             {approvalQueue.map((item) => (
@@ -716,7 +716,7 @@ export default function ManagePage() {
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button data-variant="secondary" onClick={() => focusEvent(item as unknown as AllEventRow)}>Edit</button>
                   <button onClick={() => approveEvent(item.id)} disabled={approvingEventId === item.id}>
-                    {approvingEventId === item.id ? 'Approving...' : 'Approve'}
+                    {approvingEventId === item.id ? 'Publishing...' : 'Publish to board'}
                   </button>
                 </div>
               </div>

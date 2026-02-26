@@ -9,7 +9,7 @@ type PublicEventRow = {
   seen_at_label: string | null
   seen_at_category?: string | null
   start_at: string
-  status: 'draft' | 'published'
+  status: 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
   created_at: string
   is_recurring: boolean
   recurrence_rule: string | null
@@ -18,6 +18,8 @@ type PublicEventRow = {
   event_audience?: string[]
   event_location_name?: string | null
   description?: string | null
+  published_by_name?: string | null
+  published_at?: string | null
   poster_public_url: string | null
   poster_upload_id: string | null
 }
@@ -126,9 +128,14 @@ function EventList({ rows }: { rows: PublicEventRow[] }) {
                 Seen at: {e.seen_at_label}{e.seen_at_category ? ` (${e.seen_at_category})` : ''}
               </div>
             )}
-            <div style={{ fontSize: 13, opacity: 0.75, marginTop: 6 }}>
-              Created: {formatNY(e.created_at)}
-            </div>
+            <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>Tended by Community Builders</div>
+            <details style={{ marginTop: 4 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 12, opacity: 0.8 }}>View publishing details</summary>
+              <div style={{ fontSize: 12, marginTop: 4, opacity: 0.85 }}>
+                Publisher: {e.published_by_name || 'Community Builder'}
+                {e.published_at ? ` • ${formatNY(e.published_at, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}
+              </div>
+            </details>
             {e.is_recurring && (
               <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
                 {humanizeRecurrence(e.recurrence_rule, e.start_at)}

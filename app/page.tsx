@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import PublicEventsList from './components/PublicEventsList'
 
-type EventStatus = 'draft' | 'published'
+type EventStatus = 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
 
 type EventRow = {
   id: string
@@ -19,6 +19,8 @@ type EventRow = {
   event_attributes?: string[] | null
   event_audience?: string[] | null
   event_location_name?: string | null
+  published_by?: string | null
+  published_at?: string | null
 }
 
 type LinkRow = {
@@ -54,8 +56,8 @@ export default async function Home() {
 
   const primary = await supabase
     .from('events')
-    .select('id, title, location, description, start_at, status, created_at, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name')
-    .eq('status', 'published')
+    .select('id, title, location, description, start_at, status, created_at, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name,published_by,published_at')
+    .eq('status', 'on_board')
     .order('start_at', { ascending: true })
 
   let events: EventRow[] = []
@@ -67,8 +69,8 @@ export default async function Home() {
     } else {
       const fallback = await supabase
         .from('events')
-        .select('id, title, location, description, start_at, status, created_at')
-        .eq('status', 'published')
+        .select('id, title, location, description, start_at, status, created_at,published_by,published_at')
+        .eq('status', 'on_board')
         .order('start_at', { ascending: true })
 
       if (fallback.error) {
@@ -120,6 +122,16 @@ export default async function Home() {
   const latestPosterUploadByEvent = new Map<string, string>()
   const latestSeenAtByEvent = new Map<string, string>()
   const latestSeenAtCategoryByEvent = new Map<string, string>()
+  const publisherIds = Array.from(new Set(events.map((e) => e.published_by).filter(Boolean))) as string[]
+  const publisherNameById = new Map<string, string>()
+  if (publisherIds.length > 0) {
+    const usersResult = await supabase.from('users').select('id,name').in('id', publisherIds)
+    if (!usersResult.error) {
+      for (const row of (usersResult.data || []) as Array<{ id: string; name: string | null }>) {
+        publisherNameById.set(row.id, row.name || 'Community Builder')
+      }
+    }
+  }
   for (const row of (links || []) as LinkRow[]) {
     if (latestPosterPathByEvent.has(row.event_id)) continue
     const upload = Array.isArray(row.poster_uploads) ? row.poster_uploads[0] : row.poster_uploads
@@ -150,6 +162,8 @@ export default async function Home() {
       event_audience: event.event_audience || [],
       event_location_name: event.event_location_name || null,
       description: event.description || null,
+      published_by_name: event.published_by ? publisherNameById.get(event.published_by) || 'Community Builder' : null,
+      published_at: event.published_at || null,
     }
   })
 

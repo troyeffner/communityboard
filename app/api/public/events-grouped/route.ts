@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-type EventStatus = 'draft' | 'published'
+type EventStatus = 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
 
 type EventRow = {
   id: string
@@ -54,7 +54,7 @@ export async function GET() {
   const primary = await supabase
     .from('events')
     .select('id,title,location,start_at,status,created_at,is_recurring,recurrence_rule')
-    .eq('status', 'published')
+    .eq('status', 'on_board')
     .order('start_at', { ascending: true })
 
   let events: EventRow[] = []
@@ -64,7 +64,7 @@ export async function GET() {
     const fallback = await supabase
       .from('events')
       .select('id,title,location,start_at,status,created_at')
-      .eq('status', 'published')
+      .eq('status', 'on_board')
       .order('start_at', { ascending: true })
 
     if (fallback.error) return jsonError(fallback.error.message, 500)

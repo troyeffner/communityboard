@@ -204,7 +204,7 @@ export default function SubmitPage() {
       setIsRecurring(false)
       setRecurrenceRule('')
       setStartAt(defaultStartAt2pmLocal())
-      setMessage('Manual event submitted to approval queue.')
+      setMessage('Manual event submitted as recently planted.')
     } catch {
       setMessage('Manual submission failed')
     } finally {
