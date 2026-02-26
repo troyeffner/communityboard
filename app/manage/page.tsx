@@ -9,15 +9,12 @@ type PosterUpload = {
   id: string
   created_at: string
   status: string
-  type?: string | null
   public_url?: string
   event_count: number
   linked_count?: number
-  business_count?: number
   processed_at: string | null
   done?: boolean
   is_done?: boolean
-  object_type?: string | null
   seen_at_name?: string | null
 }
 
@@ -154,7 +151,6 @@ export default function ManagePage() {
   const [approvalError, setApprovalError] = useState('')
   const [approvingEventId, setApprovingEventId] = useState<string | null>(null)
 
-  const [typeFilter, setTypeFilter] = useState<'all' | string>('all')
   const [doneFilter, setDoneFilter] = useState<'all' | 'done' | 'incomplete'>('all')
   const [uploadStatusFilter, setUploadStatusFilter] = useState<'all' | string>('all')
 
@@ -211,14 +207,13 @@ export default function ManagePage() {
 
   const locationInputRef = useRef<HTMLInputElement | null>(null)
 
-  const uniqueTypes = useMemo(() => ['all', ...Array.from(new Set(uploads.map((u) => u.type || 'poster')))], [uploads])
   const uniqueUploadStatuses = useMemo(() => ['all', ...Array.from(new Set(uploads.map((u) => u.status)))], [uploads])
 
   const filteredUploads = useMemo(() => {
     return uploads.filter((u) => {
-      if (typeFilter !== 'all' && (u.type || 'poster') !== typeFilter) return false
-      if (doneFilter === 'done' && !u.processed_at) return false
-      if (doneFilter === 'incomplete' && u.processed_at) return false
+      const done = (u.status || '').toLowerCase() === 'done' || Boolean(u.is_done ?? u.done ?? u.processed_at)
+      if (doneFilter === 'done' && !done) return false
+      if (doneFilter === 'incomplete' && done) return false
       if (uploadStatusFilter !== 'all' && u.status !== uploadStatusFilter) return false
       return true
     }).sort((a, b) => {
@@ -227,7 +222,7 @@ export default function ManagePage() {
       if (aDone !== bDone) return aDone ? 1 : -1
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
-  }, [uploads, typeFilter, doneFilter, uploadStatusFilter])
+  }, [uploads, doneFilter, uploadStatusFilter])
 
   const filteredAllEvents = useMemo(() => {
     return allEvents.filter((event) => {
@@ -767,11 +762,6 @@ export default function ManagePage() {
           </div>
 
           <div style={{ display: 'grid', gap: 8 }}>
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              {uniqueTypes.map((t) => (
-                <option key={t} value={t}>{t === 'all' ? 'All types' : t}</option>
-              ))}
-            </select>
             <select value={doneFilter} onChange={(e) => setDoneFilter(e.target.value as 'all' | 'done' | 'incomplete')} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="all">All done states</option><option value="done">Done</option><option value="incomplete">Incomplete</option>
             </select>
@@ -788,7 +778,7 @@ export default function ManagePage() {
             {filteredUploads.map((u) => (
               <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 10, padding: 8 }}>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>{formatDateTime(u.created_at)}</div>
-                <div style={{ fontSize: 13 }}>{u.status} • {u.object_type || u.type || 'event_poster'} • events: {u.event_count} • businesses: {u.business_count || 0}</div>
+                <div style={{ fontSize: 13 }}>{u.status} • events: {u.event_count}</div>
                 {u.seen_at_name && (
                   <div style={{ fontSize: 12, marginTop: 2 }}>
                     Seen at: {u.seen_at_name}

@@ -9,7 +9,6 @@ type UploadRow = {
   done?: boolean | null
   is_done?: boolean | null
   processed_at?: string | null
-  object_type?: string | null
   seen_at_name?: string | null
 }
 
@@ -37,7 +36,7 @@ export async function GET() {
 
   const uploadsRes = await supabase
     .from('poster_uploads')
-    .select('id,file_path,status,created_at,done,is_done,processed_at,object_type,seen_at_name')
+    .select('id,file_path,status,created_at,done,is_done,processed_at,seen_at_name')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -49,7 +48,7 @@ export async function GET() {
 
     const fallback = await supabase
       .from('poster_uploads')
-      .select('id,file_path,status,created_at,object_type,seen_at_name')
+      .select('id,file_path,status,created_at,seen_at_name')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -82,9 +81,8 @@ export async function GET() {
     status: u.status,
     public_url: u.file_path ? supabase.storage.from('posters').getPublicUrl(u.file_path).data.publicUrl : null,
     seen_at_name: u.seen_at_name || null,
-    done: Boolean(u.is_done ?? u.done ?? u.processed_at),
-    is_done: Boolean(u.is_done ?? u.done ?? u.processed_at),
-    object_type: u.object_type || 'event_poster',
+    done: (u.status || '').toLowerCase() === 'done' || Boolean(u.is_done ?? u.done ?? u.processed_at),
+    is_done: (u.status || '').toLowerCase() === 'done' || Boolean(u.is_done ?? u.done ?? u.processed_at),
     event_count: linkedCountByUpload[u.id] || 0,
     linked_count: linkedCountByUpload[u.id] || 0,
     linked_events_count: linkedCountByUpload[u.id] || 0,

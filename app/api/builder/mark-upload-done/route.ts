@@ -27,14 +27,16 @@ export async function POST(req: Request) {
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
+  const nextStatus = isDone ? 'done' : 'tending'
+
   let update = await supabase
     .from('poster_uploads')
-    .update({ is_done: isDone, done: isDone, processed_at: isDone ? new Date().toISOString() : null })
+    .update({ status: nextStatus, is_done: isDone, done: isDone, processed_at: isDone ? new Date().toISOString() : null })
     .eq('id', posterUploadId)
   if (update.error && isMissingDoneColumns(update.error)) {
     update = await supabase
       .from('poster_uploads')
-      .update({ processed_at: isDone ? new Date().toISOString() : null })
+      .update({ status: nextStatus, processed_at: isDone ? new Date().toISOString() : null })
       .eq('id', posterUploadId)
   }
   if (update.error) return jsonError(update.error.message, 500)

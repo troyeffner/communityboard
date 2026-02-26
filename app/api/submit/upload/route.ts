@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
-import { OBJECT_TYPES, toSet } from '@/lib/taxonomy'
 
 export const runtime = 'nodejs'
 
@@ -23,10 +22,7 @@ export async function POST(req: Request) {
   if (!file || !(file instanceof File)) return jsonError('Missing file (field name: file)')
   if (!file.type.startsWith('image/')) return jsonError('File must be an image')
 
-  const object_typeRaw = String(form.get('object_type') || 'event_poster').trim().toLowerCase()
   const seen_at_name = String(form.get('seen_at_name') || '').trim() || null
-  const objectTypeSet = toSet(OBJECT_TYPES)
-  const object_type = objectTypeSet.has(object_typeRaw) ? object_typeRaw : 'event_poster'
 
   // Read file into a Buffer
   const arrayBuffer = await file.arrayBuffer()
@@ -55,9 +51,8 @@ export async function POST(req: Request) {
   // Insert poster_uploads row
   const insertPayload = {
     file_path: filePath,
-    status: 'uploaded',
+    status: 'new',
     seen_at_name,
-    object_type,
     is_done: false,
   }
 
@@ -85,7 +80,7 @@ export async function POST(req: Request) {
       .insert([
         {
           file_path: filePath,
-          status: 'uploaded',
+          status: 'new',
           seen_at_name,
         },
       ])
@@ -98,7 +93,7 @@ export async function POST(req: Request) {
     if (insertErr) {
       const fallbackPlain = await supabase
         .from('poster_uploads')
-        .insert([{ file_path: filePath, status: 'uploaded' }])
+        .insert([{ file_path: filePath, status: 'new' }])
         .select('id')
         .single()
 

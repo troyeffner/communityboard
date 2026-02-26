@@ -106,5 +106,10 @@ export async function POST(req: Request) {
     .insert([{ poster_upload_id: posterUploadId, event_id: eventId, bbox }])
   if (link.error) return jsonError(link.error.message, 500)
 
+  await supabase
+    .from('poster_uploads')
+    .update({ status: 'tending' })
+    .eq('id', posterUploadId)
+
   return NextResponse.json({ ok: true, event_id: eventId, status: normalizedStatus })
 }

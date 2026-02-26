@@ -122,3 +122,17 @@ List uploads (verify `seen_at_name` + `linked_events_count`):
 ```bash
 curl http://localhost:3000/api/manage/list-uploads
 ```
+
+## Regression Tests
+
+Run lightweight regression checks (no `dev` server required):
+
+```bash
+npm run test
+```
+
+Run full regression gate (tests + lint + build):
+
+```bash
+npm run test:regression
+```

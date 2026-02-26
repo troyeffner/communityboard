@@ -79,6 +79,10 @@ export default function BuilderCreatePage({
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurrenceRule, setRecurrenceRule] = useState('')
   const [seenAtName, setSeenAtName] = useState('')
+  const [eventStatus, setEventStatus] = useState<'draft' | 'published'>('draft')
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadingPoster, setUploadingPoster] = useState(false)
 
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -99,7 +103,7 @@ export default function BuilderCreatePage({
     const res = await fetch('/api/manage/list-uploads-with-counts')
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return setError(data?.error || 'Failed to load posters')
-    setUploads(((data.uploads || []) as Upload[]).filter((u) => !u.is_done))
+    setUploads((data.uploads || []) as Upload[])
   }
 
   async function loadRows(uploadId: string | null) {
@@ -135,6 +139,16 @@ export default function BuilderCreatePage({
     }
   }, [manualMode, seenAtName])
 
+  async function goToNextUntendedPoster() {
+    const res = await fetch('/api/builder/next-poster')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return setError(data?.error || 'Failed to load next poster')
+    const nextId = data?.poster?.id as string | undefined
+    if (!nextId) return setMessage('No untended posters in queue.')
+    await loadUploads()
+    await selectPoster(nextId)
+  }
+
   async function selectPoster(posterId: string) {
     const upload = uploads.find((u) => u.id === posterId) || null
     setSelectedPosterId(posterId)
@@ -149,6 +163,7 @@ export default function BuilderCreatePage({
     setStartAt(defaultStartAt2pmLocal())
     setIsRecurring(false)
     setRecurrenceRule('')
+    setEventStatus('draft')
     setSeenAtName(upload?.seen_at_name || '')
     setZoom(1)
     setPan({ x: 0, y: 0 })
@@ -163,6 +178,7 @@ export default function BuilderCreatePage({
     setLocation(row.event.location || '')
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
+    setEventStatus((row.event.status || '').toLowerCase() === 'published' ? 'published' : 'draft')
     setIsRecurring(Boolean(row.event.is_recurring))
     setRecurrenceRule(row.event.recurrence_rule || '')
     setSeenAtName(selectedUpload?.seen_at_name || '')
@@ -177,6 +193,7 @@ export default function BuilderCreatePage({
     setStartAt(defaultStartAt2pmLocal())
     setIsRecurring(false)
     setRecurrenceRule('')
+    setEventStatus('draft')
   }
 
   async function saveSeenAt() {
@@ -250,6 +267,7 @@ export default function BuilderCreatePage({
             start_at: startAt,
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
+            status: eventStatus,
           }),
         })
         const manualData = await manualRes.json().catch(() => ({}))
@@ -270,7 +288,7 @@ export default function BuilderCreatePage({
           location,
           description,
           start_at: startAt,
-          status: 'draft',
+          status: eventStatus,
           is_recurring: isRecurring,
           recurrence_rule: isRecurring ? recurrenceRule : null,
         }),
@@ -284,6 +302,30 @@ export default function BuilderCreatePage({
       await loadUploads()
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function uploadFromCreate() {
+    if (!uploadFile) return
+    setUploadingPoster(true)
+    setError('')
+    setMessage('')
+    try {
+      const form = new FormData()
+      form.append('file', uploadFile)
+      if (seenAtName.trim()) form.append('seen_at_name', seenAtName.trim())
+      const res = await fetch('/api/submit/upload', { method: 'POST', body: form })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) return setError(data?.error || 'Upload failed')
+      const newPosterId = String(data?.poster_upload_id || data?.id || '').trim()
+      if (!newPosterId) return setError('Upload succeeded but missing poster ID')
+      setMessage('Poster uploaded.')
+      setUploadFile(null)
+      if (uploadInputRef.current) uploadInputRef.current.value = ''
+      await loadUploads()
+      await selectPoster(newPosterId)
+    } finally {
+      setUploadingPoster(false)
     }
   }
 
@@ -422,8 +464,27 @@ export default function BuilderCreatePage({
     <main style={{ padding: 16, fontFamily: 'sans-serif', display: 'grid', gridTemplateColumns: '320px 1fr 420px', gap: 12, minHeight: '90vh' }}>
       <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto' }}>
         <h1 style={{ marginTop: 0, marginBottom: 8 }}>Submissions</h1>
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+              style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}
+            />
+            <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
+              {uploadingPoster ? 'Uploading...' : 'Upload and select'}
+            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
+              <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
+            </div>
+          </div>
+        </div>
         <div style={{ display: 'grid', gap: 8 }}>
-          {uploads.map((u) => (
+          {uploads.filter((u) => (u.status || '').toLowerCase() !== 'done').map((u) => (
             <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr auto', gap: 8, alignItems: 'start' }}>
                 {u.public_url ? (
@@ -438,7 +499,7 @@ export default function BuilderCreatePage({
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12 }}>{new Date(u.created_at).toLocaleString()}</div>
                   <div style={{ fontSize: 12, marginTop: 2 }}>
-                    {u.is_done ? 'Done' : 'Incomplete'} • Linked: {u.linked_count ?? u.event_count ?? 0}
+                    {((u.status || '').toLowerCase() === 'done' || u.is_done) ? 'Done' : 'Incomplete'} • status: {u.status || 'new'} • Linked: {u.linked_count ?? u.event_count ?? 0}
                   </div>
                   {!!u.seen_at_name && (
                     <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -467,8 +528,6 @@ export default function BuilderCreatePage({
               <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
               <button data-variant="secondary" onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit-to-pins</button>
               <button data-variant="secondary" onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center active pin</button>
-              <button onClick={markDone}>Mark done</button>
-              <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
             </div>
             <div
               ref={stageRef}
@@ -556,6 +615,10 @@ export default function BuilderCreatePage({
                 )}
               </div>
             </div>
+            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+              <button onClick={markDone}>Mark Done</button>
+              <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
+            </div>
           </>
         )}
       </section>
@@ -586,6 +649,10 @@ export default function BuilderCreatePage({
         <div style={{ display: 'grid', gap: 8 }}>
           <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>New submissions are saved as draft and published later via approval workflow.</p>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+          <select value={eventStatus} onChange={(e) => setEventStatus(e.target.value as 'draft' | 'published')} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+            <option value="draft">draft</option>
+            <option value="published">published</option>
+          </select>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
           <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
@@ -607,7 +674,7 @@ export default function BuilderCreatePage({
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveEvent} disabled={saving || !title.trim()}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Create event'}</button>
+            <button onClick={saveEvent} disabled={saving || !title.trim()}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Create Draft Event'}</button>
             {(editingEventId || point) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
           </div>
           {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
