@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-type EventStatus = 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
+type EventStatus = 'draft' | 'published' | 'unpublished'
 
 type EventRow = {
   id: string
@@ -17,7 +17,7 @@ type EventRow = {
 type LinkRow = {
   event_id: string
   created_at: string
-  poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }[] | null
+  poster_uploads: { file_path: string; seen_at_name?: string | null } | { file_path: string; seen_at_name?: string | null }[] | null
 }
 
 function jsonError(message: string, status = 400) {
@@ -28,10 +28,9 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    (message.includes('invalid input value for enum') && message.includes('on_board')) ||
     message.includes('recurrence_rule') ||
     message.includes('is_recurring') ||
-    message.includes('seen_at_label') ||
+    message.includes('seen_at_name') ||
     message.includes('schema cache')
   )
 }
@@ -65,7 +64,7 @@ export async function GET() {
     const fallback = await supabase
       .from('events')
       .select('id,title,location,start_at,status,created_at')
-      .eq('status', (primary.error?.message || '').toLowerCase().includes('on_board') ? 'on_board' : 'published')
+      .eq('status', 'published')
       .order('start_at', { ascending: true })
 
     if (fallback.error) return jsonError(fallback.error.message, 500)
@@ -81,7 +80,7 @@ export async function GET() {
 
   const linksPrimary = await supabase
     .from('poster_event_links')
-    .select('event_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name)')
+    .select('event_id, created_at, poster_uploads(file_path,seen_at_name)')
     .order('created_at', { ascending: false })
 
   let links = linksPrimary.data as LinkRow[] | null
@@ -89,7 +88,7 @@ export async function GET() {
     const message = (linksPrimary.error.message || '').toLowerCase()
     const missingSeenLabel =
       linksPrimary.error.code === '42703' ||
-      message.includes('seen_at_label') ||
+      message.includes('seen_at_name') ||
       message.includes('schema cache')
 
     if (!missingSeenLabel) return jsonError(linksPrimary.error.message, 500)
@@ -110,7 +109,7 @@ export async function GET() {
     const upload = Array.isArray(row.poster_uploads) ? row.poster_uploads[0] : row.poster_uploads
     if (!upload?.file_path) continue
     latestPosterPathByEvent.set(row.event_id, upload.file_path)
-    const seenAt = upload.seen_at_label || upload.seen_at_name || null
+    const seenAt = upload.seen_at_name || null
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
   }
 
@@ -130,7 +129,7 @@ export async function GET() {
       is_recurring: Boolean(event.is_recurring),
       recurrence_rule: event.recurrence_rule || null,
       poster_public_url,
-      seen_at_label: latestSeenAtByEvent.get(event.id) || null,
+      seen_at_name: latestSeenAtByEvent.get(event.id) || null,
     }
   })
 

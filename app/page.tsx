@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { headers } from 'next/headers'
 import PublicEventsList from './components/PublicEventsList'
 
-type EventStatus = 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
+type EventStatus = 'draft' | 'published' | 'unpublished'
 
 type EventRow = {
   id: string
@@ -28,7 +28,7 @@ type LinkRow = {
   event_id: string
   poster_upload_id: string
   created_at: string
-  poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }[] | null
+  poster_uploads: { file_path: string; seen_at_name?: string | null } | { file_path: string; seen_at_name?: string | null }[] | null
 }
 
 type EventVoteRow = { event_id: string; voter_vid?: string | null }
@@ -47,11 +47,6 @@ function isMissingOptionalEventColumns(message: string) {
     lower.includes('recurrence_rule') ||
     lower.includes('schema cache')
   )
-}
-
-function isOnBoardEnumMismatch(message: string) {
-  const lower = message.toLowerCase()
-  return lower.includes('invalid input value for enum') && lower.includes('on_board')
 }
 
 function nyDateKey(date: Date) {
@@ -92,8 +87,7 @@ export default async function Home() {
   if (primary.error) {
     if (
       primary.error.code !== '42703' &&
-      !isMissingOptionalEventColumns(primary.error.message || '') &&
-      !isOnBoardEnumMismatch(primary.error.message || '')
+      !isMissingOptionalEventColumns(primary.error.message || '')
     ) {
       errorMessage = primary.error.message
     } else {
@@ -101,9 +95,7 @@ export default async function Home() {
         .from('events')
         .select('id, title, location, start_at, status, created_at')
         .order('start_at', { ascending: true })
-      const fallback = isOnBoardEnumMismatch(primary.error.message || '')
-        ? await fallbackBase.eq('status', 'on_board')
-        : await fallbackBase.eq('status', 'published')
+      const fallback = await fallbackBase.eq('status', 'published')
 
       if (fallback.error) {
         errorMessage = fallback.error.message
@@ -128,7 +120,7 @@ export default async function Home() {
 
   const linksPrimary = await supabase
     .from('poster_event_links')
-    .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name)')
+    .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_name)')
     .order('created_at', { ascending: false })
 
   let links = linksPrimary.data as LinkRow[] | null
@@ -136,7 +128,7 @@ export default async function Home() {
     const message = (linksPrimary.error.message || '').toLowerCase()
     const missingSeenLabel =
       linksPrimary.error.code === '42703' ||
-      message.includes('seen_at_label') ||
+      message.includes('seen_at_name') ||
       message.includes('schema cache')
 
     if (!missingSeenLabel) {
@@ -178,7 +170,7 @@ export default async function Home() {
     if (!upload?.file_path) continue
     latestPosterPathByEvent.set(row.event_id, upload.file_path)
     latestPosterUploadByEvent.set(row.event_id, row.poster_upload_id)
-    const seenAt = upload.seen_at_label || upload.seen_at_name || null
+    const seenAt = upload.seen_at_name || null
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
   }
 
@@ -221,7 +213,7 @@ export default async function Home() {
       recurrence_rule: event.recurrence_rule || null,
       poster_public_url,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
-      seen_at_label: latestSeenAtByEvent.get(event.id) || null,
+      seen_at_name: latestSeenAtByEvent.get(event.id) || null,
       event_category: event.event_category || null,
       event_attributes: event.event_attributes || [],
       event_audience: event.event_audience || [],

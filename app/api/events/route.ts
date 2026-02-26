@@ -18,18 +18,13 @@ type EventRow = {
   event_location_name?: string | null
 }
 
-function isOnBoardEnumMismatch(message: string) {
-  const lower = message.toLowerCase()
-  return lower.includes('invalid input value for enum') && lower.includes('on_board')
-}
-
 type LinkRow = {
   event_id: string
   created_at: string
   poster_upload_id: string
   poster_uploads:
-    | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }
-    | Array<{ file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }>
+    | { file_path: string; seen_at_name?: string | null }
+    | Array<{ file_path: string; seen_at_name?: string | null }>
     | null
 }
 
@@ -49,8 +44,8 @@ function nyDateKey(date: Date) {
 }
 
 export async function GET(req: Request) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const params = new URL(req.url).searchParams
@@ -75,20 +70,11 @@ export async function GET(req: Request) {
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
-  let eventsResult = primaryEvents
-  if (primaryEvents.error && isOnBoardEnumMismatch(primaryEvents.error.message || '')) {
-    eventsResult = await supabase
-      .from('events')
-      .select('id,title,location,description,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name')
-      .eq('status', 'on_board')
-      .order('start_at', { ascending: true })
-  }
-
-  if (eventsResult.error) return jsonError(eventsResult.error.message, 500)
+  if (primaryEvents.error) return jsonError(primaryEvents.error.message, 500)
 
   const linksResult = await supabase
     .from('poster_event_links')
-    .select('event_id,poster_upload_id,created_at,poster_uploads(file_path,seen_at_label,seen_at_name)')
+    .select('event_id,poster_upload_id,created_at,poster_uploads(file_path,seen_at_name)')
     .order('created_at', { ascending: false })
 
   let links: LinkRow[] = []
@@ -106,11 +92,11 @@ export async function GET(req: Request) {
     if (!upload?.file_path) continue
     latestPosterPathByEvent.set(row.event_id, upload.file_path)
     latestPosterUploadByEvent.set(row.event_id, row.poster_upload_id)
-    const seenAt = upload.seen_at_label || upload.seen_at_name || null
+    const seenAt = upload.seen_at_name || null
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
   }
 
-  const eventsData = (eventsResult.data || []) as EventRow[]
+  const eventsData = (primaryEvents.data || []) as EventRow[]
   if (eventsData.length > 0) {
     const eventIds = eventsData.map((event) => event.id)
     const votesResult = await supabase
@@ -162,7 +148,7 @@ export async function GET(req: Request) {
       event_audience: event.event_audience || [],
       poster_public_url: posterPublicUrl,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
-      seen_at_label: latestSeenAtByEvent.get(event.id) || null,
+      seen_at_name: latestSeenAtByEvent.get(event.id) || null,
       upvotes: upvotesByEvent.get(event.id) || 0,
       votedByMe: votedByMeEventIds.has(event.id),
     }
