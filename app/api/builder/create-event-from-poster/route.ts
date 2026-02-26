@@ -38,6 +38,10 @@ export async function POST(req: Request) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const eventAttributes =
+    body.event_attributes && typeof body.event_attributes === 'object' && !Array.isArray(body.event_attributes)
+      ? body.event_attributes
+      : {}
 
   const resolvedStartAt = startAt || defaultNy2pmLocalIso()
   const nyIsoGuess = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
@@ -52,20 +56,48 @@ export async function POST(req: Request) {
       is_recurring: Boolean(body.is_recurring),
       recurrence_rule: body.is_recurring ? String(body.recurrence_rule || '').trim() || null : null,
       event_category: String(body.event_category || '').trim() || null,
-      event_attributes: Array.isArray(body.event_attributes) ? body.event_attributes : [],
+      event_attributes: eventAttributes,
       event_audience: Array.isArray(body.event_audience) ? body.event_audience : [],
       event_location_name: String(body.event_location_name || '').trim() || null,
       event_location_address: String(body.event_location_address || '').trim() || null,
     }])
     .select('id')
     .single()
-  if (create.error) return jsonError(create.error.message, 500)
-  if (!create.data?.id) return jsonError('Failed to create event', 500)
+
+  let eventId = create.data?.id as string | undefined
+  if (create.error) {
+    const message = (create.error.message || '').toLowerCase()
+    const optionalMissing =
+      create.error.code === '42703' ||
+      message.includes('event_attributes') ||
+      message.includes('event_audience') ||
+      message.includes('event_category') ||
+      message.includes('event_location_name') ||
+      message.includes('event_location_address') ||
+      message.includes('schema cache')
+
+    if (!optionalMissing) return jsonError(create.error.message, 500)
+
+    const fallback = await supabase
+      .from('events')
+      .insert([{
+        title,
+        location: location || null,
+        description: description || null,
+        start_at: nyIsoGuess,
+        status: 'planted',
+      }])
+      .select('id')
+      .single()
+    if (fallback.error) return jsonError(fallback.error.message, 500)
+    eventId = fallback.data?.id as string | undefined
+  }
+  if (!eventId) return jsonError('Failed to create event', 500)
 
   const link = await supabase
     .from('poster_event_links')
-    .insert([{ poster_upload_id: posterUploadId, event_id: create.data.id, bbox }])
+    .insert([{ poster_upload_id: posterUploadId, event_id: eventId, bbox }])
   if (link.error) return jsonError(link.error.message, 500)
 
-  return NextResponse.json({ ok: true, event_id: create.data.id, status: 'planted' })
+  return NextResponse.json({ ok: true, event_id: eventId, status: 'planted' })
 }

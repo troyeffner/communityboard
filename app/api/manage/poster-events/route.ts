@@ -15,6 +15,11 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
     message.includes('source_type') ||
     message.includes('source_place') ||
     message.includes('source_detail') ||
+    message.includes('event_category') ||
+    message.includes('event_attributes') ||
+    message.includes('event_audience') ||
+    message.includes('event_location_name') ||
+    message.includes('event_location_address') ||
     message.includes('schema cache')
   )
 }
@@ -69,7 +74,7 @@ export async function GET(req: Request) {
 
     const fallback = await supabase
       .from('poster_event_links')
-      .select('id, bbox, created_at, events ( id, title, location, description, start_at, status, event_category, event_attributes, event_audience, event_location_name, event_location_address )')
+      .select('id, bbox, created_at, events ( id, title, location, start_at, status )')
       .eq('poster_upload_id', poster_upload_id)
       .order('created_at', { ascending: false })
 
