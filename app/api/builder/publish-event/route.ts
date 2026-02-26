@@ -5,6 +5,16 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
+function isMissingPublishColumns(error: { code?: string; message?: string } | null | undefined) {
+  const lower = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '42703' ||
+    lower.includes('published_at') ||
+    lower.includes('published_by') ||
+    lower.includes('schema cache')
+  )
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
@@ -17,10 +27,17 @@ export async function POST(req: Request) {
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
   const now = new Date().toISOString()
-  const update = await supabase
+  let update = await supabase
     .from('events')
-    .update({ status: 'on_board', published_by: null, published_at: now })
+    .update({ status: 'published', published_by: null, published_at: now })
     .eq('id', eventId)
+
+  if (update.error && isMissingPublishColumns(update.error)) {
+    update = await supabase
+      .from('events')
+      .update({ status: 'published' })
+      .eq('id', eventId)
+  }
   if (update.error) return jsonError(update.error.message, 500)
 
   const activity = await supabase
@@ -31,5 +48,5 @@ export async function POST(req: Request) {
     if (!message.includes('event_activity_log')) return jsonError(activity.error.message, 500)
   }
 
-  return NextResponse.json({ ok: true, status: 'on_board', published_at: now })
+  return NextResponse.json({ ok: true, status: 'published', published_at: now })
 }

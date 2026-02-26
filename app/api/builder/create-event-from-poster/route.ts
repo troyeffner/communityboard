@@ -21,6 +21,12 @@ function defaultNy2pmLocalIso() {
   return `${year}-${month}-${day}T14:00:00`
 }
 
+function normalizeStatus(raw: unknown): 'draft' | 'published' {
+  const value = String(raw || '').trim().toLowerCase()
+  if (value === 'published' || value === 'on_board') return 'published'
+  return 'draft'
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
@@ -42,6 +48,7 @@ export async function POST(req: Request) {
     body.event_attributes && typeof body.event_attributes === 'object' && !Array.isArray(body.event_attributes)
       ? body.event_attributes
       : {}
+  const normalizedStatus = normalizeStatus(body.status)
 
   const resolvedStartAt = startAt || defaultNy2pmLocalIso()
   const nyIsoGuess = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
@@ -52,7 +59,7 @@ export async function POST(req: Request) {
       location: location || null,
       description: description || null,
       start_at: nyIsoGuess,
-      status: 'planted',
+      status: normalizedStatus,
       is_recurring: Boolean(body.is_recurring),
       recurrence_rule: body.is_recurring ? String(body.recurrence_rule || '').trim() || null : null,
       event_category: String(body.event_category || '').trim() || null,
@@ -85,7 +92,7 @@ export async function POST(req: Request) {
         location: location || null,
         description: description || null,
         start_at: nyIsoGuess,
-        status: 'planted',
+        status: normalizedStatus,
       }])
       .select('id')
       .single()
@@ -99,5 +106,5 @@ export async function POST(req: Request) {
     .insert([{ poster_upload_id: posterUploadId, event_id: eventId, bbox }])
   if (link.error) return jsonError(link.error.message, 500)
 
-  return NextResponse.json({ ok: true, event_id: eventId, status: 'planted' })
+  return NextResponse.json({ ok: true, event_id: eventId, status: normalizedStatus })
 }

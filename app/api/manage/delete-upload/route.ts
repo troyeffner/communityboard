@@ -9,9 +9,9 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
 
-  const { poster_upload_id, mode } = body as { poster_upload_id?: string; mode?: 'unlink' | 'cascade' }
+  const { poster_upload_id, mode } = body as { poster_upload_id?: string; mode?: 'unlink' | 'cascade' | 'unlink_events' | 'delete_events' }
   if (!poster_upload_id) return jsonError('poster_upload_id is required')
-  const deleteMode = mode === 'cascade' ? 'cascade' : 'unlink'
+  const deleteMode = mode === 'cascade' || mode === 'delete_events' ? 'cascade' : 'unlink'
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -85,11 +85,13 @@ export async function POST(req: Request) {
 
   if (delUploadErr) return jsonError(delUploadErr.message, 500)
 
-  const { error: removeStorageErr } = await supabase.storage
-    .from('posters')
-    .remove([uploadRow.file_path])
+  if (uploadRow.file_path) {
+    const { error: removeStorageErr } = await supabase.storage
+      .from('posters')
+      .remove([uploadRow.file_path])
 
-  if (removeStorageErr) return jsonError(removeStorageErr.message, 500)
+    if (removeStorageErr) return jsonError(removeStorageErr.message, 500)
+  }
 
   return NextResponse.json({ ok: true, mode: deleteMode })
 }

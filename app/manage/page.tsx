@@ -12,12 +12,12 @@ type PosterUpload = {
   type?: string | null
   public_url?: string
   event_count: number
+  linked_count?: number
   business_count?: number
   processed_at: string | null
   done?: boolean
   is_done?: boolean
   object_type?: string | null
-  seen_at_category?: string | null
   seen_at_label?: string | null
 }
 
@@ -194,6 +194,7 @@ export default function ManagePage() {
   const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null)
   const [deletingUploadId, setDeletingUploadId] = useState<string | null>(null)
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null)
+  const [deleteChoiceUpload, setDeleteChoiceUpload] = useState<PosterUpload | null>(null)
 
   const [message, setMessage] = useState('')
   const [formError, setFormError] = useState('')
@@ -219,6 +220,11 @@ export default function ManagePage() {
       if (doneFilter === 'incomplete' && u.processed_at) return false
       if (uploadStatusFilter !== 'all' && u.status !== uploadStatusFilter) return false
       return true
+    }).sort((a, b) => {
+      const aDone = Boolean(a.is_done ?? a.done ?? a.processed_at)
+      const bDone = Boolean(b.is_done ?? b.done ?? b.processed_at)
+      if (aDone !== bDone) return aDone ? 1 : -1
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
   }, [uploads, typeFilter, doneFilter, uploadStatusFilter])
 
@@ -613,21 +619,12 @@ export default function ManagePage() {
     setUpdatingDone(false)
   }
 
-  async function deleteSubmission(upload: PosterUpload) {
-    const warning = upload.event_count > 0
-      ? `This submission has ${upload.event_count} linked item(s). Deleting it unlinks items but keeps events.`
-      : ''
-    const cascade = upload.event_count > 0 || (upload.business_count || 0) > 0
-      ? confirm('Delete linked records too? Click OK for cascade delete, Cancel for unlink only.')
-      : false
-    const confirmed = confirm(['Delete this submission image?', warning].filter(Boolean).join('\n\n'))
-    if (!confirmed) return
-
+  async function performDeleteSubmission(upload: PosterUpload, mode: 'unlink_events' | 'delete_events') {
     setDeletingUploadId(upload.id)
     const res = await fetch('/api/manage/delete-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ poster_upload_id: upload.id, mode: cascade ? 'cascade' : 'unlink' }),
+      body: JSON.stringify({ poster_upload_id: upload.id, mode }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setUploadsError(data?.error || 'Delete submission failed')
@@ -640,6 +637,24 @@ export default function ManagePage() {
 
     await refreshData()
     setDeletingUploadId(null)
+  }
+
+  async function deleteSubmission(upload: PosterUpload) {
+    const linkedCount = upload.linked_count ?? upload.event_count ?? 0
+    if (linkedCount === 0) {
+      const confirmed = confirm('Delete this submission image?')
+      if (!confirmed) return
+      await performDeleteSubmission(upload, 'unlink_events')
+      return
+    }
+    setDeleteChoiceUpload(upload)
+  }
+
+  async function selectNextIncomplete() {
+    const currentIndex = filteredUploads.findIndex((u) => u.id === selectedPosterId)
+    const start = currentIndex >= 0 ? currentIndex + 1 : 0
+    const next = [...filteredUploads.slice(start), ...filteredUploads.slice(0, start)].find((u) => !Boolean(u.is_done ?? u.done ?? u.processed_at))
+    if (next) setSelectedPosterId(next.id)
   }
 
   async function approveEvent(eventId: string) {
@@ -738,6 +753,9 @@ export default function ManagePage() {
       >
         <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto' }}>
           <h2 style={{ marginTop: 0 }}>Submissions</h2>
+          <div style={{ marginBottom: 8 }}>
+            <button data-variant="secondary" onClick={selectNextIncomplete}>Next incomplete</button>
+          </div>
 
           <div style={{ display: 'grid', gap: 8 }}>
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
@@ -764,8 +782,11 @@ export default function ManagePage() {
                 <div style={{ fontSize: 13 }}>{u.status} • {u.object_type || u.type || 'event_poster'} • events: {u.event_count} • businesses: {u.business_count || 0}</div>
                 {u.seen_at_label && (
                   <div style={{ fontSize: 12, marginTop: 2 }}>
-                    Seen at: {u.seen_at_label}{u.seen_at_category ? ` (${u.seen_at_category})` : ''}
+                    Seen at: {u.seen_at_label}
                   </div>
+                )}
+                {(u.linked_count ?? u.event_count ?? 0) === 0 && (
+                  <div style={{ fontSize: 12, marginTop: 2, color: '#92400e' }}>No events</div>
                 )}
                 <div style={{ fontSize: 12, marginTop: 2 }}>
                   {(u.is_done ?? u.done ?? Boolean(u.processed_at)) ? <span style={{ color: '#166534' }}>Done</span> : <span style={{ color: '#92400e' }}>Incomplete</span>}
@@ -915,9 +936,8 @@ export default function ManagePage() {
 
           <label style={{ display: 'block', marginTop: 8 }}>Status
             <select value={status} onChange={(e) => setStatus(e.target.value as EventStatus)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="published">published</option>
               <option value="draft">draft</option>
-              <option value="unpublished">unpublished</option>
+              <option value="published">published</option>
             </select>
           </label>
 
@@ -985,7 +1005,7 @@ export default function ManagePage() {
           <h3 style={{ marginTop: 18, marginBottom: 8 }}>All Events</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | EventStatus)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="all">All status</option><option value="published">Published</option><option value="draft">Draft</option><option value="unpublished">Unpublished</option>
+              <option value="all">All status</option><option value="draft">Draft</option><option value="published">Published</option>
             </select>
             <select value={linkedFilter} onChange={(e) => setLinkedFilter(e.target.value as 'all' | 'linked' | 'unlinked')} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="all">All link states</option><option value="linked">Linked</option><option value="unlinked">Unlinked</option>
@@ -1054,6 +1074,39 @@ export default function ManagePage() {
           )}
         </section>
       </div>
+      {deleteChoiceUpload && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center', zIndex: 50 }}>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16, width: 'min(560px, calc(100vw - 32px))' }}>
+            <h3 style={{ marginTop: 0 }}>Delete submission</h3>
+            <p style={{ marginTop: 0 }}>
+              This submission has {deleteChoiceUpload.linked_count ?? deleteChoiceUpload.event_count ?? 0} linked event(s).
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                data-variant="secondary"
+                onClick={async () => {
+                  const upload = deleteChoiceUpload
+                  setDeleteChoiceUpload(null)
+                  if (upload) await performDeleteSubmission(upload, 'unlink_events')
+                }}
+              >
+                Delete poster only
+              </button>
+              <button
+                data-variant="danger"
+                onClick={async () => {
+                  const upload = deleteChoiceUpload
+                  setDeleteChoiceUpload(null)
+                  if (upload) await performDeleteSubmission(upload, 'delete_events')
+                }}
+              >
+                Delete poster + linked events
+              </button>
+              <button data-variant="secondary" onClick={() => setDeleteChoiceUpload(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

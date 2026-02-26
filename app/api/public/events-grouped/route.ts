@@ -55,7 +55,7 @@ export async function GET() {
   const primary = await supabase
     .from('events')
     .select('id,title,location,start_at,status,created_at,is_recurring,recurrence_rule')
-    .in('status', ['on_board', 'published'])
+    .eq('status', 'published')
     .order('start_at', { ascending: true })
 
   let events: EventRow[] = []
@@ -65,7 +65,7 @@ export async function GET() {
     const fallback = await supabase
       .from('events')
       .select('id,title,location,start_at,status,created_at')
-      .eq('status', 'published')
+      .eq('status', (primary.error?.message || '').toLowerCase().includes('on_board') ? 'on_board' : 'published')
       .order('start_at', { ascending: true })
 
     if (fallback.error) return jsonError(fallback.error.message, 500)

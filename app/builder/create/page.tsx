@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 type Upload = {
   id: string
@@ -8,7 +9,6 @@ type Upload = {
   status: string
   public_url?: string
   seen_at_label?: string | null
-  seen_at_category?: string | null
   is_done?: boolean
   event_count: number
 }
@@ -44,7 +44,21 @@ function toDateTimeLocal(value?: string | null) {
   return new Date(dt.getTime() - offsetMs).toISOString().slice(0, 16)
 }
 
+function statusLabel(statusValue: string) {
+  if (statusValue === 'planted') return 'Recently planted'
+  if (statusValue === 'published') return 'Published'
+  if (statusValue === 'unpublished') return 'Returned for revision'
+  if (statusValue === 'archived') return 'Archived'
+  if (statusValue === 'draft') return 'Recently planted (legacy)'
+  if (statusValue === 'on_board') return 'Published (legacy)'
+  return statusValue
+}
+
 export default function BuilderCreatePage() {
+  const searchParams = useSearchParams()
+  const manualMode = searchParams.get('manual') === '1'
+  const posterUploadFromQuery = searchParams.get('poster_upload_id')
+
   const [uploads, setUploads] = useState<Upload[]>([])
   const [selectedPosterId, setSelectedPosterId] = useState<string | null>(null)
   const selectedUpload = useMemo(() => uploads.find((u) => u.id === selectedPosterId) || null, [uploads, selectedPosterId])
@@ -57,11 +71,9 @@ export default function BuilderCreatePage() {
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [startAt, setStartAt] = useState(defaultStartAt2pmLocal())
-  const [status, setStatus] = useState('planted')
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurrenceRule, setRecurrenceRule] = useState('')
   const [seenAtName, setSeenAtName] = useState('')
-  const [seenAtCategory, setSeenAtCategory] = useState('community_board')
 
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -93,6 +105,24 @@ export default function BuilderCreatePage() {
     loadUploads()
   }, [])
 
+  useEffect(() => {
+    if (!posterUploadFromQuery || selectedPosterId) return
+    const exists = uploads.find((u) => u.id === posterUploadFromQuery)
+    if (exists) {
+      selectPoster(posterUploadFromQuery)
+    }
+  }, [posterUploadFromQuery, selectedPosterId, uploads])
+
+  useEffect(() => {
+    if (!manualMode) return
+    try {
+      const savedSeenAt = window.localStorage.getItem('submit_seen_at_label') || ''
+      if (savedSeenAt && !seenAtName) setSeenAtName(savedSeenAt)
+    } catch {
+      // ignore localStorage failures
+    }
+  }, [manualMode, seenAtName])
+
   async function selectPoster(posterId: string) {
     const upload = uploads.find((u) => u.id === posterId) || null
     setSelectedPosterId(posterId)
@@ -105,11 +135,9 @@ export default function BuilderCreatePage() {
     setLocation('')
     setDescription('')
     setStartAt(defaultStartAt2pmLocal())
-    setStatus('planted')
     setIsRecurring(false)
     setRecurrenceRule('')
     setSeenAtName(upload?.seen_at_label || '')
-    setSeenAtCategory(upload?.seen_at_category || 'community_board')
     setZoom(1)
     setPan({ x: 0, y: 0 })
     await loadRows(posterId)
@@ -123,11 +151,9 @@ export default function BuilderCreatePage() {
     setLocation(row.event.location || '')
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
-    setStatus(row.event.status || 'planted')
     setIsRecurring(Boolean(row.event.is_recurring))
     setRecurrenceRule(row.event.recurrence_rule || '')
     setSeenAtName(selectedUpload?.seen_at_label || '')
-    setSeenAtCategory(selectedUpload?.seen_at_category || 'community_board')
   }
 
   function resetFormToNew() {
@@ -137,7 +163,6 @@ export default function BuilderCreatePage() {
     setLocation('')
     setDescription('')
     setStartAt(defaultStartAt2pmLocal())
-    setStatus('planted')
     setIsRecurring(false)
     setRecurrenceRule('')
   }
@@ -150,7 +175,6 @@ export default function BuilderCreatePage() {
       body: JSON.stringify({
         poster_upload_id: selectedPosterId,
         seen_at_name: seenAtName,
-        seen_at_category: seenAtCategory,
       }),
     })
     const data = await res.json().catch(() => ({}))
@@ -158,20 +182,27 @@ export default function BuilderCreatePage() {
       setError(data?.error || 'Failed to save Seen at')
       return false
     }
+    try {
+      window.localStorage.setItem('submit_seen_at_label', seenAtName.trim())
+    } catch {
+      // ignore localStorage failures
+    }
     return true
   }
 
   async function saveEvent() {
     setError('')
     setMessage('')
-    if (!selectedPosterId) return setError('Select a poster first.')
     if (!title.trim()) return setError('Title is required.')
     if (!startAt.trim()) return setError('Start time is required.')
+    if (!selectedPosterId && !manualMode) return setError('Select a poster first.')
 
     setSaving(true)
     try {
-      const seenAtOk = await saveSeenAt()
-      if (!seenAtOk) return
+      if (selectedPosterId) {
+        const seenAtOk = await saveSeenAt()
+        if (!seenAtOk) return
+      }
 
       if (editingEventId) {
         const res = await fetch('/api/builder/update-event', {
@@ -183,7 +214,6 @@ export default function BuilderCreatePage() {
             location,
             description,
             start_at: startAt,
-            status,
             is_recurring: isRecurring,
             recurrence_rule: isRecurring ? recurrenceRule : null,
           }),
@@ -193,6 +223,26 @@ export default function BuilderCreatePage() {
         setMessage('Updated.')
         await loadRows(selectedPosterId)
         await loadUploads()
+        return
+      }
+
+      if (!selectedPosterId) {
+        const manualRes = await fetch('/api/submit/manual-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            location,
+            description,
+            start_at: startAt,
+            is_recurring: isRecurring,
+            recurrence_rule: isRecurring ? recurrenceRule : null,
+          }),
+        })
+        const manualData = await manualRes.json().catch(() => ({}))
+        if (!manualRes.ok) return setError(manualData?.error || 'Failed to create draft event')
+        setMessage('Saved as draft.')
+        resetFormToNew()
         return
       }
 
@@ -207,7 +257,7 @@ export default function BuilderCreatePage() {
           location,
           description,
           start_at: startAt,
-          status,
+          status: 'draft',
           is_recurring: isRecurring,
           recurrence_rule: isRecurring ? recurrenceRule : null,
         }),
@@ -262,7 +312,7 @@ export default function BuilderCreatePage() {
   return (
     <main style={{ padding: 16, fontFamily: 'sans-serif', display: 'grid', gridTemplateColumns: '320px 1fr 420px', gap: 12, minHeight: '90vh' }}>
       <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto' }}>
-        <h1 style={{ marginTop: 0, marginBottom: 8 }}>Recently planted posters</h1>
+        <h1 style={{ marginTop: 0, marginBottom: 8 }}>Submissions</h1>
         <div style={{ display: 'grid', gap: 8 }}>
           {uploads.map((u) => (
             <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
@@ -280,7 +330,7 @@ export default function BuilderCreatePage() {
 
       <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <h2 style={{ marginTop: 0 }}>Poster workspace</h2>
-        {!selectedUpload?.public_url && <p style={{ opacity: 0.7 }}>Select a poster from the left list.</p>}
+        {!selectedUpload?.public_url && <p style={{ opacity: 0.7 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
           <>
             <div
@@ -381,7 +431,7 @@ export default function BuilderCreatePage() {
               <div key={row.link_id} style={{ border: activeLinkId === row.link_id ? '2px solid #ef4444' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
                 <div style={{ fontWeight: 600 }}>{row.event.title}</div>
                 <div style={{ fontSize: 12, opacity: 0.85 }}>
-                  {new Date(row.event.start_at).toLocaleString()} • {row.event.status}
+                  {new Date(row.event.start_at).toLocaleString()} • {statusLabel(row.event.status)}
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.75 }}>linked: {new Date(row.created_at).toLocaleString()}</div>
                 <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
@@ -395,18 +445,11 @@ export default function BuilderCreatePage() {
 
         <h3 style={{ marginTop: 14 }}>{editingEventId ? 'Edit event' : 'Create event'}</h3>
         <div style={{ display: 'grid', gap: 8 }}>
+          <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>New submissions are saved as draft and published later via approval workflow.</p>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
           <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-            <option value="planted">planted</option>
-            <option value="on_board">on_board</option>
-            <option value="archived">archived</option>
-            <option value="draft">draft</option>
-            <option value="published">published</option>
-            <option value="unpublished">unpublished</option>
-          </select>
           <label style={{ fontSize: 13, fontWeight: 600 }}>
             <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} /> Recurring
           </label>
@@ -416,13 +459,7 @@ export default function BuilderCreatePage() {
 
           <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
             <h4 style={{ margin: '0 0 6px 0' }}>Seen at</h4>
-            <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Seen at name" style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, marginBottom: 8 }} />
-            <select value={seenAtCategory} onChange={(e) => setSeenAtCategory(e.target.value)} style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="community_board">community_board</option>
-              <option value="window">window</option>
-              <option value="street">street</option>
-              <option value="other">other</option>
-            </select>
+            <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Seen at" style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           </div>
 
           <div style={{ display: 'flex', gap: 8 }}>

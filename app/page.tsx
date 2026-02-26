@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import PublicEventsList from './components/PublicEventsList'
 
 type EventStatus = 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
@@ -27,8 +28,10 @@ type LinkRow = {
   event_id: string
   poster_upload_id: string
   created_at: string
-  poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null }[] | null
+  poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }[] | null
 }
+
+type EventVoteRow = { event_id: string; voter_vid?: string | null }
 
 function isMissingOptionalEventColumns(message: string) {
   const lower = message.toLowerCase()
@@ -46,7 +49,7 @@ function isMissingOptionalEventColumns(message: string) {
   )
 }
 
-function isStatusEnumMismatch(message: string) {
+function isOnBoardEnumMismatch(message: string) {
   const lower = message.toLowerCase()
   return lower.includes('invalid input value for enum') && lower.includes('on_board')
 }
@@ -74,11 +77,13 @@ export default async function Home() {
   }
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
+  const requestHeaders = await headers()
+  const voterVid = requestHeaders.get('x-cb-vid')?.trim() || null
 
   const primary = await supabase
     .from('events')
     .select('id, title, location, description, start_at, status, created_at, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name,published_by,published_at')
-    .in('status', ['on_board', 'published'])
+    .eq('status', 'published')
     .order('start_at', { ascending: true })
 
   let events: EventRow[] = []
@@ -88,15 +93,17 @@ export default async function Home() {
     if (
       primary.error.code !== '42703' &&
       !isMissingOptionalEventColumns(primary.error.message || '') &&
-      !isStatusEnumMismatch(primary.error.message || '')
+      !isOnBoardEnumMismatch(primary.error.message || '')
     ) {
       errorMessage = primary.error.message
     } else {
-      const fallback = await supabase
+      const fallbackBase = supabase
         .from('events')
         .select('id, title, location, start_at, status, created_at')
-        .in('status', ['on_board', 'published'])
         .order('start_at', { ascending: true })
+      const fallback = isOnBoardEnumMismatch(primary.error.message || '')
+        ? await fallbackBase.eq('status', 'on_board')
+        : await fallbackBase.eq('status', 'published')
 
       if (fallback.error) {
         errorMessage = fallback.error.message
@@ -121,7 +128,7 @@ export default async function Home() {
 
   const linksPrimary = await supabase
     .from('poster_event_links')
-    .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name,seen_at_category)')
+    .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name)')
     .order('created_at', { ascending: false })
 
   let links = linksPrimary.data as LinkRow[] | null
@@ -138,7 +145,7 @@ export default async function Home() {
     } else {
       const fallbackLinks = await supabase
         .from('poster_event_links')
-        .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_category)')
+        .select('event_id, poster_upload_id, created_at, poster_uploads(file_path)')
         .order('created_at', { ascending: false })
 
       if (fallbackLinks.error) {
@@ -153,7 +160,8 @@ export default async function Home() {
   const latestPosterPathByEvent = new Map<string, string>()
   const latestPosterUploadByEvent = new Map<string, string>()
   const latestSeenAtByEvent = new Map<string, string>()
-  const latestSeenAtCategoryByEvent = new Map<string, string>()
+  const upvotesByEvent = new Map<string, number>()
+  const votedByMeEventIds = new Set<string>()
   const publisherIds = Array.from(new Set(events.map((e) => e.published_by).filter(Boolean))) as string[]
   const publisherNameById = new Map<string, string>()
   if (publisherIds.length > 0) {
@@ -172,7 +180,33 @@ export default async function Home() {
     latestPosterUploadByEvent.set(row.event_id, row.poster_upload_id)
     const seenAt = upload.seen_at_label || upload.seen_at_name || null
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
-    if (upload.seen_at_category) latestSeenAtCategoryByEvent.set(row.event_id, upload.seen_at_category)
+  }
+
+  if (events.length > 0) {
+    const eventIds = events.map((event) => event.id)
+    const voteCounts = await supabase
+      .from('event_votes')
+      .select('event_id')
+      .in('event_id', eventIds)
+
+    if (!voteCounts.error) {
+      for (const row of (voteCounts.data || []) as EventVoteRow[]) {
+        upvotesByEvent.set(row.event_id, (upvotesByEvent.get(row.event_id) || 0) + 1)
+      }
+    }
+
+    if (voterVid) {
+      const myVotes = await supabase
+        .from('event_votes')
+        .select('event_id')
+        .in('event_id', eventIds)
+        .eq('voter_vid', voterVid)
+      if (!myVotes.error) {
+        for (const row of (myVotes.data || []) as EventVoteRow[]) {
+          votedByMeEventIds.add(row.event_id)
+        }
+      }
+    }
   }
 
   const enriched = events.map((event) => {
@@ -188,7 +222,6 @@ export default async function Home() {
       poster_public_url,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
       seen_at_label: latestSeenAtByEvent.get(event.id) || null,
-      seen_at_category: latestSeenAtCategoryByEvent.get(event.id) || null,
       event_category: event.event_category || null,
       event_attributes: event.event_attributes || [],
       event_audience: event.event_audience || [],
@@ -196,6 +229,8 @@ export default async function Home() {
       description: event.description || null,
       published_by_name: event.published_by ? publisherNameById.get(event.published_by) || 'Community Builder' : null,
       published_at: event.published_at || null,
+      upvotes: upvotesByEvent.get(event.id) || 0,
+      votedByMe: votedByMeEventIds.has(event.id),
     }
   })
 

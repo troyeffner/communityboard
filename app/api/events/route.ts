@@ -18,7 +18,7 @@ type EventRow = {
   event_location_name?: string | null
 }
 
-function isStatusEnumMismatch(message: string) {
+function isOnBoardEnumMismatch(message: string) {
   const lower = message.toLowerCase()
   return lower.includes('invalid input value for enum') && lower.includes('on_board')
 }
@@ -28,10 +28,12 @@ type LinkRow = {
   created_at: string
   poster_upload_id: string
   poster_uploads:
-    | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null }
-    | Array<{ file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null }>
+    | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }
+    | Array<{ file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }>
     | null
 }
+
+type EventVoteRow = { event_id: string; voter_vid?: string | null }
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -66,18 +68,19 @@ export async function GET(req: Request) {
   const selectedAudience = audience.filter((tag) => audSet.has(tag))
 
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const voterVid = req.headers.get('x-cb-vid')?.trim() || null
   const primaryEvents = await supabase
     .from('events')
     .select('id,title,location,description,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name')
-    .in('status', ['on_board', 'published'])
+    .eq('status', 'published')
     .order('start_at', { ascending: true })
 
   let eventsResult = primaryEvents
-  if (primaryEvents.error && isStatusEnumMismatch(primaryEvents.error.message || '')) {
+  if (primaryEvents.error && isOnBoardEnumMismatch(primaryEvents.error.message || '')) {
     eventsResult = await supabase
       .from('events')
       .select('id,title,location,description,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name')
-      .eq('status', 'published')
+      .eq('status', 'on_board')
       .order('start_at', { ascending: true })
   }
 
@@ -85,7 +88,7 @@ export async function GET(req: Request) {
 
   const linksResult = await supabase
     .from('poster_event_links')
-    .select('event_id,poster_upload_id,created_at,poster_uploads(file_path,seen_at_label,seen_at_name,seen_at_category)')
+    .select('event_id,poster_upload_id,created_at,poster_uploads(file_path,seen_at_label,seen_at_name)')
     .order('created_at', { ascending: false })
 
   let links: LinkRow[] = []
@@ -94,7 +97,8 @@ export async function GET(req: Request) {
   const latestPosterPathByEvent = new Map<string, string>()
   const latestPosterUploadByEvent = new Map<string, string>()
   const latestSeenAtByEvent = new Map<string, string>()
-  const latestSeenAtCategoryByEvent = new Map<string, string>()
+  const upvotesByEvent = new Map<string, number>()
+  const votedByMeEventIds = new Set<string>()
 
   for (const row of links) {
     if (latestPosterPathByEvent.has(row.event_id)) continue
@@ -104,10 +108,37 @@ export async function GET(req: Request) {
     latestPosterUploadByEvent.set(row.event_id, row.poster_upload_id)
     const seenAt = upload.seen_at_label || upload.seen_at_name || null
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
-    if (upload.seen_at_category) latestSeenAtCategoryByEvent.set(row.event_id, upload.seen_at_category)
   }
 
-  const filtered = ((eventsResult.data || []) as EventRow[]).filter((event) => {
+  const eventsData = (eventsResult.data || []) as EventRow[]
+  if (eventsData.length > 0) {
+    const eventIds = eventsData.map((event) => event.id)
+    const votesResult = await supabase
+      .from('event_votes')
+      .select('event_id')
+      .in('event_id', eventIds)
+
+    if (!votesResult.error) {
+      for (const row of (votesResult.data || []) as EventVoteRow[]) {
+        upvotesByEvent.set(row.event_id, (upvotesByEvent.get(row.event_id) || 0) + 1)
+      }
+    }
+
+    if (voterVid) {
+      const myVotesResult = await supabase
+        .from('event_votes')
+        .select('event_id')
+        .in('event_id', eventIds)
+        .eq('voter_vid', voterVid)
+      if (!myVotesResult.error) {
+        for (const row of (myVotesResult.data || []) as EventVoteRow[]) {
+          votedByMeEventIds.add(row.event_id)
+        }
+      }
+    }
+  }
+
+  const filtered = eventsData.filter((event) => {
     if (recurringOnly && !event.is_recurring) return false
     if (selectedCategory && event.event_category !== selectedCategory) return false
     const eventAttrs = event.event_attributes || []
@@ -132,7 +163,8 @@ export async function GET(req: Request) {
       poster_public_url: posterPublicUrl,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
       seen_at_label: latestSeenAtByEvent.get(event.id) || null,
-      seen_at_category: latestSeenAtCategoryByEvent.get(event.id) || null,
+      upvotes: upvotesByEvent.get(event.id) || 0,
+      votedByMe: votedByMeEventIds.has(event.id),
     }
   })
 

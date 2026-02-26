@@ -5,6 +5,16 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
+function isMissingDoneColumns(error: { code?: string; message?: string } | null | undefined) {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '42703' ||
+    message.includes('done') ||
+    message.includes('is_done') ||
+    message.includes('schema cache')
+  )
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
@@ -17,10 +27,16 @@ export async function POST(req: Request) {
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
-  const update = await supabase
+  let update = await supabase
     .from('poster_uploads')
     .update({ is_done: isDone, done: isDone, processed_at: isDone ? new Date().toISOString() : null })
     .eq('id', posterUploadId)
+  if (update.error && isMissingDoneColumns(update.error)) {
+    update = await supabase
+      .from('poster_uploads')
+      .update({ processed_at: isDone ? new Date().toISOString() : null })
+      .eq('id', posterUploadId)
+  }
   if (update.error) return jsonError(update.error.message, 500)
 
   return NextResponse.json({ ok: true, is_done: isDone })

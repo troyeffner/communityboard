@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   const { error } = await supabase
     .from('events')
-    .update({ status: 'on_board' })
+    .update({ status: 'published' })
     .eq('id', event_id)
 
   if (error) return jsonError(error.message, 500)

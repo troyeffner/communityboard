@@ -6,7 +6,6 @@ type PosterRow = {
   id: string
   file_path: string
   created_at?: string
-  seen_at_category?: string | null
   seen_at_label?: string | null
   seen_at_name?: string | null
 }
@@ -65,7 +64,7 @@ export default async function PosterPage({
 
   const primary = await supabase
     .from('poster_uploads')
-    .select('id,file_path,created_at,seen_at_category,seen_at_label,seen_at_name')
+    .select('id,file_path,created_at,seen_at_label,seen_at_name')
     .eq('id', id)
     .limit(1)
 
@@ -78,7 +77,7 @@ export default async function PosterPage({
     }
     const fallbackWithName = await supabase
       .from('poster_uploads')
-      .select('id,file_path,created_at,seen_at_category,seen_at_name')
+      .select('id,file_path,created_at,seen_at_name')
       .eq('id', id)
       .limit(1)
     if (!fallbackWithName.error) {
@@ -130,9 +129,7 @@ export default async function PosterPage({
   const directUrl = rawPath.startsWith('http://') || rawPath.startsWith('https://') ? rawPath : ''
   const imageUrls = Array.from(new Set([directUrl, ...publicUrls].filter(Boolean)))
   const seenAt = poster.seen_at_label || poster.seen_at_name || null
-  const sourceLabel = seenAt
-    ? `Seen at: ${seenAt}${poster.seen_at_category ? ` (${poster.seen_at_category})` : ''}`
-    : null
+  const sourceLabel = seenAt ? `Seen at: ${seenAt}` : null
 
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '16px 16px 24px', fontFamily: 'sans-serif' }}>

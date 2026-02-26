@@ -11,7 +11,6 @@ function isMissingSeenAtColumnError(error: { code?: string; message?: string } |
     error?.code === '42703' ||
     message.includes('seen_at_label') ||
     message.includes('seen_at_name') ||
-    message.includes('seen_at_category') ||
     message.includes('schema cache')
   )
 }
@@ -23,7 +22,6 @@ export async function POST(req: Request) {
   if (!posterUploadId) return jsonError('poster_upload_id is required')
 
   const seenAtName = String(body.seen_at_name || '').trim() || null
-  const seenAtCategory = String(body.seen_at_category || '').trim() || null
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
@@ -32,7 +30,7 @@ export async function POST(req: Request) {
 
   const primary = await supabase
     .from('poster_uploads')
-    .update({ seen_at_label: seenAtName, seen_at_name: seenAtName, seen_at_category: seenAtCategory })
+    .update({ seen_at_label: seenAtName, seen_at_name: seenAtName })
     .eq('id', posterUploadId)
   if (primary.error && !isMissingSeenAtColumnError(primary.error)) return jsonError(primary.error.message, 500)
 
@@ -44,5 +42,5 @@ export async function POST(req: Request) {
     if (fallback.error && !isMissingSeenAtColumnError(fallback.error)) return jsonError(fallback.error.message, 500)
   }
 
-  return NextResponse.json({ ok: true, seen_at_name: seenAtName, seen_at_category: seenAtCategory })
+  return NextResponse.json({ ok: true, seen_at_name: seenAtName })
 }

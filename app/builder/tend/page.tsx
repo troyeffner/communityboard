@@ -5,12 +5,34 @@ import { useEffect, useState } from 'react'
 type Row = {
   id: string
   title: string
+  description: string | null
   location: string | null
   start_at: string
   status: string
   created_at: string
   is_recurring: boolean
   is_linked: boolean
+}
+
+function normalizeStatusForEdit(raw?: string | null) {
+  const value = (raw || '').toLowerCase()
+  if (value === 'published' || value === 'on_board') return 'published'
+  return 'draft'
+}
+
+function toDateTimeLocal(value?: string | null) {
+  if (!value) return ''
+  const dt = new Date(value)
+  if (Number.isNaN(dt.getTime())) return ''
+  const offsetMs = dt.getTimezoneOffset() * 60_000
+  return new Date(dt.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+function statusLabel(statusValue: string) {
+  const value = statusValue.toLowerCase()
+  if (value === 'planted' || value === 'draft') return 'Draft'
+  if (value === 'published' || value === 'on_board') return 'Published'
+  return statusValue
 }
 
 export default function BuilderTendPage() {
@@ -20,6 +42,12 @@ export default function BuilderTendPage() {
   const [recurring, setRecurring] = useState(false)
   const [q, setQ] = useState('')
   const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editStartAt, setEditStartAt] = useState('')
+  const [editStatus, setEditStatus] = useState('draft')
 
   async function load() {
     setError('')
@@ -79,6 +107,48 @@ export default function BuilderTendPage() {
     await load()
   }
 
+  function beginEdit(row: Row) {
+    setError('')
+    setEditingId(row.id)
+    setEditTitle(row.title || '')
+    setEditLocation(row.location || '')
+    setEditDescription(row.description || '')
+    setEditStartAt(toDateTimeLocal(row.start_at))
+    setEditStatus(normalizeStatusForEdit(row.status))
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditTitle('')
+    setEditLocation('')
+    setEditDescription('')
+    setEditStartAt('')
+    setEditStatus('draft')
+  }
+
+  async function saveEdit() {
+    if (!editingId) return
+    if (!editTitle.trim()) return setError('Title is required')
+    if (!editStartAt.trim()) return setError('Start is required')
+
+    const res = await fetch('/api/builder/update-event', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event_id: editingId,
+        title: editTitle,
+        location: editLocation,
+        description: editDescription,
+        start_at: editStartAt,
+        status: editStatus,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return setError(data?.error || 'Save failed')
+    cancelEdit()
+    await load()
+  }
+
   return (
     <main style={{ padding: 16, fontFamily: 'sans-serif' }}>
       <h1 style={{ margin: 0 }}>Builder Tend</h1>
@@ -87,9 +157,8 @@ export default function BuilderTendPage() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">All status</option>
-          <option value="planted">Recently planted</option>
-          <option value="on_board">On board</option>
-          <option value="archived">Archived</option>
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
         </select>
         <select value={linked} onChange={(e) => setLinked(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">Linked + unlinked</option>
@@ -119,18 +188,39 @@ export default function BuilderTendPage() {
             <tr key={row.id}>
               <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{row.title}</td>
               <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{new Date(row.start_at).toLocaleString()}</td>
-              <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{row.status}</td>
+              <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{statusLabel(row.status)}</td>
               <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{row.is_linked ? 'linked' : 'unlinked'}</td>
               <td style={{ borderTop: '1px solid #eee', padding: 8, display: 'flex', gap: 6 }}>
-                {row.status !== 'on_board' && (
+                {row.status !== 'on_board' && row.status !== 'published' && (
                   <button onClick={() => publish(row.id)}>Publish to board</button>
                 )}
+                <button data-variant="secondary" onClick={() => beginEdit(row)}>Edit</button>
                 <button data-variant="danger" onClick={() => removeEvent(row.id)}>Remove</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {editingId && (
+        <section style={{ marginTop: 14, border: '1px solid #e5e7eb', borderRadius: 10, padding: 10, maxWidth: 560 }}>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Edit event</h3>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+            <input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="Location" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+            <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1', resize: 'vertical' }} />
+            <input type="datetime-local" value={editStartAt} onChange={(e) => setEditStartAt(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+            <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={saveEdit}>Save changes</button>
+              <button data-variant="secondary" onClick={cancelEdit}>Cancel</button>
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   )
 }

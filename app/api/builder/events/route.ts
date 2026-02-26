@@ -20,6 +20,19 @@ type Row = {
   event_location_address: string | null
 }
 
+function isMissingOptionalColumns(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes('is_recurring') ||
+    lower.includes('recurrence_rule') ||
+    lower.includes('event_location_name') ||
+    lower.includes('event_location_address') ||
+    lower.includes('description') ||
+    lower.includes('end_at') ||
+    lower.includes('schema cache')
+  )
+}
+
 export async function GET(req: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.DEV_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.DEV_SUPABASE_SERVICE_ROLE_KEY
@@ -37,7 +50,31 @@ export async function GET(req: Request) {
     .select('id,title,description,location,start_at,end_at,status,is_recurring,recurrence_rule,created_at,event_location_name,event_location_address')
     .order('created_at', { ascending: false })
     .limit(300)
-  if (eventsResult.error) return jsonError(eventsResult.error.message, 500)
+
+  let events: Row[] = []
+  if (eventsResult.error) {
+    if (eventsResult.error.code !== '42703' && !isMissingOptionalColumns(eventsResult.error.message || '')) {
+      return jsonError(eventsResult.error.message, 500)
+    }
+
+    const fallback = await supabase
+      .from('events')
+      .select('id,title,location,start_at,status,created_at')
+      .order('created_at', { ascending: false })
+      .limit(300)
+    if (fallback.error) return jsonError(fallback.error.message, 500)
+    events = ((fallback.data || []) as Array<Omit<Row, 'description' | 'end_at' | 'is_recurring' | 'recurrence_rule' | 'event_location_name' | 'event_location_address'>>).map((row) => ({
+      ...row,
+      description: null,
+      end_at: null,
+      is_recurring: false,
+      recurrence_rule: null,
+      event_location_name: null,
+      event_location_address: null,
+    }))
+  } else {
+    events = (eventsResult.data || []) as Row[]
+  }
 
   const linksResult = await supabase.from('poster_event_links').select('event_id,poster_upload_id')
   if (linksResult.error) return jsonError(linksResult.error.message, 500)
@@ -48,7 +85,7 @@ export async function GET(req: Request) {
     if (!posterByEvent.has(row.event_id)) posterByEvent.set(row.event_id, row.poster_upload_id)
   }
 
-  const rows = ((eventsResult.data || []) as Row[])
+  const rows = events
     .map((row) => ({
       ...row,
       is_recurring: Boolean(row.is_recurring),

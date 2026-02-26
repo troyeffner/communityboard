@@ -65,14 +65,12 @@ export const AUDIENCE = [
   'artists_makers',
 ] as const
 
-export const SEEN_AT_CATEGORIES = ['community_board', 'window', 'street', 'other'] as const
 export const OBJECT_TYPES = ['event_poster', 'business_cards', 'mixed'] as const
 
 export type EventCategory = (typeof EVENT_CATEGORIES)[number]
 export type BusinessCategory = (typeof BUSINESS_CATEGORIES)[number]
 export type AttributeTag = (typeof ATTRIBUTES)[number]
 export type AudienceTag = (typeof AUDIENCE)[number]
-export type SeenAtCategory = (typeof SEEN_AT_CATEGORIES)[number]
 export type ObjectType = (typeof OBJECT_TYPES)[number]
 
 export function asStringArray(value: unknown): string[] {
