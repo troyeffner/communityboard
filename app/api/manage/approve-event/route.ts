@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { EVENT_STATUSES } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
 
   const { error } = await supabase
     .from('events')
-    .update({ status: 'published' })
+    .update({ status: EVENT_STATUSES.PUBLISHED })
     .eq('id', event_id)
 
   if (error) return jsonError(error.message, 500)

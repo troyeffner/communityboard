@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { EVENT_STATUSES, POSTER_STATUSES, normalizeEventStatus, normalizePosterStatus } from '@/lib/statuses'
 
 type Upload = {
   id: string
@@ -45,12 +46,11 @@ function toDateTimeLocal(value?: string | null) {
 }
 
 function statusLabel(statusValue: string) {
-  if (statusValue === 'planted') return 'Recently planted'
-  if (statusValue === 'published') return 'Published'
-  if (statusValue === 'unpublished') return 'Returned for revision'
-  if (statusValue === 'archived') return 'Archived'
-  if (statusValue === 'draft') return 'Recently planted (legacy)'
-  if (statusValue === 'on_board') return 'Published (legacy)'
+  const normalized = normalizeEventStatus(statusValue, EVENT_STATUSES.DRAFT)
+  if (normalized === EVENT_STATUSES.PLANTED) return 'Recently planted'
+  if (normalized === EVENT_STATUSES.PUBLISHED) return 'Published'
+  if (normalized === EVENT_STATUSES.UNPUBLISHED) return 'Returned for revision'
+  if (normalized === EVENT_STATUSES.DRAFT) return 'Draft'
   return statusValue
 }
 
@@ -79,7 +79,7 @@ export default function BuilderCreatePage({
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurrenceRule, setRecurrenceRule] = useState('')
   const [seenAtName, setSeenAtName] = useState('')
-  const [eventStatus, setEventStatus] = useState<'draft' | 'published'>('draft')
+  const [eventStatus, setEventStatus] = useState<'draft' | 'published' | 'planted' | 'unpublished'>(EVENT_STATUSES.DRAFT)
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadingPoster, setUploadingPoster] = useState(false)
@@ -163,7 +163,7 @@ export default function BuilderCreatePage({
     setStartAt(defaultStartAt2pmLocal())
     setIsRecurring(false)
     setRecurrenceRule('')
-    setEventStatus('draft')
+    setEventStatus(EVENT_STATUSES.DRAFT)
     setSeenAtName(upload?.seen_at_name || '')
     setZoom(1)
     setPan({ x: 0, y: 0 })
@@ -178,7 +178,7 @@ export default function BuilderCreatePage({
     setLocation(row.event.location || '')
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
-    setEventStatus((row.event.status || '').toLowerCase() === 'published' ? 'published' : 'draft')
+    setEventStatus(normalizeEventStatus(row.event.status, EVENT_STATUSES.DRAFT))
     setIsRecurring(Boolean(row.event.is_recurring))
     setRecurrenceRule(row.event.recurrence_rule || '')
     setSeenAtName(selectedUpload?.seen_at_name || '')
@@ -193,7 +193,7 @@ export default function BuilderCreatePage({
     setStartAt(defaultStartAt2pmLocal())
     setIsRecurring(false)
     setRecurrenceRule('')
-    setEventStatus('draft')
+    setEventStatus(EVENT_STATUSES.DRAFT)
   }
 
   async function saveSeenAt() {
@@ -324,6 +324,8 @@ export default function BuilderCreatePage({
       if (uploadInputRef.current) uploadInputRef.current.value = ''
       await loadUploads()
       await selectPoster(newPosterId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setUploadingPoster(false)
     }
@@ -484,7 +486,7 @@ export default function BuilderCreatePage({
           </div>
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
-          {uploads.filter((u) => (u.status || '').toLowerCase() !== 'done').map((u) => (
+          {uploads.filter((u) => normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE).map((u) => (
             <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr auto', gap: 8, alignItems: 'start' }}>
                 {u.public_url ? (
@@ -499,7 +501,7 @@ export default function BuilderCreatePage({
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12 }}>{new Date(u.created_at).toLocaleString()}</div>
                   <div style={{ fontSize: 12, marginTop: 2 }}>
-                    {((u.status || '').toLowerCase() === 'done' || u.is_done) ? 'Done' : 'Incomplete'} • status: {u.status || 'new'} • Linked: {u.linked_count ?? u.event_count ?? 0}
+                    {(normalizePosterStatus(u.status) === POSTER_STATUSES.DONE || u.is_done) ? 'Done' : 'Incomplete'} • status: {normalizePosterStatus(u.status)} • Linked: {u.linked_count ?? u.event_count ?? 0}
                   </div>
                   {!!u.seen_at_name && (
                     <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -649,9 +651,11 @@ export default function BuilderCreatePage({
         <div style={{ display: 'grid', gap: 8 }}>
           <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>New submissions are saved as draft and published later via approval workflow.</p>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          <select value={eventStatus} onChange={(e) => setEventStatus(e.target.value as 'draft' | 'published')} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-            <option value="draft">draft</option>
-            <option value="published">published</option>
+          <select value={eventStatus} onChange={(e) => setEventStatus(e.target.value as 'draft' | 'published' | 'planted' | 'unpublished')} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+            <option value={EVENT_STATUSES.DRAFT}>draft</option>
+            <option value={EVENT_STATUSES.PLANTED}>planted</option>
+            <option value={EVENT_STATUSES.PUBLISHED}>published</option>
+            <option value={EVENT_STATUSES.UNPUBLISHED}>unpublished</option>
           </select>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />

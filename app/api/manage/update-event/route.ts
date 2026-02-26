@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES, asStringArray, toSet } from '@/lib/taxonomy'
-
-type EventStatus = 'draft' | 'published' | 'unpublished'
+import { EVENT_STATUSES, normalizeEventStatus } from '@/lib/statuses'
 const SOURCE_TYPES = new Set([
   'community_board',
   'window_display',
@@ -59,7 +58,7 @@ export async function POST(req: Request) {
     source_place?: string
     source_detail?: string
     start_at?: string
-    status?: EventStatus
+    status?: string
     is_recurring?: boolean
     recurrence_rule?: string | null
     event_category?: string | null
@@ -79,7 +78,7 @@ export async function POST(req: Request) {
   if (!id) return jsonError('id is required')
   if (!title?.trim()) return jsonError('title is required')
   if (!start_at?.trim()) return jsonError('start_at is required')
-  if (status !== 'draft' && status !== 'published' && status !== 'unpublished') return jsonError('Invalid status')
+  const normalizedStatus = normalizeEventStatus(status, EVENT_STATUSES.DRAFT)
 
   const recurring = Boolean(is_recurring)
   const recurrenceRule = recurrence_rule?.trim() || null
@@ -109,7 +108,7 @@ export async function POST(req: Request) {
     source_place: source_place?.trim() || null,
     source_detail: source_detail?.trim() || null,
     start_at: nyIsoGuess,
-    status,
+    status: normalizedStatus,
     is_recurring: recurring,
     recurrence_rule: recurring ? recurrenceRule : null,
     event_category: parsedCategory,

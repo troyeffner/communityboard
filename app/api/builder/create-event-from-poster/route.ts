@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { EVENT_STATUSES, normalizeEventStatus } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -19,12 +20,6 @@ function defaultNy2pmLocalIso() {
   const day = parts.find((p) => p.type === 'day')?.value
   if (!year || !month || !day) return '2000-01-01T14:00:00'
   return `${year}-${month}-${day}T14:00:00`
-}
-
-function normalizeStatus(raw: unknown): 'draft' | 'published' {
-  const value = String(raw || '').trim().toLowerCase()
-  if (value === 'published' || value === 'on_board') return 'published'
-  return 'draft'
 }
 
 export async function POST(req: Request) {
@@ -48,7 +43,7 @@ export async function POST(req: Request) {
     body.event_attributes && typeof body.event_attributes === 'object' && !Array.isArray(body.event_attributes)
       ? body.event_attributes
       : {}
-  const normalizedStatus = normalizeStatus(body.status)
+  const normalizedStatus = normalizeEventStatus(body.status, EVENT_STATUSES.DRAFT)
 
   const resolvedStartAt = startAt || defaultNy2pmLocalIso()
   const nyIsoGuess = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt

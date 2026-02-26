@@ -136,3 +136,31 @@ Run full regression gate (tests + lint + build):
 ```bash
 npm run test:regression
 ```
+
+Optional DB enum/status smoke test (runs real inserts/links against Supabase):
+
+```bash
+RUN_DB_REGRESSION=1 npm test -- tests/regression/db-status-smoke.test.mjs
+```
+
+## Enum / Schema Alignment (DEV + PROD)
+
+Use migration:
+
+`db/migrations/20260226_enum_schema_alignment.sql`
+
+This migration aligns:
+- `poster_status` enum to support `new`, `tending`, `done`, `uploaded`
+- `event_status` enum to support `draft`, `published`, `unpublished`, `planted`
+- additive columns on `poster_uploads` and `events` used by the app
+
+Before applying, you can inspect enum values in SQL editor:
+
+```sql
+select unnest(enum_range(null::poster_status)) as v;
+select unnest(enum_range(null::event_status)) as v;
+```
+
+Apply order:
+1. Apply enum/schema migration first (DEV, then PROD).
+2. Deploy app code that writes `poster_uploads.status='new'`.

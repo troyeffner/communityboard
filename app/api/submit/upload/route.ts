@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
+import { POSTER_STATUSES } from '@/lib/statuses'
 
 export const runtime = 'nodejs'
 
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
   // Insert poster_uploads row
   const insertPayload = {
     file_path: filePath,
-    status: 'new',
+    status: POSTER_STATUSES.NEW,
     seen_at_name,
     is_done: false,
   }
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
       .insert([
         {
           file_path: filePath,
-          status: 'new',
+          status: POSTER_STATUSES.NEW,
           seen_at_name,
         },
       ])
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
     if (insertErr) {
       const fallbackPlain = await supabase
         .from('poster_uploads')
-        .insert([{ file_path: filePath, status: 'new' }])
+        .insert([{ file_path: filePath, status: POSTER_STATUSES.NEW }])
         .select('id')
         .single()
 

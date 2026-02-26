@@ -89,8 +89,8 @@ export default function SubmitPage() {
       if (!reuseSeenAt) setSeenAtName('')
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
-    } catch {
-      setMessage('Upload failed')
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setSubmitting(false)
     }

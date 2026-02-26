@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { EVENT_STATUSES } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -29,13 +30,13 @@ export async function POST(req: Request) {
   const now = new Date().toISOString()
   let update = await supabase
     .from('events')
-    .update({ status: 'published', published_by: null, published_at: now })
+    .update({ status: EVENT_STATUSES.PUBLISHED, published_by: null, published_at: now })
     .eq('id', eventId)
 
   if (update.error && isMissingPublishColumns(update.error)) {
     update = await supabase
       .from('events')
-      .update({ status: 'published' })
+      .update({ status: EVENT_STATUSES.PUBLISHED })
       .eq('id', eventId)
   }
   if (update.error) return jsonError(update.error.message, 500)
@@ -48,5 +49,5 @@ export async function POST(req: Request) {
     if (!message.includes('event_activity_log')) return jsonError(activity.error.message, 500)
   }
 
-  return NextResponse.json({ ok: true, status: 'published', published_at: now })
+  return NextResponse.json({ ok: true, status: EVENT_STATUSES.PUBLISHED, published_at: now })
 }

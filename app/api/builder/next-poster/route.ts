@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { POSTER_STATUSES } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -15,7 +16,7 @@ export async function GET() {
   const query = await supabase
     .from('poster_uploads')
     .select('id,created_at,status')
-    .neq('status', 'done')
+    .neq('status', POSTER_STATUSES.DONE)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()

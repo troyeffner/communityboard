@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES, asStringArray, toSet } from '@/lib/taxonomy'
+import { EVENT_STATUSES, normalizeEventStatus } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
 type BBoxPoint = { x: number; y: number }
-type EventStatus = 'draft' | 'published' | 'unpublished'
 
 function isMissingRecurrenceColumnError(error: { code?: string; message?: string } | null | undefined) {
   const message = (error?.message || '').toLowerCase()
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     location?: string
     description?: string
     start_at?: string
-    status?: EventStatus
+    status?: string
     bbox?: BBoxPoint
     is_recurring?: boolean
     recurrence_rule?: string | null
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
 
   if (!poster_upload_id) return jsonError('poster_upload_id is required')
   if (!title?.trim()) return jsonError('title is required')
-  if (status !== 'draft' && status !== 'published' && status !== 'unpublished') return jsonError('Invalid status')
+  const normalizedStatus = normalizeEventStatus(status, EVENT_STATUSES.DRAFT)
 
   if (!bbox || typeof bbox.x !== 'number' || typeof bbox.y !== 'number') {
     return jsonError('bbox is required (x,y). Click the image to set a pin.')
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
     source_place: null,
     source_detail: null,
     start_at: nyIsoGuess,
-    status,
+    status: normalizedStatus,
     is_recurring: recurring,
     recurrence_rule: recurring ? recurrenceRule : null,
     event_category: parsedCategory,
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
           title: eventPayload.title,
           location: eventPayload.location,
           start_at: eventPayload.start_at,
-          status: eventPayload.status,
+          status: normalizedStatus,
         },
       ])
       .select('id')

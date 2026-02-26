@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES, asStringArray, toSet } from '@/lib/taxonomy'
-
-type EventStatus = 'draft' | 'published' | 'unpublished'
+import { EVENT_STATUSES } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -56,7 +55,7 @@ export async function POST(req: Request) {
     event_audience?: string[] | string | null
     event_location_name?: string | null
     event_location_address?: string | null
-    status?: EventStatus
+    status?: string
   }
 
   if (!title?.trim()) return jsonError('title is required')
@@ -85,7 +84,7 @@ export async function POST(req: Request) {
     location: location?.trim() || null,
     description: description?.trim() || null,
     start_at: nyIsoGuess,
-    status: 'draft' as EventStatus,
+    status: EVENT_STATUSES.DRAFT,
     is_recurring: recurring,
     recurrence_rule: recurring ? rule : null,
     event_category: parsedCategory,

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { POSTER_STATUSES } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
-  const nextStatus = isDone ? 'done' : 'tending'
+  const nextStatus = isDone ? POSTER_STATUSES.DONE : POSTER_STATUSES.TENDING
 
   let update = await supabase
     .from('poster_uploads')
