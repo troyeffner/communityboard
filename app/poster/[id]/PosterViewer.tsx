@@ -19,6 +19,7 @@ type PinchState = {
   midX: number
   midY: number
 } | null
+type TouchPoint = { clientX: number; clientY: number }
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
@@ -116,11 +117,11 @@ export default function PosterViewer({
     setTranslateY(clamped.y)
   }
 
-  function touchDistance(t1: Touch, t2: Touch) {
+  function touchDistance(t1: TouchPoint, t2: TouchPoint) {
     return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
   }
 
-  function touchMid(t1: Touch, t2: Touch) {
+  function touchMid(t1: TouchPoint, t2: TouchPoint) {
     return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }
   }
 
