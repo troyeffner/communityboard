@@ -15,6 +15,17 @@ type UploadRow = {
 
 type LinkRow = { poster_upload_id: string }
 
+function isMissingDoneColumns(error: { code?: string; message?: string } | null | undefined) {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '42703' ||
+    message.includes('done') ||
+    message.includes('is_done') ||
+    message.includes('processed_at') ||
+    message.includes('schema cache')
+  )
+}
+
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -30,9 +41,26 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  if (uploadsRes.error) return NextResponse.json({ error: uploadsRes.error.message }, { status: 500 })
+  let uploads = (uploadsRes.data || []) as UploadRow[]
+  if (uploadsRes.error) {
+    if (!isMissingDoneColumns(uploadsRes.error)) {
+      return NextResponse.json({ error: uploadsRes.error.message }, { status: 500 })
+    }
 
-  const uploads = (uploadsRes.data || []) as UploadRow[]
+    const fallback = await supabase
+      .from('poster_uploads')
+      .select('id,file_path,status,created_at,object_type,seen_at_name')
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 })
+    uploads = ((fallback.data || []) as UploadRow[]).map((row) => ({
+      ...row,
+      done: false,
+      is_done: false,
+      processed_at: null,
+    }))
+  }
   const uploadIds = uploads.map((u) => u.id)
 
   let linkedCountByUpload: Record<string, number> = {}
@@ -64,4 +92,3 @@ export async function GET() {
 
   return NextResponse.json({ uploads: rows })
 }
-
