@@ -28,11 +28,16 @@ export async function POST(req: Request) {
 
   const insert = await supabase
     .from('event_votes')
-    .insert([{ event_id: eventId, voter_vid: voterVid }], { onConflict: 'event_id,voter_vid', ignoreDuplicates: true })
+    .insert([{ event_id: eventId, voter_vid: voterVid }])
 
   if (insert.error) {
-    if (isMissingVotesTable(insert.error)) return jsonError('event_votes table is missing. Run migrations.', 500)
-    return jsonError(insert.error.message, 500)
+    // Unique (event_id, voter_vid): treat repeated upvote as success.
+    if (insert.error.code === '23505') {
+      // no-op
+    } else {
+      if (isMissingVotesTable(insert.error)) return jsonError('event_votes table is missing. Run migrations.', 500)
+      return jsonError(insert.error.message, 500)
+    }
   }
 
   const countResult = await supabase
