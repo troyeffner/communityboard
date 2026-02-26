@@ -15,6 +15,9 @@ export async function GET() {
     const lower = message.toLowerCase()
     return (
       lower.includes('done') ||
+      lower.includes('is_done') ||
+      lower.includes('object_type') ||
+      lower.includes('seen_at_category') ||
       lower.includes('seen_at_label') ||
       lower.includes('seen_at_name') ||
       lower.includes('schema cache')
@@ -23,7 +26,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('poster_uploads')
-    .select('id, file_path, status, created_at, done, seen_at_label, seen_at_name')
+    .select('id, file_path, status, created_at, done, is_done, object_type, seen_at_category, seen_at_label, seen_at_name')
     .order('created_at', { ascending: false })
     .limit(20)
 
@@ -41,7 +44,7 @@ export async function GET() {
     if (!fallbackWithSeenAtName.error) {
       const uploadsWithUrls = (fallbackWithSeenAtName.data || []).map((u) => {
         const { data: pub } = supabase.storage.from('posters').getPublicUrl(u.file_path)
-        return { ...u, done: false, seen_at_label: u.seen_at_name || null, seen_at_name: u.seen_at_name || null, public_url: pub.publicUrl }
+        return { ...u, done: false, is_done: false, object_type: 'event_poster', seen_at_category: null, seen_at_label: u.seen_at_name || null, seen_at_name: u.seen_at_name || null, public_url: pub.publicUrl }
       })
 
       return NextResponse.json({ uploads: uploadsWithUrls })
@@ -57,7 +60,7 @@ export async function GET() {
 
     const uploadsWithUrls = (fallback.data || []).map((u) => {
       const { data: pub } = supabase.storage.from('posters').getPublicUrl(u.file_path)
-      return { ...u, done: false, seen_at_label: null, seen_at_name: null, public_url: pub.publicUrl }
+      return { ...u, done: false, is_done: false, object_type: 'event_poster', seen_at_category: null, seen_at_label: null, seen_at_name: null, public_url: pub.publicUrl }
     })
 
     return NextResponse.json({ uploads: uploadsWithUrls })
@@ -65,7 +68,15 @@ export async function GET() {
 
   const uploadsWithUrls = (data || []).map((u) => {
     const { data: pub } = supabase.storage.from('posters').getPublicUrl(u.file_path)
-    return { ...u, seen_at_label: u.seen_at_label || u.seen_at_name || null, public_url: pub.publicUrl }
+    return {
+      ...u,
+      done: Boolean((u as { is_done?: boolean | null }).is_done ?? u.done),
+      is_done: Boolean((u as { is_done?: boolean | null }).is_done ?? u.done),
+      object_type: (u as { object_type?: string | null }).object_type || 'event_poster',
+      seen_at_category: (u as { seen_at_category?: string | null }).seen_at_category || null,
+      seen_at_label: u.seen_at_label || u.seen_at_name || null,
+      public_url: pub.publicUrl,
+    }
   })
 
   return NextResponse.json({ uploads: uploadsWithUrls })

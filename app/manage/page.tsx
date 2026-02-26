@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES } from '@/lib/taxonomy'
 
-type EventStatus = 'draft' | 'published'
+type EventStatus = 'draft' | 'published' | 'unpublished'
 
 type PosterUpload = {
   id: string
@@ -11,8 +12,12 @@ type PosterUpload = {
   type?: string | null
   public_url?: string
   event_count: number
+  business_count?: number
   processed_at: string | null
   done?: boolean
+  is_done?: boolean
+  object_type?: string | null
+  seen_at_category?: string | null
   seen_at_label?: string | null
 }
 
@@ -28,6 +33,11 @@ type EventRecord = {
   status: EventStatus
   is_recurring?: boolean
   recurrence_rule?: string | null
+  event_category?: string | null
+  event_attributes?: string[] | null
+  event_audience?: string[] | null
+  event_location_name?: string | null
+  event_location_address?: string | null
 }
 
 type PosterEventRow = {
@@ -41,6 +51,16 @@ type AllEventRow = EventRecord & {
   created_at: string
   linked_count: number
   is_linked: boolean
+  poster_upload_id: string | null
+}
+type ApprovalQueueRow = {
+  id: string
+  title: string
+  location: string | null
+  start_at: string
+  status: EventStatus
+  created_at: string
+  source_type: 'poster' | 'manual'
   poster_upload_id: string | null
 }
 
@@ -130,6 +150,9 @@ export default function ManagePage() {
 
   const [allEvents, setAllEvents] = useState<AllEventRow[]>([])
   const [allEventsError, setAllEventsError] = useState('')
+  const [approvalQueue, setApprovalQueue] = useState<ApprovalQueueRow[]>([])
+  const [approvalError, setApprovalError] = useState('')
+  const [approvingEventId, setApprovingEventId] = useState<string | null>(null)
 
   const [typeFilter, setTypeFilter] = useState<'all' | string>('all')
   const [doneFilter, setDoneFilter] = useState<'all' | 'done' | 'incomplete'>('all')
@@ -138,11 +161,20 @@ export default function ManagePage() {
   const [statusFilter, setStatusFilter] = useState<'all' | EventStatus>('all')
   const [linkedFilter, setLinkedFilter] = useState<'all' | 'linked' | 'unlinked'>('all')
   const [recurringFilter, setRecurringFilter] = useState<'all' | 'recurring'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<'all' | string>('all')
+  const [attributeFilter, setAttributeFilter] = useState<string[]>([])
+  const [audienceFilter, setAudienceFilter] = useState<string[]>([])
+  const [searchFilter, setSearchFilter] = useState('')
 
   const [title, setTitle] = useState('')
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [sourcePlace, setSourcePlace] = useState('')
+  const [eventCategory, setEventCategory] = useState<string>('')
+  const [eventAttributes, setEventAttributes] = useState<string[]>([])
+  const [eventAudience, setEventAudience] = useState<string[]>([])
+  const [eventLocationName, setEventLocationName] = useState('')
+  const [eventLocationAddress, setEventLocationAddress] = useState('')
   const [startAt, setStartAt] = useState(defaultStartAt2pmLocal())
   const [status, setStatus] = useState<EventStatus>('published')
 
@@ -196,9 +228,16 @@ export default function ManagePage() {
       if (linkedFilter === 'linked' && !event.is_linked) return false
       if (linkedFilter === 'unlinked' && event.is_linked) return false
       if (recurringFilter === 'recurring' && !event.is_recurring) return false
+      if (categoryFilter !== 'all' && event.event_category !== categoryFilter) return false
+      if (attributeFilter.length > 0 && !attributeFilter.every((tag) => (event.event_attributes || []).includes(tag))) return false
+      if (audienceFilter.length > 0 && !audienceFilter.every((tag) => (event.event_audience || []).includes(tag))) return false
+      if (searchFilter.trim()) {
+        const haystack = `${event.title} ${event.location || ''} ${event.description || ''}`.toLowerCase()
+        if (!haystack.includes(searchFilter.trim().toLowerCase())) return false
+      }
       return true
     })
-  }, [allEvents, statusFilter, linkedFilter, recurringFilter])
+  }, [allEvents, statusFilter, linkedFilter, recurringFilter, categoryFilter, attributeFilter, audienceFilter, searchFilter])
 
   const isEditMode = editingEventId !== null
 
@@ -222,6 +261,11 @@ export default function ManagePage() {
     setLocation('')
     setDescription('')
     setSourcePlace(selectedUpload?.seen_at_label || '')
+    setEventCategory('')
+    setEventAttributes([])
+    setEventAudience([])
+    setEventLocationName('')
+    setEventLocationAddress('')
     setStartAt(defaultStartAt2pmLocal())
     setStatus('published')
     setIsRecurring(false)
@@ -287,8 +331,19 @@ export default function ManagePage() {
     setAllEvents((data.rows || []) as AllEventRow[])
   }
 
+  async function loadApprovalQueue() {
+    setApprovalError('')
+    const res = await fetch('/api/manage/approval-queue')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setApprovalError(data?.error || 'Failed to load approval queue')
+      return
+    }
+    setApprovalQueue((data.rows || []) as ApprovalQueueRow[])
+  }
+
   async function refreshData() {
-    await Promise.all([loadUploads(), loadPosterEvents(selectedPosterId), loadAllEvents()])
+    await Promise.all([loadUploads(), loadPosterEvents(selectedPosterId), loadAllEvents(), loadApprovalQueue()])
   }
 
   useEffect(() => {
@@ -301,6 +356,7 @@ export default function ManagePage() {
   useEffect(() => {
     loadUploads()
     loadAllEvents()
+    loadApprovalQueue()
   }, [])
 
   useEffect(() => {
@@ -374,6 +430,11 @@ export default function ManagePage() {
     setLocation(event.location || '')
     setDescription(event.description || '')
     setSourcePlace(event.source_place || '')
+    setEventCategory(event.event_category || '')
+    setEventAttributes(event.event_attributes || [])
+    setEventAudience(event.event_audience || [])
+    setEventLocationName(event.event_location_name || '')
+    setEventLocationAddress(event.event_location_address || '')
     setStartAt(toDateTimeLocal(event.start_at))
     setStatus('published')
 
@@ -477,6 +538,11 @@ export default function ManagePage() {
             description,
             source_place: sourcePlace,
             seen_at_label: sourcePlace,
+            event_category: eventCategory || null,
+            event_attributes: eventAttributes,
+            event_audience: eventAudience,
+            event_location_name: eventLocationName,
+            event_location_address: eventLocationAddress,
             start_at: startAt,
             status,
             is_recurring: isRecurring,
@@ -505,6 +571,11 @@ export default function ManagePage() {
           location,
           description,
           source_place: effectiveSourcePlace,
+          event_category: eventCategory || null,
+          event_attributes: eventAttributes,
+          event_audience: eventAudience,
+          event_location_name: eventLocationName,
+          event_location_address: eventLocationAddress,
           start_at: startAt,
           status,
           bbox: point,
@@ -531,13 +602,13 @@ export default function ManagePage() {
     const res = await fetch('/api/manage/set-upload-processed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ poster_upload_id: selectedPosterId, processed: true }),
+      body: JSON.stringify({ poster_upload_id: selectedPosterId, processed: !(selectedUpload?.is_done ?? selectedUpload?.done ?? Boolean(selectedUpload?.processed_at)) }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setProcessingError(data?.error || 'Failed to mark done')
     else {
       await loadUploads()
-      setMessage('Marked done.')
+      setMessage((selectedUpload?.is_done ?? selectedUpload?.done ?? Boolean(selectedUpload?.processed_at)) ? 'Marked incomplete.' : 'Marked done.')
     }
     setUpdatingDone(false)
   }
@@ -546,6 +617,9 @@ export default function ManagePage() {
     const warning = upload.event_count > 0
       ? `This submission has ${upload.event_count} linked item(s). Deleting it unlinks items but keeps events.`
       : ''
+    const cascade = upload.event_count > 0 || (upload.business_count || 0) > 0
+      ? confirm('Delete linked records too? Click OK for cascade delete, Cancel for unlink only.')
+      : false
     const confirmed = confirm(['Delete this submission image?', warning].filter(Boolean).join('\n\n'))
     if (!confirmed) return
 
@@ -553,7 +627,7 @@ export default function ManagePage() {
     const res = await fetch('/api/manage/delete-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ poster_upload_id: upload.id }),
+      body: JSON.stringify({ poster_upload_id: upload.id, mode: cascade ? 'cascade' : 'unlink' }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) setUploadsError(data?.error || 'Delete submission failed')
@@ -566,6 +640,23 @@ export default function ManagePage() {
 
     await refreshData()
     setDeletingUploadId(null)
+  }
+
+  async function approveEvent(eventId: string) {
+    setApprovingEventId(eventId)
+    const res = await fetch('/api/manage/approve-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_id: eventId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) setApprovalError(data?.error || 'Approve failed')
+    await refreshData()
+    setApprovingEventId(null)
+  }
+
+  function toggleTag(list: string[], setList: (value: string[]) => void, tag: string) {
+    setList(list.includes(tag) ? list.filter((item) => item !== tag) : [...list, tag])
   }
 
   async function deleteLinked(linkId: string) {
@@ -607,6 +698,32 @@ export default function ManagePage() {
   return (
     <main style={{ padding: 16, fontFamily: 'sans-serif', height: '100vh', overflow: 'hidden' }}>
       <h1 style={{ margin: '0 0 12px 0' }}>Manage</h1>
+      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+        <h2 style={{ margin: '0 0 8px 0' }}>Approval Queue</h2>
+        {approvalError && <p style={{ color: 'crimson', marginTop: 0 }}>{approvalError}</p>}
+        {approvalQueue.length === 0 ? (
+          <p style={{ margin: 0, opacity: 0.7 }}>No draft events waiting for approval.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: 8 }}>
+            {approvalQueue.map((item) => (
+              <div key={item.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{item.title}</div>
+                  <div style={{ fontSize: 13, opacity: 0.8 }}>
+                    {formatDateTime(item.start_at)} • {item.location || 'No location'} • {item.source_type}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button data-variant="secondary" onClick={() => focusEvent(item as unknown as AllEventRow)}>Edit</button>
+                  <button onClick={() => approveEvent(item.id)} disabled={approvingEventId === item.id}>
+                    {approvingEventId === item.id ? 'Approving...' : 'Approve'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div
         style={{
@@ -644,14 +761,14 @@ export default function ManagePage() {
             {filteredUploads.map((u) => (
               <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 10, padding: 8 }}>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>{formatDateTime(u.created_at)}</div>
-                <div style={{ fontSize: 13 }}>{u.status} • {u.type || 'poster'} • linked: {u.event_count}</div>
+                <div style={{ fontSize: 13 }}>{u.status} • {u.object_type || u.type || 'event_poster'} • events: {u.event_count} • businesses: {u.business_count || 0}</div>
                 {u.seen_at_label && (
                   <div style={{ fontSize: 12, marginTop: 2 }}>
-                    Seen at: {u.seen_at_label}
+                    Seen at: {u.seen_at_label}{u.seen_at_category ? ` (${u.seen_at_category})` : ''}
                   </div>
                 )}
                 <div style={{ fontSize: 12, marginTop: 2 }}>
-                  {(u.done ?? Boolean(u.processed_at)) ? <span style={{ color: '#166534' }}>Done</span> : <span style={{ color: '#92400e' }}>Incomplete</span>}
+                  {(u.is_done ?? u.done ?? Boolean(u.processed_at)) ? <span style={{ color: '#166534' }}>Done</span> : <span style={{ color: '#92400e' }}>Incomplete</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                   <button data-variant="secondary" onClick={() => setSelectedPosterId(u.id)}>
@@ -724,7 +841,7 @@ export default function ManagePage() {
               </div>
 
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={markDone} disabled={updatingDone}>{updatingDone ? 'Saving...' : 'Mark Done'}</button>
+                <button onClick={markDone} disabled={updatingDone}>{updatingDone ? 'Saving...' : ((selectedUpload?.is_done ?? selectedUpload?.done ?? Boolean(selectedUpload?.processed_at)) ? 'Mark Incomplete' : 'Mark Done')}</button>
                 <button data-variant="secondary" onClick={() => { setHasUserAdjustedView(true); setZoom((z) => Math.min(4, Number((z + 0.25).toFixed(2)))) }}>Zoom +</button>
                 <button data-variant="secondary" onClick={() => { setHasUserAdjustedView(true); setZoom((z) => Math.max(1, Number((z - 0.25).toFixed(2)))) }}>Zoom -</button>
                 <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); setHasUserAdjustedView(false) }}>Reset view</button>
@@ -759,6 +876,39 @@ export default function ManagePage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
           </label>
 
+          <label style={{ display: 'block', marginTop: 8 }}>Category
+            <select value={eventCategory} onChange={(e) => setEventCategory(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+              <option value="">Select category</option>
+              {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </label>
+          <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Attributes</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {ATTRIBUTES.map((tag) => (
+                <label key={tag} style={{ fontSize: 12, fontWeight: 500 }}>
+                  <input type="checkbox" checked={eventAttributes.includes(tag)} onChange={() => toggleTag(eventAttributes, setEventAttributes, tag)} /> {tag}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Audience</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {AUDIENCE.map((tag) => (
+                <label key={tag} style={{ fontSize: 12, fontWeight: 500 }}>
+                  <input type="checkbox" checked={eventAudience.includes(tag)} onChange={() => toggleTag(eventAudience, setEventAudience, tag)} /> {tag}
+                </label>
+              ))}
+            </div>
+          </div>
+          <label style={{ display: 'block', marginTop: 8 }}>Event location name
+            <input value={eventLocationName} onChange={(e) => setEventLocationName(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+          </label>
+          <label style={{ display: 'block', marginTop: 8 }}>Event location address
+            <input value={eventLocationAddress} onChange={(e) => setEventLocationAddress(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+          </label>
+
           <label style={{ display: 'block', marginTop: 8 }}>Start
             <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           </label>
@@ -767,6 +917,7 @@ export default function ManagePage() {
             <select value={status} onChange={(e) => setStatus(e.target.value as EventStatus)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="published">published</option>
               <option value="draft">draft</option>
+              <option value="unpublished">unpublished</option>
             </select>
           </label>
 
@@ -834,7 +985,7 @@ export default function ManagePage() {
           <h3 style={{ marginTop: 18, marginBottom: 8 }}>All Events</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | EventStatus)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="all">All status</option><option value="published">Published</option><option value="draft">Draft</option>
+              <option value="all">All status</option><option value="published">Published</option><option value="draft">Draft</option><option value="unpublished">Unpublished</option>
             </select>
             <select value={linkedFilter} onChange={(e) => setLinkedFilter(e.target.value as 'all' | 'linked' | 'unlinked')} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="all">All link states</option><option value="linked">Linked</option><option value="unlinked">Unlinked</option>
@@ -842,7 +993,26 @@ export default function ManagePage() {
             <select value={recurringFilter} onChange={(e) => setRecurringFilter(e.target.value as 'all' | 'recurring')} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="all">All recurrence</option><option value="recurring">Recurring only</option>
             </select>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+              <option value="all">All categories</option>
+              {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <input value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} placeholder="Search..." style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }} />
             <button data-variant="secondary" onClick={loadAllEvents}>Refresh</button>
+          </div>
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {ATTRIBUTES.map((tag) => (
+              <button key={tag} data-variant={attributeFilter.includes(tag) ? undefined : 'secondary'} onClick={() => toggleTag(attributeFilter, setAttributeFilter, tag)}>
+                {tag}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {AUDIENCE.map((tag) => (
+              <button key={tag} data-variant={audienceFilter.includes(tag) ? undefined : 'secondary'} onClick={() => toggleTag(audienceFilter, setAudienceFilter, tag)}>
+                {tag}
+              </button>
+            ))}
           </div>
 
           {allEventsError && <p style={{ color: 'crimson' }}>{allEventsError}</p>}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
+import { OBJECT_TYPES, SEEN_AT_CATEGORIES, toSet } from '@/lib/taxonomy'
 
 export const runtime = 'nodejs'
 
@@ -23,9 +24,17 @@ export async function POST(req: Request) {
   if (!file.type.startsWith('image/')) return jsonError('File must be an image')
 
   const seen_at_type = String(form.get('seen_at_type') || '').trim().toLowerCase() || null
+  const seen_at_categoryRaw = String(form.get('seen_at_category') || '').trim().toLowerCase() || null
+  const object_typeRaw = String(form.get('object_type') || 'event_poster').trim().toLowerCase()
   const seen_at_label = String(form.get('seen_at_label') || form.get('seen_at_name') || '').trim() || null
   const seen_at_notes = String(form.get('seen_at_notes') || '').trim() || null
   const seen_at_confidence = String(form.get('seen_at_confidence') || '').trim().toLowerCase() || 'unknown'
+  const seenAtCategorySet = toSet(SEEN_AT_CATEGORIES)
+  const objectTypeSet = toSet(OBJECT_TYPES)
+  const seen_at_category = seen_at_categoryRaw && seenAtCategorySet.has(seen_at_categoryRaw)
+    ? seen_at_categoryRaw
+    : null
+  const object_type = objectTypeSet.has(object_typeRaw) ? object_typeRaw : 'event_poster'
 
   const latRaw = String(form.get('seen_at_lat') || '').trim()
   const lngRaw = String(form.get('seen_at_lng') || '').trim()
@@ -63,12 +72,15 @@ export async function POST(req: Request) {
     file_path: filePath,
     status: 'uploaded',
     seen_at_type,
+    seen_at_category,
     seen_at_label,
     seen_at_name: seen_at_label,
     seen_at_notes,
     seen_at_lat,
     seen_at_lng,
     seen_at_confidence,
+    object_type,
+    is_done: false,
   }
 
   const insert = await supabase

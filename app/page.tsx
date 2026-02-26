@@ -9,18 +9,23 @@ type EventRow = {
   id: string
   title: string
   location: string | null
+  description?: string | null
   start_at: string
   status: EventStatus
   created_at: string
   is_recurring?: boolean | null
   recurrence_rule?: string | null
+  event_category?: string | null
+  event_attributes?: string[] | null
+  event_audience?: string[] | null
+  event_location_name?: string | null
 }
 
 type LinkRow = {
   event_id: string
   poster_upload_id: string
   created_at: string
-  poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null }[] | null
+  poster_uploads: { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null } | { file_path: string; seen_at_label?: string | null; seen_at_name?: string | null; seen_at_category?: string | null }[] | null
 }
 
 function nyDateKey(date: Date) {
@@ -49,7 +54,7 @@ export default async function Home() {
 
   const primary = await supabase
     .from('events')
-    .select('id, title, location, start_at, status, created_at, is_recurring, recurrence_rule')
+    .select('id, title, location, description, start_at, status, created_at, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name')
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
@@ -62,7 +67,7 @@ export default async function Home() {
     } else {
       const fallback = await supabase
         .from('events')
-        .select('id, title, location, start_at, status, created_at')
+        .select('id, title, location, description, start_at, status, created_at')
         .eq('status', 'published')
         .order('start_at', { ascending: true })
 
@@ -82,7 +87,7 @@ export default async function Home() {
 
   const linksPrimary = await supabase
     .from('poster_event_links')
-    .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name)')
+    .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_label,seen_at_name,seen_at_category)')
     .order('created_at', { ascending: false })
 
   let links = linksPrimary.data as LinkRow[] | null
@@ -99,7 +104,7 @@ export default async function Home() {
     } else {
       const fallbackLinks = await supabase
         .from('poster_event_links')
-        .select('event_id, poster_upload_id, created_at, poster_uploads(file_path)')
+        .select('event_id, poster_upload_id, created_at, poster_uploads(file_path,seen_at_category)')
         .order('created_at', { ascending: false })
 
       if (fallbackLinks.error) {
@@ -114,6 +119,7 @@ export default async function Home() {
   const latestPosterPathByEvent = new Map<string, string>()
   const latestPosterUploadByEvent = new Map<string, string>()
   const latestSeenAtByEvent = new Map<string, string>()
+  const latestSeenAtCategoryByEvent = new Map<string, string>()
   for (const row of (links || []) as LinkRow[]) {
     if (latestPosterPathByEvent.has(row.event_id)) continue
     const upload = Array.isArray(row.poster_uploads) ? row.poster_uploads[0] : row.poster_uploads
@@ -122,6 +128,7 @@ export default async function Home() {
     latestPosterUploadByEvent.set(row.event_id, row.poster_upload_id)
     const seenAt = upload.seen_at_label || upload.seen_at_name || null
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
+    if (upload.seen_at_category) latestSeenAtCategoryByEvent.set(row.event_id, upload.seen_at_category)
   }
 
   const enriched = events.map((event) => {
@@ -137,6 +144,12 @@ export default async function Home() {
       poster_public_url,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
       seen_at_label: latestSeenAtByEvent.get(event.id) || null,
+      seen_at_category: latestSeenAtCategoryByEvent.get(event.id) || null,
+      event_category: event.event_category || null,
+      event_attributes: event.event_attributes || [],
+      event_audience: event.event_audience || [],
+      event_location_name: event.event_location_name || null,
+      description: event.description || null,
     }
   })
 
@@ -165,6 +178,9 @@ export default async function Home() {
       }}
     >
       <h1>Utica Community Board</h1>
+      <p style={{ marginTop: 0, marginBottom: 12 }}>
+        <a href="/businesses">Browse Businesses & Services</a>
+      </p>
 
       {errorMessage && <pre style={{ whiteSpace: 'pre-wrap' }}>Error: {errorMessage}</pre>}
 

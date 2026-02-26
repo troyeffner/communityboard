@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { EVENT_CATEGORIES, ATTRIBUTES, AUDIENCE, OBJECT_TYPES, SEEN_AT_CATEGORIES } from '@/lib/taxonomy'
 
 async function resizeImage(file: File): Promise<File> {
   const imageUrl = URL.createObjectURL(file)
@@ -53,11 +54,19 @@ export default function SubmitPage() {
   const [location, setLocation] = useState('')
   const [startAt, setStartAt] = useState(defaultStartAt2pmLocal())
   const [description, setDescription] = useState('')
+  const [manualCategory, setManualCategory] = useState('')
+  const [manualAttributes, setManualAttributes] = useState<string[]>([])
+  const [manualAudience, setManualAudience] = useState<string[]>([])
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurrenceRule, setRecurrenceRule] = useState('')
 
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [objectType, setObjectType] = useState('event_poster')
+  const [seenAtCategory, setSeenAtCategory] = useState('community_board')
   const [seenAtLabel, setSeenAtLabel] = useState('')
   const [seenAtNotes, setSeenAtNotes] = useState('')
+  const [reuseSeenAt, setReuseSeenAt] = useState(true)
   const [seenAtLat, setSeenAtLat] = useState<number | null>(null)
   const [seenAtLng, setSeenAtLng] = useState<number | null>(null)
   const [locationStatus, setLocationStatus] = useState('')
@@ -65,6 +74,10 @@ export default function SubmitPage() {
   useEffect(() => {
     const saved = window.localStorage.getItem('submit_seen_at_label')
     if (saved) setSeenAtLabel(saved)
+    const savedCategory = window.localStorage.getItem('submit_seen_at_category')
+    if (savedCategory) setSeenAtCategory(savedCategory)
+    const savedObjectType = window.localStorage.getItem('submit_object_type')
+    if (savedObjectType) setObjectType(savedObjectType)
   }, [])
 
   function onFileChange(nextFile: File | null) {
@@ -86,13 +99,22 @@ export default function SubmitPage() {
       const resized = await resizeImage(file)
       const form = new FormData()
       form.append('file', resized)
+      form.append('object_type', objectType)
+      form.append('seen_at_category', seenAtCategory)
       form.append('seen_at_label', seenAtLabel)
       form.append('seen_at_notes', seenAtNotes)
       if (seenAtLat !== null) form.append('seen_at_lat', String(seenAtLat))
       if (seenAtLng !== null) form.append('seen_at_lng', String(seenAtLng))
       const confidence = seenAtLat !== null && seenAtLng !== null ? 'gps' : seenAtLabel.trim() ? 'typed' : 'unknown'
       form.append('seen_at_confidence', confidence)
-      window.localStorage.setItem('submit_seen_at_label', seenAtLabel.trim())
+      if (reuseSeenAt) {
+        window.localStorage.setItem('submit_seen_at_label', seenAtLabel.trim())
+        window.localStorage.setItem('submit_seen_at_category', seenAtCategory)
+        window.localStorage.setItem('submit_object_type', objectType)
+      } else {
+        window.localStorage.removeItem('submit_seen_at_label')
+        window.localStorage.removeItem('submit_seen_at_category')
+      }
 
       setMessage('Uploading...')
       const res = await fetch('/api/submit/upload', { method: 'POST', body: form })
@@ -108,6 +130,10 @@ export default function SubmitPage() {
       setSeenAtLat(null)
       setSeenAtLng(null)
       setLocationStatus('')
+      if (!reuseSeenAt) {
+        setSeenAtLabel('')
+        setSeenAtCategory('community_board')
+      }
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
     } catch {
@@ -155,6 +181,11 @@ export default function SubmitPage() {
           location,
           description,
           start_at: startAt,
+          event_category: manualCategory || null,
+          event_attributes: manualAttributes,
+          event_audience: manualAudience,
+          is_recurring: isRecurring,
+          recurrence_rule: isRecurring ? recurrenceRule : null,
           // manual entries remain draft/unpublished in backend
         }),
       })
@@ -167,6 +198,11 @@ export default function SubmitPage() {
       setTitle('')
       setLocation('')
       setDescription('')
+      setManualCategory('')
+      setManualAttributes([])
+      setManualAudience([])
+      setIsRecurring(false)
+      setRecurrenceRule('')
       setStartAt(defaultStartAt2pmLocal())
       setMessage('Manual event submitted to approval queue.')
     } catch {
@@ -174,6 +210,10 @@ export default function SubmitPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function toggleTag(values: string[], setter: (next: string[]) => void, tag: string) {
+    setter(values.includes(tag) ? values.filter((v) => v !== tag) : [...values, tag])
   }
 
   return (
@@ -200,8 +240,21 @@ export default function SubmitPage() {
             <label style={{ display: 'block', marginTop: 8 }}>Seen at (where you found this poster)
               <input value={seenAtLabel} onChange={(e) => setSeenAtLabel(e.target.value)} placeholder="e.g., Emmerson Cafe Community Board" style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
             </label>
+            <label style={{ display: 'block', marginTop: 8 }}>Seen at category
+              <select value={seenAtCategory} onChange={(e) => setSeenAtCategory(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                {SEEN_AT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'block', marginTop: 8 }}>Object type
+              <select value={objectType} onChange={(e) => setObjectType(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                {OBJECT_TYPES.map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
             <label style={{ display: 'block', marginTop: 8 }}>Notes (optional)
               <input value={seenAtNotes} onChange={(e) => setSeenAtNotes(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+            </label>
+            <label style={{ display: 'block', marginTop: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={reuseSeenAt} onChange={(e) => setReuseSeenAt(e.target.checked)} /> Use same seen-at for next upload
             </label>
             <button type="button" data-variant="secondary" onClick={captureLocation} style={{ marginTop: 10 }}>
               Use my current location
@@ -247,6 +300,40 @@ export default function SubmitPage() {
           <label>Description
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
           </label>
+          <label>Category
+            <select value={manualCategory} onChange={(e) => setManualCategory(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+              <option value="">Select category</option>
+              {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </label>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>Attributes</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+              {ATTRIBUTES.map((tag) => (
+                <label key={tag} style={{ fontSize: 12, fontWeight: 500 }}>
+                  <input type="checkbox" checked={manualAttributes.includes(tag)} onChange={() => toggleTag(manualAttributes, setManualAttributes, tag)} /> {tag}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>Audience</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+              {AUDIENCE.map((tag) => (
+                <label key={tag} style={{ fontSize: 12, fontWeight: 500 }}>
+                  <input type="checkbox" checked={manualAudience.includes(tag)} onChange={() => toggleTag(manualAudience, setManualAudience, tag)} /> {tag}
+                </label>
+              ))}
+            </div>
+          </div>
+          <label style={{ fontSize: 13 }}>
+            <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} /> Recurring event
+          </label>
+          {isRecurring && (
+            <label>Recurrence rule
+              <input value={recurrenceRule} onChange={(e) => setRecurrenceRule(e.target.value)} placeholder="e.g., monthly:first:tuesday" style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+            </label>
+          )}
 
           <button onClick={submitManual} style={{ width: '100%', minHeight: 44 }} disabled={!title || submitting}>
             {submitting ? 'Submitting...' : 'Submit Manual Event'}

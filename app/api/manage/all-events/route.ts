@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES, asStringArray, toSet } from '@/lib/taxonomy'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-type EventStatus = 'draft' | 'published'
+type EventStatus = 'draft' | 'published' | 'unpublished'
 
 type EventRow = {
   id: string
@@ -20,6 +21,11 @@ type EventRow = {
   created_at: string
   is_recurring: boolean | null
   recurrence_rule: string | null
+  event_category: string | null
+  event_attributes: string[] | null
+  event_audience: string[] | null
+  event_location_name: string | null
+  event_location_address: string | null
 }
 
 type LinkRow = {
@@ -37,20 +43,29 @@ function isMissingOptionalColumns(error: { code?: string; message?: string } | n
     message.includes('source_type') ||
     message.includes('source_place') ||
     message.includes('source_detail') ||
+    message.includes('event_category') ||
+    message.includes('event_attributes') ||
+    message.includes('event_audience') ||
+    message.includes('event_location_name') ||
+    message.includes('event_location_address') ||
     message.includes('schema cache')
   )
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const categorySet = toSet(EVENT_CATEGORIES)
+  const attributeSet = toSet(ATTRIBUTES)
+  const audienceSet = toSet(AUDIENCE)
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
+  const params = new URL(req.url).searchParams
 
   const primary = await supabase
     .from('events')
-    .select('id,title,location,description,source_type,source_place,source_detail,start_at,status,created_at,is_recurring,recurrence_rule')
+    .select('id,title,location,description,source_type,source_place,source_detail,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name,event_location_address')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -74,6 +89,11 @@ export async function GET() {
       source_detail: null,
       is_recurring: false,
       recurrence_rule: null,
+      event_category: null,
+      event_attributes: [],
+      event_audience: [],
+      event_location_name: null,
+      event_location_address: null,
     }))
   } else {
     events = (primary.data || []) as EventRow[]
@@ -101,10 +121,39 @@ export async function GET() {
     source_detail: e.source_detail || null,
     is_recurring: Boolean(e.is_recurring),
     recurrence_rule: e.recurrence_rule || null,
+    event_category: e.event_category || null,
+    event_attributes: e.event_attributes || [],
+    event_audience: e.event_audience || [],
+    event_location_name: e.event_location_name || null,
+    event_location_address: e.event_location_address || null,
     linked_count: linkCounts.get(e.id) || 0,
     is_linked: (linkCounts.get(e.id) || 0) > 0,
     poster_upload_id: latestPosterByEvent.get(e.id) || null,
   }))
 
-  return NextResponse.json({ rows })
+  const status = params.get('status')
+  const linked = params.get('linked')
+  const recurringOnly = params.get('recurringOnly')
+  const category = params.get('category')
+  const q = params.get('q')?.trim().toLowerCase() || ''
+  const attrs = asStringArray(params.get('attr')).filter((tag) => attributeSet.has(tag))
+  const aud = asStringArray(params.get('aud')).filter((tag) => audienceSet.has(tag))
+  const validCategory = category && categorySet.has(category) ? category : null
+
+  const filtered = rows.filter((row) => {
+    if (status && row.status !== status) return false
+    if (linked === 'linked' && !row.is_linked) return false
+    if (linked === 'unlinked' && row.is_linked) return false
+    if (recurringOnly === 'true' && !row.is_recurring) return false
+    if (validCategory && row.event_category !== validCategory) return false
+    if (attrs.length > 0 && !attrs.every((tag) => (row.event_attributes || []).includes(tag))) return false
+    if (aud.length > 0 && !aud.every((tag) => (row.event_audience || []).includes(tag))) return false
+    if (q) {
+      const haystack = `${row.title} ${row.location || ''} ${row.description || ''}`.toLowerCase()
+      if (!haystack.includes(q)) return false
+    }
+    return true
+  })
+
+  return NextResponse.json({ rows: filtered })
 }

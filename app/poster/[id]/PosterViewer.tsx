@@ -127,22 +127,6 @@ export default function PosterViewer({
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button data-variant="secondary" onClick={() => zoomTo(effectiveScale + 0.2)}>Zoom +</button>
-        <button data-variant="secondary" onClick={() => zoomTo(effectiveScale - 0.2)}>Zoom -</button>
-        <button
-          data-variant="secondary"
-          onClick={() => {
-            setUserInteracted(false)
-            setScale(1)
-            setTranslateX(0)
-            setTranslateY(0)
-          }}
-        >
-          Reset
-        </button>
-      </div>
-
       <div
         ref={stageRef}
         onMouseDown={(e) => {
@@ -325,6 +309,21 @@ export default function PosterViewer({
             Poster image unavailable for this record.
           </div>
         )}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button data-variant="secondary" onClick={() => zoomTo(effectiveScale + 0.2)}>Zoom +</button>
+        <button data-variant="secondary" onClick={() => zoomTo(effectiveScale - 0.2)}>Zoom -</button>
+        <button
+          data-variant="secondary"
+          onClick={() => {
+            setUserInteracted(false)
+            setScale(1)
+            setTranslateX(0)
+            setTranslateY(0)
+          }}
+        >
+          Reset
+        </button>
       </div>
     </div>
   )

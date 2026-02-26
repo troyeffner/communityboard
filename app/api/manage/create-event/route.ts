@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES, asStringArray, toSet } from '@/lib/taxonomy'
 
 function badRequest(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -25,19 +26,29 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return badRequest('Invalid JSON')
 
-  const { password, title, description, start_at, status } = body as {
+  const { password, title, description, start_at, status, event_category, event_attributes, event_audience } = body as {
     password?: string
     title?: string
     description?: string
     start_at?: string
-    status?: 'draft' | 'published'
+    status?: 'draft' | 'published' | 'unpublished'
+    event_category?: string | null
+    event_attributes?: string[] | string | null
+    event_audience?: string[] | string | null
   }
 
   if (!password || password !== process.env.ADMIN_PASSWORD) {
     return badRequest('Unauthorized', 401)
   }
   if (!title?.trim()) return badRequest('Title is required')
-  if (status !== 'draft' && status !== 'published') return badRequest('Invalid status')
+  if (status !== 'draft' && status !== 'published' && status !== 'unpublished') return badRequest('Invalid status')
+  const categorySet = toSet(EVENT_CATEGORIES)
+  const attributeSet = toSet(ATTRIBUTES)
+  const audienceSet = toSet(AUDIENCE)
+  const parsedCategory = event_category?.trim() || null
+  const parsedAttributes = asStringArray(event_attributes).filter((tag) => attributeSet.has(tag))
+  const parsedAudience = asStringArray(event_audience).filter((tag) => audienceSet.has(tag))
+  if (parsedCategory && !categorySet.has(parsedCategory)) return badRequest('Invalid event_category')
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -59,6 +70,9 @@ export async function POST(req: Request) {
       description: description?.trim() || null,
       start_at: nyIsoGuess,
       status,
+      event_category: parsedCategory,
+      event_attributes: parsedAttributes,
+      event_audience: parsedAudience,
     },
   ])
 

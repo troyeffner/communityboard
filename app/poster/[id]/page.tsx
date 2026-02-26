@@ -6,6 +6,7 @@ type PosterRow = {
   id: string
   file_path: string
   created_at?: string
+  seen_at_category?: string | null
   seen_at_label?: string | null
   seen_at_name?: string | null
 }
@@ -64,7 +65,7 @@ export default async function PosterPage({
 
   const primary = await supabase
     .from('poster_uploads')
-    .select('id,file_path,created_at,seen_at_label,seen_at_name')
+    .select('id,file_path,created_at,seen_at_category,seen_at_label,seen_at_name')
     .eq('id', id)
     .limit(1)
 
@@ -77,7 +78,7 @@ export default async function PosterPage({
     }
     const fallbackWithName = await supabase
       .from('poster_uploads')
-      .select('id,file_path,created_at,seen_at_name')
+      .select('id,file_path,created_at,seen_at_category,seen_at_name')
       .eq('id', id)
       .limit(1)
     if (!fallbackWithName.error) {
@@ -130,7 +131,7 @@ export default async function PosterPage({
   const imageUrls = Array.from(new Set([directUrl, ...publicUrls].filter(Boolean)))
   const seenAt = poster.seen_at_label || poster.seen_at_name || null
   const sourceLabel = seenAt
-    ? `Seen at: ${seenAt}`
+    ? `Seen at: ${seenAt}${poster.seen_at_category ? ` (${poster.seen_at_category})` : ''}`
     : null
 
   return (
@@ -204,7 +205,6 @@ export default async function PosterPage({
           </a>
         </div>
       )}
-      {sourceLabel && <p style={{ margin: '0 0 4px 0', fontSize: 14 }}>{sourceLabel}</p>}
       {poster.created_at && (
         <p style={{ margin: '0 0 8px 0', opacity: 0.85, fontSize: 14 }}>
           Photo taken: {new Intl.DateTimeFormat('en-US', {
@@ -215,6 +215,7 @@ export default async function PosterPage({
           }).format(new Date(poster.created_at))}
         </p>
       )}
+      {sourceLabel && <p style={{ margin: '0 0 8px 0', fontSize: 14 }}>{sourceLabel}</p>}
       <PosterViewer key={`${id}:${event_id || 'none'}`} imageUrls={imageUrls} pins={pins} activeEventId={event_id || null} />
     </main>
   )

@@ -26,12 +26,12 @@ export async function POST(req: Request) {
 
   const update = await supabase
     .from('poster_uploads')
-    .update({ processed_at, done: processed })
+    .update({ processed_at, done: processed, is_done: processed })
     .eq('id', poster_upload_id)
 
   if (update.error) {
     const message = (update.error.message || '').toLowerCase()
-    const missingDone = update.error.code === '42703' || message.includes('done') || message.includes('schema cache')
+    const missingDone = update.error.code === '42703' || message.includes('done') || message.includes('is_done') || message.includes('schema cache')
     if (!missingDone) return jsonError(update.error.message, 500)
 
     const fallback = await supabase
