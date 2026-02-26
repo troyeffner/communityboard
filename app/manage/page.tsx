@@ -18,6 +18,7 @@ export default function ManagePage() {
   const [startAt, setStartAt] = useState('')
   const [status, setStatus] = useState<'draft' | 'published'>('draft')
   const [message, setMessage] = useState('')
+  const [formError, setFormError] = useState('')
   const [selectedPosterId, setSelectedPosterId] = useState<string | null>(null)
 
   const [uploads, setUploads] = useState<PosterUpload[]>([])
@@ -29,6 +30,72 @@ export default function ManagePage() {
   )
 
   const [point, setPoint] = useState<BBoxPoint | null>(null)
+
+  type PosterEventRow = {
+    link_id: string
+    bbox: { x: number; y: number } | null
+    created_at: string
+    event: {
+      id: string
+      title: string
+      location: string | null
+      start_at: string
+      status: 'draft' | 'published'
+    }
+  }
+
+  const [posterEvents, setPosterEvents] = useState<PosterEventRow[]>([])
+  const [posterEventsError, setPosterEventsError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null)
+
+  async function refreshPosterEvents(posterUploadId: string | null) {
+    setPosterEventsError('')
+    if (!posterUploadId) {
+      setPosterEvents([])
+      return
+    }
+    try {
+      const res = await fetch(
+        `/api/manage/poster-events?poster_upload_id=${encodeURIComponent(posterUploadId)}`
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPosterEvents([])
+        setPosterEventsError(data?.error || 'Failed to load linked events')
+        return
+      }
+      setPosterEvents(data.rows || [])
+    } catch {
+      setPosterEvents([])
+      setPosterEventsError('Failed to load linked events')
+    }
+  }
+
+  async function deletePosterEvent(linkId: string) {
+    setDeleteError('')
+    if (!confirm('Delete this event?')) return
+
+    setDeletingLinkId(linkId)
+    try {
+      const res = await fetch('/api/manage/delete-poster-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link_id: linkId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setDeleteError(data?.error || 'Delete failed')
+        return
+      }
+      await refreshPosterEvents(selectedPosterId)
+      setMessage('Event deleted.')
+    } catch {
+      setDeleteError('Delete failed')
+    } finally {
+      setDeletingLinkId(null)
+    }
+  }
 
   async function loadUploads() {
     setUploadsError('')
@@ -47,6 +114,10 @@ export default function ManagePage() {
 
   useEffect(() => {
     setPoint(null)
+    setMessage('')
+    setFormError('')
+    setDeleteError('')
+    refreshPosterEvents(selectedPosterId)
   }, [selectedPosterId])
 
   function handleImageClick(e: React.MouseEvent<HTMLImageElement>) {
@@ -64,12 +135,15 @@ export default function ManagePage() {
   }
 
   async function submitEvent() {
+    setFormError('')
+    setMessage('')
+
     if (!selectedPosterId) {
-      setMessage('Select a submission first.')
+      setFormError('Select a submission first.')
       return
     }
     if (!point) {
-      setMessage('Click on the image to set the event location.')
+      setFormError('Click on the image to set the event location.')
       return
     }
 
@@ -90,15 +164,25 @@ export default function ManagePage() {
 
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      setMessage(data?.error || 'Error')
+      setFormError(data?.error || 'Error')
+      setMessage('')
       return
     }
 
-    setMessage('Saved.')
+    setMessage('Saved. Ready for another event on this poster.')
     setTitle('')
     setLocation('')
     setStartAt('')
     setStatus('draft')
+    setPoint(null)
+    await refreshPosterEvents(selectedPosterId)
+  }
+
+  function formatDateTime(value?: string | null) {
+    if (!value) return '—'
+    const dt = new Date(value)
+    if (Number.isNaN(dt.getTime())) return value
+    return dt.toLocaleString()
   }
 
   return (
@@ -154,7 +238,7 @@ export default function ManagePage() {
             Status
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
               style={{ display: 'block', width: '100%', padding: 8, marginTop: 6 }}
             >
               <option value="draft">draft</option>
@@ -174,6 +258,7 @@ export default function ManagePage() {
             Create event
           </button>
 
+          {formError && <p style={{ marginTop: 12, color: 'crimson' }}>{formError}</p>}
           {message && <p style={{ marginTop: 12 }}>{message}</p>}
         </div>
 
@@ -209,8 +294,31 @@ export default function ManagePage() {
                   }}
                 />
 
+                {posterEvents
+                  .filter((r) => r.bbox)
+                  .map((r) => (
+                    <div
+                      key={r.link_id}
+                      title={r.event.title}
+                      style={{
+                        position: 'absolute',
+                        left: `${(r.bbox!.x) * 100}%`,
+                        top: `${(r.bbox!.y) * 100}%`,
+                        transform: 'translate(-50%, -50%)',
+                        width: 12,
+                        height: 12,
+                        borderRadius: 999,
+                        background: 'limegreen',
+                        border: '2px solid white',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  ))}
+
                 {point && (
                   <div
+                    title="New pin (unsaved)"
                     style={{
                       position: 'absolute',
                       left: `${point.x * 100}%`,
@@ -225,6 +333,112 @@ export default function ManagePage() {
                       pointerEvents: 'none',
                     }}
                   />
+                )}
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <h3 style={{ marginBottom: 8 }}>Events created from this poster</h3>
+
+                {posterEventsError && (
+                  <p style={{ color: 'crimson', marginTop: 0 }}>{posterEventsError}</p>
+                )}
+
+                {deleteError && (
+                  <p style={{ color: 'crimson', marginTop: 0 }}>{deleteError}</p>
+                )}
+
+                {!posterEventsError && posterEvents.length === 0 && (
+                  <p style={{ opacity: 0.7, marginTop: 0 }}>No events created from this poster yet.</p>
+                )}
+
+                {posterEvents.length > 0 && (
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      fontSize: 14,
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            borderBottom: '1px solid #ddd',
+                            padding: 6,
+                          }}
+                        >
+                          Title
+                        </th>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            borderBottom: '1px solid #ddd',
+                            padding: 6,
+                          }}
+                        >
+                          Start
+                        </th>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            borderBottom: '1px solid #ddd',
+                            padding: 6,
+                          }}
+                        >
+                          Status
+                        </th>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            borderBottom: '1px solid #ddd',
+                            padding: 6,
+                          }}
+                        >
+                          Location
+                        </th>
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            borderBottom: '1px solid #ddd',
+                            padding: 6,
+                          }}
+                        >
+                          Created
+                        </th>
+                        <th style={{ borderBottom: '1px solid #ddd', padding: 6 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {posterEvents.map((row) => (
+                        <tr key={row.link_id}>
+                          <td style={{ borderBottom: '1px solid #eee', padding: 6 }}>
+                            {row.event.title}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #eee', padding: 6 }}>
+                            {formatDateTime(row.event.start_at)}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #eee', padding: 6 }}>
+                            {row.event.status}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #eee', padding: 6 }}>
+                            {row.event.location || '—'}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #eee', padding: 6 }}>
+                            {formatDateTime(row.created_at)}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #eee', padding: 6 }}>
+                            <button
+                              onClick={() => deletePosterEvent(row.link_id)}
+                              disabled={deletingLinkId === row.link_id}
+                            >
+                              {deletingLinkId === row.link_id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>

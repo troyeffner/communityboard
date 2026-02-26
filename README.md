@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Communityboard
 
-## Getting Started
+## High-Level Infrastructure
 
-First, run the development server:
+### Frontend / App
+- Next.js App Router app.
+- Key pages:
+- `/`: public events list
+- `/submit`: public poster uploader
+- `/manage`: admin flow to map poster uploads to events with image pins
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Backend
+- Next.js Route Handlers under `app/api/**`.
+- Supabase for:
+- Postgres (events, uploads, links)
+- Storage bucket (`posters`)
+- Server-side API access via `@supabase/supabase-js` with Service Role key.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Deployment
+- Code is in GitHub.
+- Typical path: local changes -> commit -> push -> deploy on hosting platform.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Required in `.env.local` and production:
 
-## Learn More
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase admin key. Server-side only; never expose in client code.
 
-To learn more about Next.js, take a look at the following resources:
+Optional (only if adding client-side Supabase usage):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Supabase Storage
 
-## Deploy on Vercel
+- Bucket: `posters`
+- Upload route currently writes keys like:
+- `uploads/<timestamp>-<random>.<ext>`
+- Historical keys may look like:
+- `posters/<uuid>.jpeg`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`/api/manage/list-uploads` computes `public_url` with:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `supabase.storage.from('posters').getPublicUrl(file_path)`
+
+## Database Tables
+
+### `poster_uploads`
+- `id` (uuid, PK)
+- `file_path` (text)
+- `status` (text)
+- `created_at` (timestamptz)
+
+### `events`
+- `id` (uuid, PK)
+- `title` (text)
+- `location` (text, nullable)
+- `start_at` (timestamptz)
+- `status` (`draft` | `published`)
+
+### `poster_event_links`
+- `id` (uuid, PK)
+- `poster_upload_id` (uuid, FK -> `poster_uploads.id`)
+- `event_id` (uuid, FK -> `events.id`)
+- `bbox` (jsonb, nullable; stores normalized `{ x, y }` values)
+- `created_at` (timestamptz)
+
+## API Routes
+
+### Public submission
+- `POST /api/submit/upload`
+- Accepts multipart file upload.
+- Stores file in `posters` bucket.
+- Inserts `poster_uploads` row.
+- Returns `{ ok: true, id }`.
+
+### Manage: list uploads
+- `GET /api/manage/list-uploads`
+- Returns recent uploads with computed `public_url`.
+
+### Manage: create event from poster
+- `POST /api/manage/create-event-from-poster`
+- Creates `events` row.
+- Creates `poster_event_links` row with `bbox`.
+
+### Manage: list events linked to poster
+- `GET /api/manage/poster-events?poster_upload_id=<uuid>`
+- Returns rows shaped as:
+- `{ link_id, bbox, created_at, event: { id, title, location, start_at, status } }`
+
+### Manage: delete linked event
+- `POST /api/manage/delete-poster-event` with `{ link_id }`
+- Deletes link row, then deletes the linked event row.
+- Returns `{ ok: true }` or `{ error: ... }`.
+
+## Local Workflow Notes
+
+- Only one Next dev server can hold `.next/dev/lock` at a time.
+- If a local dev server is already running, avoid starting another in automation contexts.
+- Preferred non-port checks:
+- `npm run lint`
+- `npm run build`
