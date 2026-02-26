@@ -660,12 +660,11 @@ export default function BuilderCreatePage({
         <div style={{ display: 'grid', gap: 8 }}>
           <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>New submissions are saved as draft and published later via approval workflow.</p>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          <select value={eventStatus} onChange={(e) => setEventStatus(e.target.value as 'draft' | 'published' | 'planted' | 'unpublished')} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-            <option value={EVENT_STATUSES.DRAFT}>draft</option>
-            <option value={EVENT_STATUSES.PLANTED}>planted</option>
-            <option value={EVENT_STATUSES.PUBLISHED}>published</option>
-            <option value={EVENT_STATUSES.UNPUBLISHED}>unpublished</option>
-          </select>
+          {!editingEventId && (
+            <div style={{ fontSize: 12, opacity: 0.75 }}>
+              Status: {EVENT_STATUSES.DRAFT}
+            </div>
+          )}
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
           <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
