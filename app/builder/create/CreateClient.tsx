@@ -703,7 +703,7 @@ export default function BuilderCreatePage({
         </div>
       </section>
 
-      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, display: 'grid', gridTemplateRows: 'auto auto 1fr auto', minHeight: 0, overflow: 'hidden', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
+      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, display: 'grid', gridTemplateRows: 'auto auto auto auto', minHeight: 0, overflow: 'hidden', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
         <h2 style={{ marginTop: 0 }}>Poster workspace</h2>
         {!selectedUpload?.public_url && <p style={{ opacity: 0.7 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
@@ -734,7 +734,15 @@ export default function BuilderCreatePage({
               }}
               onMouseUp={() => { dragRef.current = null }}
               onMouseLeave={() => { dragRef.current = null }}
-              style={{ position: 'relative', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', flex: 1, minHeight: 420, aspectRatio: '16 / 9' }}
+              style={{
+                position: 'relative',
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                overflow: 'hidden',
+                width: '100%',
+                height: 'clamp(420px, 62vh, 720px)',
+                aspectRatio: '16 / 9',
+              }}
             >
               <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'top left' }}>
                 <img
