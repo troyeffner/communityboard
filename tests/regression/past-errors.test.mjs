@@ -85,3 +85,11 @@ test('browse API uses poster_items model (not only legacy link table)', () => {
   const src = read('app/api/public/browse/route.ts')
   assert.equal(src.includes(".from('poster_items')"), true)
 })
+
+test('create image click does not reset typed form state', () => {
+  const src = read('app/builder/create/CreateClient.tsx')
+  const clickIndex = src.indexOf('setPoint({ x: Number(Math.max(0, Math.min(1, x)).toFixed(4)), y: Number(Math.max(0, Math.min(1, y)).toFixed(4)) })')
+  assert.notEqual(clickIndex, -1, 'expected image click pin setter')
+  const snippet = src.slice(clickIndex, clickIndex + 260)
+  assert.equal(snippet.includes('resetFormToNew()'), false)
+})

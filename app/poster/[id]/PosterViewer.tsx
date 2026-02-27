@@ -135,6 +135,11 @@ export default function PosterViewer({
 
   function selectPin(pin: Pin) {
     setSelectedEventId(pin.event_id)
+    if (pin.bbox) {
+      const panX = stageMetrics.stageW / 2 - (stageMetrics.offsetX + pin.bbox.x * stageMetrics.baseW) * zoom
+      const panY = stageMetrics.stageH / 2 - (stageMetrics.offsetY + pin.bbox.y * stageMetrics.baseH) * zoom
+      setPan({ x: Number(panX.toFixed(1)), y: Number(panY.toFixed(1)) })
+    }
     router.push(`?event_id=${encodeURIComponent(pin.event_id)}`)
   }
 

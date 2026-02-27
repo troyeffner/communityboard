@@ -151,12 +151,15 @@ export default async function Home() {
   const publisherIds = Array.from(new Set(events.map((e) => e.published_by).filter(Boolean))) as string[]
   const publisherNameById = new Map<string, string>()
   if (publisherIds.length > 0) {
-    let usersResult: any = await supabase.from('users').select('id,display_name').in('id', publisherIds)
-    if (usersResult.error) {
-      usersResult = await supabase.from('users').select('id,name').in('id', publisherIds)
-    }
-    if (!usersResult.error) {
-      for (const row of (usersResult.data || []) as Array<{ id: string; name?: string | null; display_name?: string | null }>) {
+    const usersByDisplayName = await supabase.from('users').select('id,display_name').in('id', publisherIds)
+    const usersByName = usersByDisplayName.error
+      ? await supabase.from('users').select('id,name').in('id', publisherIds)
+      : null
+    const userRows = usersByDisplayName.error
+      ? ((usersByName?.data || []) as Array<{ id: string; name?: string | null }>)
+      : ((usersByDisplayName.data || []) as Array<{ id: string; display_name?: string | null }>)
+    if (!usersByDisplayName.error || (usersByName && !usersByName.error)) {
+      for (const row of userRows as Array<{ id: string; name?: string | null; display_name?: string | null }>) {
         publisherNameById.set(row.id, row.display_name || row.name || 'Community Builder')
       }
     }

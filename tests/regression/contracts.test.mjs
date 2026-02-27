@@ -34,3 +34,16 @@ test('item upvote endpoint exists and targets poster_item_upvotes', () => {
   assert.equal(source.includes('export async function POST'), true)
   assert.equal(source.includes('export async function DELETE'), true)
 })
+
+test('create inspector uses tabs and pin-required helper', () => {
+  const source = read('app/builder/create/CreateClient.tsx')
+  assert.equal(source.includes('Business/Service'), true)
+  assert.equal(source.includes('Poster meta'), true)
+  assert.equal(source.includes('Click the poster to place a pin.'), true)
+})
+
+test('community event calendar actions render as links', () => {
+  const source = read('app/components/PublicEventsList.tsx')
+  assert.equal(source.includes('href={toGoogleCalendarUrl'), true)
+  assert.equal(source.includes('Download .ics'), true)
+})

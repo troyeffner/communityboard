@@ -53,32 +53,37 @@ export async function GET(req: Request) {
   const seenAt = params.get('seenAt')?.trim() || ''
   const viewerId = getViewerIdFromCookie(req.headers.get('cookie'))
 
-  let postersRes: any = await supabase
+  const postersWithVenue = await supabase
     .from('poster_uploads')
     .select('id,file_path,created_at,seen_at_name,venue_id,venues(name)')
     .order('created_at', { ascending: false })
     .limit(200)
 
-  if (postersRes.error) {
-    const msg = (postersRes.error.message || '').toLowerCase()
-    const missingJoin = msg.includes('could not find a relationship') || msg.includes('relation')
-    if (missingJoin) {
-      postersRes = await supabase
+  const useNoJoinFallback =
+    Boolean(postersWithVenue.error) &&
+    (() => {
+      const msg = (postersWithVenue.error?.message || '').toLowerCase()
+      return msg.includes('could not find a relationship') || msg.includes('relation')
+    })()
+
+  const postersNoJoin = useNoJoinFallback
+    ? await supabase
         .from('poster_uploads')
         .select('id,file_path,created_at,seen_at_name,venue_id')
         .order('created_at', { ascending: false })
         .limit(200)
-    }
-  }
+    : null
 
-  if (postersRes.error) {
-    const msg = (postersRes.error.message || '').toLowerCase()
+  const postersError = postersNoJoin?.error || postersWithVenue.error
+
+  if (postersError) {
+    const msg = (postersError.message || '').toLowerCase()
     const maybeMissingColumns =
-      postersRes.error.code === '42703' ||
+      postersError.code === '42703' ||
       msg.includes('seen_at_name') ||
       msg.includes('venue_id') ||
       msg.includes('schema cache')
-    if (!maybeMissingColumns) return jsonError(postersRes.error.message, 500)
+    if (!maybeMissingColumns) return jsonError(postersError.message, 500)
 
     const fallback = await supabase
       .from('poster_uploads')
@@ -103,7 +108,8 @@ export async function GET(req: Request) {
     })
   }
 
-  const posters = ((postersRes.data || []) as PosterRow[])
+  const posterRows = ((postersNoJoin?.data || postersWithVenue.data || []) as PosterRow[])
+  const posters = posterRows
     .map((row) => {
       const venue = Array.isArray(row.venues) ? row.venues[0] : row.venues
       const seenAtName = (venue?.name || row.seen_at_name || null)

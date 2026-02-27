@@ -142,10 +142,7 @@ export default function BuilderCreatePage({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [drawer, setDrawer] = useState<{ open: boolean; panel: 'eventsList' | 'eventForm' | 'posterMeta' }>({
-    open: false,
-    panel: 'eventsList',
-  })
+  const [inspectorTab, setInspectorTab] = useState<'event' | 'business' | 'posterMeta'>('event')
   const [isMobile, setIsMobile] = useState(false)
   const panelsRef = useRef<HTMLDivElement | null>(null)
   const [stageSize, setStageSize] = useState({ width: 1, height: 1 })
@@ -249,7 +246,7 @@ export default function BuilderCreatePage({
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
     setSeenAtName(selectedUpload?.seen_at_name || '')
-    setDrawer({ open: true, panel: 'eventForm' })
+    setInspectorTab('event')
     if (isMobile && panelsRef.current) {
       panelsRef.current.scrollTo({ left: panelsRef.current.clientWidth * 2, behavior: 'smooth' })
     }
@@ -559,6 +556,9 @@ export default function BuilderCreatePage({
     setDeleteModalOpen(true)
   }
 
+  const needsPinForNew = Boolean(selectedPosterId && !editingEventId)
+  const canSubmitItem = !saving && (!needsPinForNew || Boolean(point))
+
   return (
     <main
       ref={panelsRef}
@@ -612,33 +612,21 @@ export default function BuilderCreatePage({
               style={{
                 border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb',
                 borderRadius: 8,
-                padding: 8,
+                padding: 4,
                 background: '#fff',
-                textAlign: 'left',
+                display: 'grid',
+                placeItems: 'center',
               }}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: 8, alignItems: 'start' }}>
-                {u.public_url ? (
-                  <img
-                    src={u.public_url}
-                    alt="Poster thumb"
-                    style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
-                  />
-                ) : (
-                  <div style={{ width: 76, height: 76, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc' }} />
-                )}
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12 }}>{formatCaptureHour(u.created_at)}</div>
-                  <div style={{ fontSize: 12, marginTop: 2 }}>
-                    {(normalizePosterStatus(u.status) === POSTER_STATUSES.DONE || u.is_done) ? 'Done' : 'Incomplete'} • status: {normalizePosterStatus(u.status)} • Items: {u.linked_count ?? u.event_count ?? 0}
-                  </div>
-                  {!!u.seen_at_name && (
-                    <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Seen at: {u.seen_at_name}
-                    </div>
-                  )}
-                </div>
-              </div>
+              {u.public_url ? (
+                <img
+                  src={u.public_url}
+                  alt="Poster thumb"
+                  style={{ width: '100%', maxWidth: 108, height: 108, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
+                />
+              ) : (
+                <div style={{ width: '100%', maxWidth: 108, height: 108, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc' }} />
+              )}
             </button>
           ))}
           {uploads.length === 0 && <p style={{ opacity: 0.7 }}>No incomplete posters.</p>}
@@ -702,7 +690,7 @@ export default function BuilderCreatePage({
                     setPoint({ x: Number(Math.max(0, Math.min(1, x)).toFixed(4)), y: Number(Math.max(0, Math.min(1, y)).toFixed(4)) })
                     setActiveLinkId(null)
                     setEditingEventId(null)
-                    resetFormToNew()
+                    setInspectorTab('event')
                   }}
                   style={{
                     position: 'absolute',
@@ -763,28 +751,6 @@ export default function BuilderCreatePage({
               <button onClick={markDone}>Mark Done</button>
               <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
             </div>
-            <div style={{ marginTop: 10 }}>
-              <h3 style={{ margin: '0 0 8px 0' }}>Items on this poster</h3>
-              {rows.length === 0 ? (
-                <p style={{ opacity: 0.75, margin: 0 }}>No items yet. Click image to add a new pin and item.</p>
-              ) : (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {rows.map((row) => (
-                    <div key={row.link_id} style={{ border: activeLinkId === row.link_id ? '2px solid #ef4444' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
-                      <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft event)'}</div>
-                      <div style={{ fontSize: 12, opacity: 0.85 }}>
-                        {new Date(row.event.start_at).toLocaleString()} • {statusLabel(row.event.status)}
-                      </div>
-                      <div style={{ fontSize: 12, opacity: 0.75 }}>linked: {new Date(row.created_at).toLocaleString()}</div>
-                      <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
-                        <button data-variant="secondary" onClick={() => startEdit(row)}>Edit</button>
-                        <button data-variant="danger" onClick={() => deleteEventRow(row)}>Delete</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </>
         )}
       </section>
@@ -793,81 +759,115 @@ export default function BuilderCreatePage({
         <h2 style={{ marginTop: 0 }}>Inspector</h2>
         <div style={{ display: 'grid', gap: 10 }}>
           {!selectedPosterId && <p style={{ margin: 0, opacity: 0.75 }}>Select a submission to begin.</p>}
-          {selectedPosterId && !activeLinkId && !point && (
+          {selectedPosterId && (
             <>
-              <p style={{ margin: 0, opacity: 0.75 }}>Poster selected. Choose an action.</p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button data-variant="secondary" onClick={() => setDrawer({ open: true, panel: 'eventsList' })}>Items</button>
-                <button data-variant="secondary" onClick={() => setDrawer({ open: true, panel: 'posterMeta' })}>Poster meta</button>
-                <button onClick={() => setDrawer({ open: true, panel: 'eventForm' })}>Add item</button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('event')}
+                  style={{
+                    border: inspectorTab === 'event' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    background: inspectorTab === 'event' ? '#eff6ff' : '#fff',
+                    fontWeight: 600,
+                  }}
+                >
+                  Event
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('business')}
+                  style={{
+                    border: inspectorTab === 'business' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    background: inspectorTab === 'business' ? '#eff6ff' : '#fff',
+                    fontWeight: 600,
+                  }}
+                >
+                  Business/Service
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('posterMeta')}
+                  style={{
+                    border: inspectorTab === 'posterMeta' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    background: inspectorTab === 'posterMeta' ? '#eff6ff' : '#fff',
+                    fontWeight: 600,
+                  }}
+                >
+                  Poster meta
+                </button>
               </div>
-            </>
-          )}
-          {activeLinkId && (
-            <>
-              <p style={{ margin: 0, opacity: 0.75 }}>Item selected. Open form to edit.</p>
-              <button onClick={() => setDrawer({ open: true, panel: 'eventForm' })}>Edit item</button>
-            </>
-          )}
-          {!activeLinkId && point && (
-            <>
-              <p style={{ margin: 0, opacity: 0.75 }}>Pinned draft at x={point.x}, y={point.y}</p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setDrawer({ open: true, panel: 'eventForm' })}>Add draft item</button>
-                <button data-variant="secondary" onClick={() => setPoint(null)}>Cancel pin</button>
+              <div>
+                <h3 style={{ margin: '6px 0 8px 0' }}>Items on this poster</h3>
+                {rows.length === 0 ? (
+                  <p style={{ opacity: 0.75, margin: 0 }}>No items yet. Click image to add a new pin and item.</p>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8, maxHeight: 260, overflow: 'auto' }}>
+                    {rows.map((row) => (
+                      <div key={row.link_id} style={{ border: activeLinkId === row.link_id ? '2px solid #ef4444' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(row)}
+                          style={{ textAlign: 'left', border: 'none', padding: 0, background: 'transparent', width: '100%' }}
+                        >
+                          <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft item)'}</div>
+                          <div style={{ fontSize: 12, opacity: 0.85 }}>
+                            {new Date(row.event.start_at).toLocaleString()} • {statusLabel(row.event.status)}
+                          </div>
+                        </button>
+                        <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                          <button data-variant="secondary" onClick={() => startEdit(row)}>Edit</button>
+                          <button data-variant="danger" onClick={() => deleteEventRow(row)}>Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
           {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
           {message && <p style={{ margin: 0 }}>{message}</p>}
-
-          {drawer.open && (
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10, marginTop: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <strong>{drawer.panel === 'eventsList' ? 'Items' : drawer.panel === 'posterMeta' ? 'Poster meta' : (editingEventId ? 'Edit item' : 'Add item')}</strong>
-                <button data-variant="secondary" onClick={() => setDrawer((d) => ({ ...d, open: false }))}>Close</button>
+          {selectedPosterId && inspectorTab === 'posterMeta' && (
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>Captured</div>
+                <div>{formatCaptureHour(selectedUpload?.created_at || null)}</div>
+                <input
+                  value={seenAtName}
+                  onChange={(e) => setSeenAtName(e.target.value)}
+                  placeholder="Seen at"
+                  style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}
+                />
+                <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
+                  {savingSeenAt ? 'Saving...' : 'Save metadata'}
+                </button>
               </div>
-
-              {drawer.panel === 'eventsList' && (
-                <div style={{ display: 'grid', gap: 6 }}>
-                  {rows.length === 0 && <p style={{ margin: 0, opacity: 0.75 }}>No items yet.</p>}
-                  {rows.map((row) => (
-                    <button key={row.link_id} type="button" onClick={() => startEdit(row)} style={{ textAlign: 'left', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: activeLinkId === row.link_id ? '#eff6ff' : '#fff' }}>
-                      <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft event)'}</div>
-                      <div style={{ fontSize: 12, opacity: 0.75 }}>{new Date(row.event.start_at).toLocaleString()}</div>
-                    </button>
-                  ))}
+            </div>
+          )}
+          {selectedPosterId && inspectorTab === 'business' && (
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
+              <p style={{ margin: 0, opacity: 0.75 }}>Business/Service editor is coming soon. Use Event tab for now.</p>
+            </div>
+          )}
+          {selectedPosterId && inspectorTab === 'event' && (
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
+                <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                {!editingEventId && !point ? <p style={{ margin: 0, color: '#92400e', fontSize: 13 }}>Click the poster to place a pin.</p> : null}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
+                  {(editingEventId || point) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
                 </div>
-              )}
-
-              {drawer.panel === 'posterMeta' && (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>Captured</div>
-                  <div>{formatCaptureHour(selectedUpload?.created_at || null)}</div>
-                  <input
-                    value={seenAtName}
-                    onChange={(e) => setSeenAtName(e.target.value)}
-                    placeholder="Seen at"
-                    style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}
-                  />
-                  <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
-                    {savingSeenAt ? 'Saving...' : 'Save metadata'}
-                  </button>
-                </div>
-              )}
-
-              {drawer.panel === 'eventForm' && (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-                  <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
-                  <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={saveEvent} disabled={saving}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add Draft Item'}</button>
-                    {(editingEventId || point) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
         </div>
