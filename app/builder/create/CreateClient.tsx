@@ -21,6 +21,7 @@ type PosterEventRow = {
   created_at: string
   event: {
     id: string
+    item_type?: string | null
     title: string
     location: string | null
     description?: string | null
@@ -120,6 +121,7 @@ export default function BuilderCreatePage({
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
 
   const [title, setTitle] = useState('')
+  const [itemType, setItemType] = useState<'event' | 'recurring_event' | 'class_program' | 'business_service' | 'opportunity' | 'announcement'>('event')
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [startAt, setStartAt] = useState(defaultStartAt2pmLocal())
@@ -242,6 +244,7 @@ export default function BuilderCreatePage({
     setActiveLinkId(row.link_id)
     setPoint(null)
     setTitle(row.event.title || '')
+    setItemType((row.event.item_type as typeof itemType) || 'event')
     setLocation(row.event.location || '')
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
@@ -256,6 +259,7 @@ export default function BuilderCreatePage({
     setEditingEventId(null)
     setActiveLinkId(null)
     setTitle('')
+    setItemType('event')
     setLocation('')
     setDescription('')
     setStartAt(defaultStartAt2pmLocal())
@@ -305,6 +309,7 @@ export default function BuilderCreatePage({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             event_id: editingEventId,
+            type: itemType,
             title: effectiveTitle,
             location,
             description,
@@ -344,6 +349,7 @@ export default function BuilderCreatePage({
         body: JSON.stringify({
           poster_upload_id: selectedPosterId,
           bbox: point,
+          type: itemType,
           title: effectiveTitle,
           location,
           description,
@@ -792,7 +798,7 @@ export default function BuilderCreatePage({
                     color: '#0f172a',
                   }}
                 >
-                  Event
+                  Item
                 </button>
                 <button
                   type="button"
@@ -838,7 +844,7 @@ export default function BuilderCreatePage({
                         >
                           <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft item)'}</div>
                           <div style={{ fontSize: 12, opacity: 0.85 }}>
-                            {new Date(row.event.start_at).toLocaleString()} • {statusLabel(row.event.status)}
+                            {new Date(row.event.start_at).toLocaleString()} • {(row.event.item_type || 'event').replaceAll('_', ' ')} • {statusLabel(row.event.status)}
                           </div>
                         </button>
                         <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
@@ -880,6 +886,14 @@ export default function BuilderCreatePage({
             <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
               <div style={{ display: 'grid', gap: 8 }}>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                <select value={itemType} onChange={(e) => setItemType(e.target.value as typeof itemType)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                  <option value="event">Item type: event</option>
+                  <option value="recurring_event">Item type: recurring event</option>
+                  <option value="class_program">Item type: class/program</option>
+                  <option value="business_service">Item type: business/service</option>
+                  <option value="opportunity">Item type: opportunity</option>
+                  <option value="announcement">Item type: announcement</option>
+                </select>
                 <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
                 <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />

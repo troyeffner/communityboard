@@ -388,7 +388,7 @@ export default function PublicEventsList({ sections }: { sections: Sections }) {
         <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Filters</h2>
         <div style={{ display: 'grid', gap: 8 }}>
           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-            <option value="">All categories</option>
+            <option value="">All item types</option>
             {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
           <input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search title, description, location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />

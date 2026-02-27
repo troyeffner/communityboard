@@ -15,6 +15,7 @@ export async function PATCH(req: Request) {
   const description = typeof body.description === 'string' ? body.description.trim() : ''
   const location = typeof body.location === 'string' ? body.location.trim() : ''
   const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : ''
+  const itemType = typeof body.type === 'string' ? body.type.trim().toLowerCase() : ''
   const startAtRaw = typeof body.start_at === 'string' ? body.start_at.trim() : ''
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -27,6 +28,7 @@ export async function PATCH(req: Request) {
   if ('location' in body) updates.location_text = location || null
   if ('description' in body) updates.details_json = description ? { description } : {}
   if (status) updates.status = status
+  if (itemType) updates.type = itemType
   if (startAtRaw) {
     const dt = new Date(startAtRaw.length === 16 ? `${startAtRaw}:00` : startAtRaw)
     if (!Number.isNaN(dt.getTime())) {

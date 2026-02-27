@@ -834,7 +834,7 @@ export default function ManagePage() {
         </section>
 
         <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto', minHeight: 0 }}>
-          <h2 style={{ marginTop: 0 }}>{isEditMode ? 'Edit Item' : 'Create Event / Business'}</h2>
+          <h2 style={{ marginTop: 0 }}>{isEditMode ? 'Edit Item' : 'Add Item'}</h2>
 
           <label style={{ display: 'block', marginTop: 8 }}>Title
             <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
@@ -862,9 +862,9 @@ export default function ManagePage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
           </label>
 
-          <label style={{ display: 'block', marginTop: 8 }}>Category
+          <label style={{ display: 'block', marginTop: 8 }}>Item type
             <select value={eventCategory} onChange={(e) => setEventCategory(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="">Select category</option>
+              <option value="">Select item type</option>
               {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
           </label>
@@ -930,7 +930,7 @@ export default function ManagePage() {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={submitEvent} disabled={savingForm || !title || !startAt}>
-              {savingForm ? 'Saving...' : isEditMode ? 'Save changes' : 'Create event'}
+              {savingForm ? 'Saving...' : isEditMode ? 'Save changes' : 'Add item'}
             </button>
             {isEditMode && <button data-variant="secondary" onClick={clearForm}>Cancel</button>}
           </div>
@@ -967,7 +967,7 @@ export default function ManagePage() {
             </table>
           )}
 
-          <h3 style={{ marginTop: 18, marginBottom: 8 }}>All Events</h3>
+          <h3 style={{ marginTop: 18, marginBottom: 8 }}>All Items</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | EventStatus)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="all">All status</option><option value="draft">Draft</option><option value="published">Published</option>
@@ -979,7 +979,7 @@ export default function ManagePage() {
               <option value="all">All recurrence</option><option value="recurring">Recurring only</option>
             </select>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="all">All categories</option>
+              <option value="all">All item types</option>
               {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
             <input value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} placeholder="Search..." style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }} />
