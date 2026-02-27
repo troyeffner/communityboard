@@ -19,8 +19,6 @@ type EventRow = {
   start_at: string
   status: EventStatus
   created_at: string
-  is_recurring: boolean | null
-  recurrence_rule: string | null
   event_category: string | null
   event_attributes: string[] | null
   event_audience: string[] | null
@@ -37,8 +35,6 @@ function isMissingOptionalColumns(error: { code?: string; message?: string } | n
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('recurrence_rule') ||
-    message.includes('is_recurring') ||
     message.includes('description') ||
     message.includes('source_type') ||
     message.includes('source_place') ||
@@ -65,7 +61,7 @@ export async function GET(req: Request) {
 
   const primary = await supabase
     .from('events')
-    .select('id,title,location,description,source_type,source_place,source_detail,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name,event_location_address')
+    .select('id,title,location,description,source_type,source_place,source_detail,start_at,status,created_at,event_category,event_attributes,event_audience,event_location_name,event_location_address')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -81,14 +77,12 @@ export async function GET(req: Request) {
 
     if (fallback.error) return jsonError(fallback.error.message, 500)
 
-    events = ((fallback.data || []) as Array<Omit<EventRow, 'description' | 'source_type' | 'source_place' | 'source_detail' | 'is_recurring' | 'recurrence_rule'>>).map((e) => ({
+    events = ((fallback.data || []) as Array<Omit<EventRow, 'description' | 'source_type' | 'source_place' | 'source_detail'>>).map((e) => ({
       ...e,
       description: null,
       source_type: null,
       source_place: null,
       source_detail: null,
-      is_recurring: false,
-      recurrence_rule: null,
       event_category: null,
       event_attributes: [],
       event_audience: [],
@@ -119,8 +113,6 @@ export async function GET(req: Request) {
     source_type: e.source_type || null,
     source_place: e.source_place || null,
     source_detail: e.source_detail || null,
-    is_recurring: Boolean(e.is_recurring),
-    recurrence_rule: e.recurrence_rule || null,
     event_category: e.event_category || null,
     event_attributes: e.event_attributes || [],
     event_audience: e.event_audience || [],
@@ -144,7 +136,7 @@ export async function GET(req: Request) {
     if (status && row.status !== status) return false
     if (linked === 'linked' && !row.is_linked) return false
     if (linked === 'unlinked' && row.is_linked) return false
-    if (recurringOnly === 'true' && !row.is_recurring) return false
+    if (recurringOnly === 'true') return false
     if (validCategory && row.event_category !== validCategory) return false
     if (attrs.length > 0 && !attrs.every((tag) => (row.event_attributes || []).includes(tag))) return false
     if (aud.length > 0 && !aud.every((tag) => (row.event_audience || []).includes(tag))) return false

@@ -10,8 +10,6 @@ type EventRow = {
   start_at: string
   status: EventStatus
   created_at: string
-  is_recurring?: boolean | null
-  recurrence_rule?: string | null
 }
 
 type LinkRow = {
@@ -28,8 +26,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('recurrence_rule') ||
-    message.includes('is_recurring') ||
     message.includes('seen_at_name') ||
     message.includes('schema cache')
   )
@@ -53,7 +49,7 @@ export async function GET() {
 
   const primary = await supabase
     .from('events')
-    .select('id,title,location,start_at,status,created_at,is_recurring,recurrence_rule')
+    .select('id,title,location,start_at,status,created_at')
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
@@ -69,11 +65,7 @@ export async function GET() {
 
     if (fallback.error) return jsonError(fallback.error.message, 500)
 
-    events = ((fallback.data || []) as EventRow[]).map((row) => ({
-      ...row,
-      is_recurring: false,
-      recurrence_rule: null,
-    }))
+    events = (fallback.data || []) as EventRow[]
   } else {
     events = (primary.data || []) as EventRow[]
   }
@@ -126,8 +118,6 @@ export async function GET() {
       start_at: event.start_at,
       status: event.status,
       created_at: event.created_at,
-      is_recurring: Boolean(event.is_recurring),
-      recurrence_rule: event.recurrence_rule || null,
       poster_public_url,
       seen_at_name: latestSeenAtByEvent.get(event.id) || null,
     }
@@ -137,8 +127,8 @@ export async function GET() {
   const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const todayKey = nyDateKey(now)
 
-  const recurring = enriched.filter((e) => e.is_recurring)
-  const oneTime = enriched.filter((e) => !e.is_recurring)
+  const recurring = [] as typeof enriched
+  const oneTime = enriched
 
   const today = oneTime.filter((e) => nyDateKey(new Date(e.start_at)) === todayKey)
   const thisWeek = oneTime.filter((e) => {

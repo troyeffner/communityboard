@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { EVENT_STATUSES, POSTER_STATUSES, normalizeEventStatus, normalizePosterStatus } from '@/lib/statuses'
+import { createClient } from '@supabase/supabase-js'
 
 type Upload = {
   id: string
@@ -28,6 +29,35 @@ type PosterEventRow = {
   }
 }
 
+async function resizeImageForUpload(file: File): Promise<File> {
+  const imageUrl = URL.createObjectURL(file)
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = imageUrl
+    })
+    const maxEdge = 2000
+    const longest = Math.max(image.width, image.height)
+    const scale = longest > maxEdge ? maxEdge / longest : 1
+    const width = Math.max(1, Math.round(image.width * scale))
+    const height = Math.max(1, Math.round(image.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas unavailable')
+    ctx.drawImage(image, 0, 0, width, height)
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((out) => (out ? resolve(out) : reject(new Error('Encoding failed'))), 'image/jpeg', 0.78)
+    })
+    return new File([blob], 'poster.jpg', { type: 'image/jpeg' })
+  } finally {
+    URL.revokeObjectURL(imageUrl)
+  }
+}
+
 function defaultStartAt2pmLocal() {
   const d = new Date()
   d.setHours(14, 0, 0, 0)
@@ -41,6 +71,18 @@ function toDateTimeLocal(value?: string | null) {
   if (Number.isNaN(dt.getTime())) return defaultStartAt2pmLocal()
   const offsetMs = dt.getTimezoneOffset() * 60_000
   return new Date(dt.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+function formatCaptureHour(value?: string | null) {
+  if (!value) return 'Unknown'
+  const dt = new Date(value)
+  if (Number.isNaN(dt.getTime())) return 'Unknown'
+  return dt.toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: 'numeric',
+  })
 }
 
 function statusLabel(statusValue: string) {
@@ -100,6 +142,13 @@ export default function BuilderCreatePage({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [drawer, setDrawer] = useState<{ open: boolean; panel: 'eventsList' | 'eventForm' | 'posterMeta' }>({
+    open: false,
+    panel: 'eventsList',
+  })
+  const [isMobile, setIsMobile] = useState(false)
+  const panelsRef = useRef<HTMLDivElement | null>(null)
+  const [stageSize, setStageSize] = useState({ width: 1, height: 1 })
 
   async function loadUploads() {
     const res = await fetch('/api/manage/list-uploads-with-counts')
@@ -122,6 +171,25 @@ export default function BuilderCreatePage({
   useEffect(() => {
     loadUploads()
   }, [])
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < 980)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  useEffect(() => {
+    if (!stageRef.current) return
+    const stage = stageRef.current
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect
+      if (!box) return
+      setStageSize({ width: box.width || 1, height: box.height || 1 })
+    })
+    observer.observe(stage)
+    return () => observer.disconnect()
+  }, [selectedPosterId])
 
   useEffect(() => {
     if (!posterUploadFromQuery || selectedPosterId) return
@@ -167,6 +235,9 @@ export default function BuilderCreatePage({
     setZoom(1)
     setPan({ x: 0, y: 0 })
     await loadRows(posterId)
+    if (isMobile && panelsRef.current) {
+      panelsRef.current.scrollTo({ left: panelsRef.current.clientWidth, behavior: 'smooth' })
+    }
   }
 
   function startEdit(row: PosterEventRow) {
@@ -178,6 +249,10 @@ export default function BuilderCreatePage({
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
     setSeenAtName(selectedUpload?.seen_at_name || '')
+    setDrawer({ open: true, panel: 'eventForm' })
+    if (isMobile && panelsRef.current) {
+      panelsRef.current.scrollTo({ left: panelsRef.current.clientWidth * 2, behavior: 'smooth' })
+    }
   }
 
   function resetFormToNew() {
@@ -296,12 +371,40 @@ export default function BuilderCreatePage({
     setError('')
     setMessage('')
     try {
-      const form = new FormData()
-      form.append('file', uploadFile)
-      if (seenAtName.trim()) form.append('seen_at_name', seenAtName.trim())
-      const res = await fetch('/api/submit/upload', { method: 'POST', body: form })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) return setError(friendlyError(data?.error, 'Upload failed'))
+      const resized = await resizeImageForUpload(uploadFile)
+      const before = Math.round(uploadFile.size / 1024)
+      const after = Math.round(resized.size / 1024)
+      console.info(`Upload compression: ${before}KB -> ${after}KB`)
+
+      const signed = await fetch('/api/submit/signed-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_type: 'image/jpeg' }),
+      })
+      const signedData = await signed.json().catch(() => ({}))
+      if (!signed.ok) return setError(friendlyError(signedData?.error, 'Upload failed'))
+
+      const pubUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!pubUrl || !anon) return setError('Missing public Supabase upload config')
+      const browserSupabase = createClient(pubUrl, anon)
+      const uploadRes = await browserSupabase.storage
+        .from('posters')
+        .uploadToSignedUrl(String(signedData.path), String(signedData.token), resized)
+      if (uploadRes.error) return setError(friendlyError(uploadRes.error.message, 'Upload failed'))
+
+      const finalize = await fetch('/api/submit/finalize-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: signedData.path, seen_at_name: seenAtName.trim() || null }),
+      })
+      const data = await finalize.json().catch(() => ({}))
+      if (!finalize.ok) return setError(friendlyError(data?.error, 'Upload failed'))
+      fetch('/api/submit/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poster_upload_id: data?.poster_upload_id || data?.id || null }),
+      }).catch(() => {})
       const newPosterId = String(data?.poster_upload_id || data?.id || '').trim()
       if (!newPosterId) return setError('Upload succeeded but missing poster ID')
       setMessage('Poster uploaded.')
@@ -352,20 +455,29 @@ export default function BuilderCreatePage({
   }
 
   function getStageMetrics() {
-    const stage = stageRef.current
-    if (!stage) return null
-    const stageW = stage.clientWidth || 1
-    const stageH = stage.clientHeight || 1
-    const baseW = stageW
-    const baseH = Math.max(1, stageW * (imageNatural.height / imageNatural.width))
-    return { stageW, stageH, baseW, baseH }
+    const stageW = stageSize.width || 1
+    const stageH = stageSize.height || 1
+    const naturalRatio = imageNatural.width / Math.max(1, imageNatural.height)
+    const stageRatio = stageW / stageH
+    let baseW = stageW
+    let baseH = stageH
+    if (naturalRatio > stageRatio) {
+      baseW = stageW
+      baseH = stageW / naturalRatio
+    } else {
+      baseH = stageH
+      baseW = stageH * naturalRatio
+    }
+    const offsetX = (stageW - baseW) / 2
+    const offsetY = (stageH - baseH) / 2
+    return { stageW, stageH, baseW, baseH, offsetX, offsetY }
   }
 
   function centerOnPoint(pointToCenter: { x: number; y: number }, targetZoom = zoom) {
     const m = getStageMetrics()
     if (!m) return
-    const panX = m.stageW / 2 - pointToCenter.x * m.baseW * targetZoom
-    const panY = m.stageH / 2 - pointToCenter.y * m.baseH * targetZoom
+    const panX = m.stageW / 2 - (m.offsetX + pointToCenter.x * m.baseW) * targetZoom
+    const panY = m.stageH / 2 - (m.offsetY + pointToCenter.y * m.baseH) * targetZoom
     setZoom(Number(targetZoom.toFixed(2)))
     setPan({ x: Number(panX.toFixed(1)), y: Number(panY.toFixed(1)) })
   }
@@ -448,8 +560,20 @@ export default function BuilderCreatePage({
   }
 
   return (
-    <main style={{ padding: 16, fontFamily: 'sans-serif', display: 'grid', gridTemplateColumns: '320px 1fr 420px', gap: 12, minHeight: '90vh' }}>
-      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto' }}>
+    <main
+      ref={panelsRef}
+      style={{
+        padding: 16,
+        fontFamily: 'sans-serif',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'repeat(3, calc(100vw - 32px))' : '320px minmax(640px, 1fr) 420px',
+        gap: 12,
+        minHeight: 'calc(100vh - 64px)',
+        overflowX: isMobile ? 'auto' : 'visible',
+        scrollSnapType: isMobile ? 'x mandatory' : 'none',
+      }}
+    >
+      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
         <h1 style={{ marginTop: 0, marginBottom: 8 }}>Submissions</h1>
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, marginBottom: 8 }}>
           <div style={{ display: 'grid', gap: 8 }}>
@@ -481,8 +605,19 @@ export default function BuilderCreatePage({
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
           {uploads.filter((u) => normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE).map((u) => (
-            <div key={u.id} style={{ border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr auto', gap: 8, alignItems: 'start' }}>
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => selectPoster(u.id)}
+              style={{
+                border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: 8,
+                background: '#fff',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: 8, alignItems: 'start' }}>
                 {u.public_url ? (
                   <img
                     src={u.public_url}
@@ -493,9 +628,9 @@ export default function BuilderCreatePage({
                   <div style={{ width: 76, height: 76, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc' }} />
                 )}
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12 }}>{new Date(u.created_at).toLocaleString()}</div>
+                  <div style={{ fontSize: 12 }}>{formatCaptureHour(u.created_at)}</div>
                   <div style={{ fontSize: 12, marginTop: 2 }}>
-                    {(normalizePosterStatus(u.status) === POSTER_STATUSES.DONE || u.is_done) ? 'Done' : 'Incomplete'} • status: {normalizePosterStatus(u.status)} • Linked: {u.linked_count ?? u.event_count ?? 0}
+                    {(normalizePosterStatus(u.status) === POSTER_STATUSES.DONE || u.is_done) ? 'Done' : 'Incomplete'} • status: {normalizePosterStatus(u.status)} • Items: {u.linked_count ?? u.event_count ?? 0}
                   </div>
                   {!!u.seen_at_name && (
                     <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -503,21 +638,24 @@ export default function BuilderCreatePage({
                     </div>
                   )}
                 </div>
-                <button data-variant="secondary" onClick={() => selectPoster(u.id)}>
-                  {selectedPosterId === u.id ? 'Selected' : 'Select'}
-                </button>
               </div>
-            </div>
+            </button>
           ))}
           {uploads.length === 0 && <p style={{ opacity: 0.7 }}>No incomplete posters.</p>}
         </div>
       </section>
 
-      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto' }}>
+      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, display: 'grid', gridTemplateRows: 'auto auto 1fr auto', minHeight: 0, overflow: 'hidden', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
         <h2 style={{ marginTop: 0 }}>Poster workspace</h2>
         {!selectedUpload?.public_url && <p style={{ opacity: 0.7 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
           <>
+            <div style={{ minHeight: 64, border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <div><div style={{ fontSize: 12, opacity: 0.75 }}>Captured</div><div style={{ fontSize: 13 }}>{formatCaptureHour(selectedUpload.created_at)}</div></div>
+              <div><div style={{ fontSize: 12, opacity: 0.75 }}>Seen at</div><div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUpload.seen_at_name || '—'}</div></div>
+              <div><div style={{ fontSize: 12, opacity: 0.75 }}>Status</div><div style={{ fontSize: 13 }}>{normalizePosterStatus(selectedUpload.status)}</div></div>
+              <div><div style={{ fontSize: 12, opacity: 0.75 }}>Events</div><div style={{ fontSize: 13 }}>{rows.length}</div></div>
+            </div>
             <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button data-variant="secondary" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom out</button>
               <button data-variant="secondary" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom in</button>
@@ -538,9 +676,9 @@ export default function BuilderCreatePage({
               }}
               onMouseUp={() => { dragRef.current = null }}
               onMouseLeave={() => { dragRef.current = null }}
-              style={{ position: 'relative', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', flex: 1, minHeight: 520 }}
+              style={{ position: 'relative', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', flex: 1, minHeight: 420, aspectRatio: '16 / 9' }}
             >
-              <div style={{ position: 'relative', transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'top left', width: '100%' }}>
+              <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'top left' }}>
                 <img
                   ref={imageRef}
                   src={selectedUpload.public_url}
@@ -556,6 +694,8 @@ export default function BuilderCreatePage({
                       didDragRef.current = false
                       return
                     }
+                    const m = getStageMetrics()
+                    if (!m) return
                     const rect = e.currentTarget.getBoundingClientRect()
                     const x = (e.clientX - rect.left) / rect.width
                     const y = (e.clientY - rect.top) / rect.height
@@ -564,7 +704,15 @@ export default function BuilderCreatePage({
                     setEditingEventId(null)
                     resetFormToNew()
                   }}
-                  style={{ width: '100%', display: 'block' }}
+                  style={{
+                    position: 'absolute',
+                    left: `${getStageMetrics()?.offsetX || 0}px`,
+                    top: `${getStageMetrics()?.offsetY || 0}px`,
+                    width: `${getStageMetrics()?.baseW || 0}px`,
+                    height: `${getStageMetrics()?.baseH || 0}px`,
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
                 />
                 {rows.filter((row) => row.bbox).map((row) => {
                   const active = activeLinkId === row.link_id
@@ -579,8 +727,8 @@ export default function BuilderCreatePage({
                       }}
                       style={{
                         position: 'absolute',
-                        left: `${row.bbox!.x * 100}%`,
-                        top: `${row.bbox!.y * 100}%`,
+                        left: `${(getStageMetrics()?.offsetX || 0) + row.bbox!.x * (getStageMetrics()?.baseW || 0)}px`,
+                        top: `${(getStageMetrics()?.offsetY || 0) + row.bbox!.y * (getStageMetrics()?.baseH || 0)}px`,
                         transform: 'translate(-50%, -50%)',
                         width: active ? 16 : 12,
                         height: active ? 16 : 12,
@@ -597,8 +745,8 @@ export default function BuilderCreatePage({
                   <div
                     style={{
                       position: 'absolute',
-                      left: `${point.x * 100}%`,
-                      top: `${point.y * 100}%`,
+                      left: `${(getStageMetrics()?.offsetX || 0) + point.x * (getStageMetrics()?.baseW || 0)}px`,
+                      top: `${(getStageMetrics()?.offsetY || 0) + point.y * (getStageMetrics()?.baseH || 0)}px`,
                       transform: 'translate(-50%, -50%)',
                       width: 14,
                       height: 14,
@@ -615,28 +763,10 @@ export default function BuilderCreatePage({
               <button onClick={markDone}>Mark Done</button>
               <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
             </div>
-            <div style={{ marginTop: 10, border: '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Captured</div>
-              <div style={{ fontSize: 14, marginBottom: 8 }}>{new Date(selectedUpload.created_at).toLocaleString()}</div>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Poster status</div>
-              <div style={{ fontSize: 14, marginBottom: 8 }}>{normalizePosterStatus(selectedUpload.status)}</div>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Seen at (CNAT)</div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <input
-                  value={seenAtName}
-                  onChange={(e) => setSeenAtName(e.target.value)}
-                  placeholder="Seen at"
-                  style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}
-                />
-                <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
-                  {savingSeenAt ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
             <div style={{ marginTop: 10 }}>
-              <h3 style={{ margin: '0 0 8px 0' }}>Events on this poster</h3>
+              <h3 style={{ margin: '0 0 8px 0' }}>Items on this poster</h3>
               {rows.length === 0 ? (
-                <p style={{ opacity: 0.75, margin: 0 }}>No events yet. Click image to add a new pin and event.</p>
+                <p style={{ opacity: 0.75, margin: 0 }}>No items yet. Click image to add a new pin and item.</p>
               ) : (
                 <div style={{ display: 'grid', gap: 8 }}>
                   {rows.map((row) => (
@@ -659,27 +789,87 @@ export default function BuilderCreatePage({
         )}
       </section>
 
-      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto' }}>
+      <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, overflow: 'auto', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
         <h2 style={{ marginTop: 0 }}>Inspector</h2>
-        <h3 style={{ marginTop: 14 }}>{editingEventId ? 'Edit event' : 'Create event'}</h3>
-        <div style={{ display: 'grid', gap: 8 }}>
-          <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>Select a pin to edit, or click image to create a pinned draft.</p>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          {!editingEventId && (
-            <div style={{ fontSize: 12, opacity: 0.75 }}>
-              Status: {EVENT_STATUSES.DRAFT}
-            </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {!selectedPosterId && <p style={{ margin: 0, opacity: 0.75 }}>Select a submission to begin.</p>}
+          {selectedPosterId && !activeLinkId && !point && (
+            <>
+              <p style={{ margin: 0, opacity: 0.75 }}>Poster selected. Choose an action.</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button data-variant="secondary" onClick={() => setDrawer({ open: true, panel: 'eventsList' })}>Items</button>
+                <button data-variant="secondary" onClick={() => setDrawer({ open: true, panel: 'posterMeta' })}>Poster meta</button>
+                <button onClick={() => setDrawer({ open: true, panel: 'eventForm' })}>Add item</button>
+              </div>
+            </>
           )}
-          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
-          <input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveEvent} disabled={saving}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Create Draft Event'}</button>
-            {(editingEventId || point) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
-          </div>
+          {activeLinkId && (
+            <>
+              <p style={{ margin: 0, opacity: 0.75 }}>Item selected. Open form to edit.</p>
+              <button onClick={() => setDrawer({ open: true, panel: 'eventForm' })}>Edit item</button>
+            </>
+          )}
+          {!activeLinkId && point && (
+            <>
+              <p style={{ margin: 0, opacity: 0.75 }}>Pinned draft at x={point.x}, y={point.y}</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setDrawer({ open: true, panel: 'eventForm' })}>Add draft item</button>
+                <button data-variant="secondary" onClick={() => setPoint(null)}>Cancel pin</button>
+              </div>
+            </>
+          )}
           {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
           {message && <p style={{ margin: 0 }}>{message}</p>}
+
+          {drawer.open && (
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <strong>{drawer.panel === 'eventsList' ? 'Items' : drawer.panel === 'posterMeta' ? 'Poster meta' : (editingEventId ? 'Edit item' : 'Add item')}</strong>
+                <button data-variant="secondary" onClick={() => setDrawer((d) => ({ ...d, open: false }))}>Close</button>
+              </div>
+
+              {drawer.panel === 'eventsList' && (
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {rows.length === 0 && <p style={{ margin: 0, opacity: 0.75 }}>No items yet.</p>}
+                  {rows.map((row) => (
+                    <button key={row.link_id} type="button" onClick={() => startEdit(row)} style={{ textAlign: 'left', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: activeLinkId === row.link_id ? '#eff6ff' : '#fff' }}>
+                      <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft event)'}</div>
+                      <div style={{ fontSize: 12, opacity: 0.75 }}>{new Date(row.event.start_at).toLocaleString()}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {drawer.panel === 'posterMeta' && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>Captured</div>
+                  <div>{formatCaptureHour(selectedUpload?.created_at || null)}</div>
+                  <input
+                    value={seenAtName}
+                    onChange={(e) => setSeenAtName(e.target.value)}
+                    placeholder="Seen at"
+                    style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}
+                  />
+                  <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
+                    {savingSeenAt ? 'Saving...' : 'Save metadata'}
+                  </button>
+                </div>
+              )}
+
+              {drawer.panel === 'eventForm' && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                  <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                  <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
+                  <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={saveEvent} disabled={saving}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add Draft Item'}</button>
+                    {(editingEventId || point) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

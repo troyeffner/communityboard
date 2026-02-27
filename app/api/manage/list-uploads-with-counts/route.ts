@@ -10,9 +10,11 @@ type UploadRow = {
   is_done?: boolean | null
   processed_at?: string | null
   seen_at_name?: string | null
+  venues?: { name: string | null } | { name: string | null }[] | null
 }
 
 type LinkRow = { poster_upload_id: string }
+type ItemCountRow = { poster_id: string }
 
 function isMissingDoneColumns(error: { code?: string; message?: string } | null | undefined) {
   const message = (error?.message || '').toLowerCase()
@@ -22,6 +24,7 @@ function isMissingDoneColumns(error: { code?: string; message?: string } | null 
     message.includes('is_done') ||
     message.includes('processed_at') ||
     message.includes('seen_at_name') ||
+    message.includes('relationship') ||
     message.includes('schema cache')
   )
 }
@@ -37,7 +40,7 @@ export async function GET() {
 
   const uploadsRes = await supabase
     .from('poster_uploads')
-    .select('id,file_path,status,created_at,done,is_done,processed_at,seen_at_name')
+    .select('id,file_path,status,created_at,done,is_done,processed_at,seen_at_name,venue_id,venues(name)')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -80,15 +83,26 @@ export async function GET() {
 
   let linkedCountByUpload: Record<string, number> = {}
   if (uploadIds.length > 0) {
-    const linksRes = await supabase
-      .from('poster_event_links')
-      .select('poster_upload_id')
-      .in('poster_upload_id', uploadIds)
-    if (linksRes.error) return NextResponse.json({ error: linksRes.error.message }, { status: 500 })
-    linkedCountByUpload = ((linksRes.data || []) as LinkRow[]).reduce<Record<string, number>>((acc, row) => {
-      acc[row.poster_upload_id] = (acc[row.poster_upload_id] || 0) + 1
-      return acc
-    }, {})
+    const itemsRes = await supabase
+      .from('poster_items')
+      .select('poster_id')
+      .in('poster_id', uploadIds)
+    if (!itemsRes.error) {
+      linkedCountByUpload = ((itemsRes.data || []) as ItemCountRow[]).reduce<Record<string, number>>((acc, row) => {
+        acc[row.poster_id] = (acc[row.poster_id] || 0) + 1
+        return acc
+      }, {})
+    } else {
+      const linksRes = await supabase
+        .from('poster_event_links')
+        .select('poster_upload_id')
+        .in('poster_upload_id', uploadIds)
+      if (linksRes.error) return NextResponse.json({ error: linksRes.error.message }, { status: 500 })
+      linkedCountByUpload = ((linksRes.data || []) as LinkRow[]).reduce<Record<string, number>>((acc, row) => {
+        acc[row.poster_upload_id] = (acc[row.poster_upload_id] || 0) + 1
+        return acc
+      }, {})
+    }
   }
 
   const rows = uploads.map((u) => ({
@@ -96,7 +110,7 @@ export async function GET() {
     created_at: u.created_at,
     status: u.status,
     public_url: u.file_path ? supabase.storage.from('posters').getPublicUrl(u.file_path).data.publicUrl : null,
-    seen_at_name: u.seen_at_name || null,
+    seen_at_name: (Array.isArray(u.venues) ? u.venues[0]?.name : u.venues?.name) || u.seen_at_name || null,
     done: ['done', 'processed'].includes((u.status || '').toLowerCase()) || Boolean(u.is_done ?? u.done ?? u.processed_at),
     is_done: ['done', 'processed'].includes((u.status || '').toLowerCase()) || Boolean(u.is_done ?? u.done ?? u.processed_at),
     event_count: linkedCountByUpload[u.id] || 0,

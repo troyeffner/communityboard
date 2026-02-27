@@ -11,50 +11,52 @@ export async function PATCH(req: Request) {
   const eventId = String(body.event_id || '').trim()
   if (!eventId) return jsonError('event_id is required')
 
-  const allowed: Record<string, unknown> = {}
-  const fields = ['title', 'description', 'start_at', 'end_at', 'location', 'event_location_name', 'event_location_address', 'status', 'event_category', 'event_attributes', 'event_audience']
-  for (const key of fields) {
-    if (key in body) allowed[key] = body[key]
-  }
-  if ('event_attributes' in allowed) {
-    const value = allowed.event_attributes
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      allowed.event_attributes = {}
-    }
-  }
-  if ('event_audience' in allowed && !Array.isArray(allowed.event_audience)) {
-    allowed.event_audience = []
-  }
-  if (Object.keys(allowed).length === 0) return jsonError('No updatable fields provided')
+  const title = typeof body.title === 'string' ? body.title.trim() : ''
+  const description = typeof body.description === 'string' ? body.description.trim() : ''
+  const location = typeof body.location === 'string' ? body.location.trim() : ''
+  const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : ''
+  const startAtRaw = typeof body.start_at === 'string' ? body.start_at.trim() : ''
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
-  const update = await supabase.from('events').update(allowed).eq('id', eventId)
-  if (update.error) {
-    const message = (update.error.message || '').toLowerCase()
-    const optionalMissing =
-      update.error.code === '42703' ||
-      message.includes('event_attributes') ||
-      message.includes('event_audience') ||
-      message.includes('event_category') ||
-      message.includes('event_location_name') ||
-      message.includes('event_location_address') ||
+  const updates: Record<string, unknown> = {}
+  if (title) updates.title = title
+  if ('location' in body) updates.location_text = location || null
+  if ('description' in body) updates.details_json = description ? { description } : {}
+  if (status) updates.status = status
+  if (startAtRaw) {
+    const dt = new Date(startAtRaw.length === 16 ? `${startAtRaw}:00` : startAtRaw)
+    if (!Number.isNaN(dt.getTime())) {
+      updates.start_date = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+      updates.time_of_day = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}:00`
+    }
+  }
+  if (Object.keys(updates).length === 0) return jsonError('No updatable fields provided')
+
+  const itemUpdate = await supabase.from('poster_items').update(updates).eq('id', eventId)
+  if (itemUpdate.error) {
+    const message = (itemUpdate.error.message || '').toLowerCase()
+    const missingPosterItems =
+      itemUpdate.error.code === '42P01' ||
+      itemUpdate.error.code === '42703' ||
+      message.includes('poster_items') ||
+      message.includes('location_text') ||
+      message.includes('details_json') ||
       message.includes('schema cache')
 
-    if (!optionalMissing) return jsonError(update.error.message, 500)
+    if (!missingPosterItems) return jsonError(itemUpdate.error.message, 500)
 
-    const fallbackAllowed: Record<string, unknown> = {}
-    const fallbackFields = ['title', 'description', 'start_at', 'end_at', 'location', 'status']
-    for (const key of fallbackFields) {
-      if (key in allowed) fallbackAllowed[key] = allowed[key]
-    }
-    if (Object.keys(fallbackAllowed).length > 0) {
-      const fallback = await supabase.from('events').update(fallbackAllowed).eq('id', eventId)
-      if (fallback.error) return jsonError(fallback.error.message, 500)
-    }
+    const legacyUpdates: Record<string, unknown> = {}
+    if (title) legacyUpdates.title = title
+    if ('location' in body) legacyUpdates.location = location || null
+    if ('description' in body) legacyUpdates.description = description || null
+    if (status) legacyUpdates.status = status
+    if (startAtRaw) legacyUpdates.start_at = startAtRaw.length === 16 ? `${startAtRaw}:00` : startAtRaw
+    const fallback = await supabase.from('events').update(legacyUpdates).eq('id', eventId)
+    if (fallback.error) return jsonError(fallback.error.message, 500)
   }
 
   await supabase

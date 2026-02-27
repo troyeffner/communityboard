@@ -5,39 +5,32 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-function isMissingRecurrenceColumnError(error: { code?: string; message?: string } | null | undefined) {
+function isOptionalSchemaError(error: { code?: string; message?: string } | null | undefined) {
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('description') ||
-    message.includes('source_type') ||
-    message.includes('source_place') ||
-    message.includes('source_detail') ||
-    message.includes('event_category') ||
-    message.includes('event_attributes') ||
-    message.includes('event_audience') ||
-    message.includes('event_location_name') ||
-    message.includes('event_location_address') ||
+    message.includes('poster_items') ||
+    message.includes('x') ||
+    message.includes('y') ||
+    message.includes('location_text') ||
+    message.includes('time_of_day') ||
     message.includes('schema cache')
   )
 }
 
-type EventStatus = 'draft' | 'published' | 'unpublished'
-type EventRow = {
+type ItemStatus = 'draft' | 'published' | 'archived' | string
+type ItemRow = {
   id: string
   title: string
-  location: string | null
-  description?: string | null
-  source_type?: string | null
-  source_place?: string | null
-  source_detail?: string | null
-  start_at: string
-  status: EventStatus
-  event_category?: string | null
-  event_attributes?: string[] | null
-  event_audience?: string[] | null
-  event_location_name?: string | null
-  event_location_address?: string | null
+  type?: string | null
+  location_text?: string | null
+  details_json?: { description?: string | null } | null
+  time_of_day?: string | null
+  start_date?: string | null
+  status: ItemStatus
+  x: number
+  y: number
+  created_at: string
 }
 
 type LinkRow = {
@@ -45,6 +38,16 @@ type LinkRow = {
   bbox: { x: number; y: number } | null
   created_at: string
   events: EventRow | EventRow[] | null
+}
+
+type EventRow = {
+  id: string
+  title: string
+  location: string | null
+  description?: string | null
+  start_at: string
+  status: string
+  item_type?: string | null
 }
 
 export async function GET(req: Request) {
@@ -58,36 +61,49 @@ export async function GET(req: Request) {
 
   const supabase = createClient(supabaseUrl, serviceKey)
 
-  const primary = await supabase
-    .from('poster_event_links')
-    .select('id, bbox, created_at, events ( id, title, location, description, source_type, source_place, source_detail, start_at, status, event_category, event_attributes, event_audience, event_location_name, event_location_address )')
-    .eq('poster_upload_id', poster_upload_id)
+  const itemsPrimary = await supabase
+    .from('poster_items')
+    .select('id,title,type,status,start_date,time_of_day,location_text,details_json,x,y,created_at')
+    .eq('poster_id', poster_upload_id)
     .order('created_at', { ascending: false })
 
-  let data: LinkRow[] | null = (primary.data || null) as LinkRow[] | null
-  if (primary.error) {
-    if (!isMissingRecurrenceColumnError(primary.error)) return jsonError(primary.error.message, 500)
-
-    const fallback = await supabase
-      .from('poster_event_links')
-      .select('id, bbox, created_at, events ( id, title, location, start_at, status )')
-      .eq('poster_upload_id', poster_upload_id)
-      .order('created_at', { ascending: false })
-
-    if (fallback.error) return jsonError(fallback.error.message, 500)
-    data = (fallback.data || null) as LinkRow[] | null
+  if (!itemsPrimary.error) {
+    const rows = ((itemsPrimary.data || []) as ItemRow[]).map((item) => {
+      const startAt = item.start_date
+        ? `${item.start_date}T${item.time_of_day || '14:00:00'}`
+        : new Date(item.created_at).toISOString()
+      return {
+        link_id: item.id,
+        bbox: { x: item.x, y: item.y },
+        created_at: item.created_at,
+        event: {
+          id: item.id,
+          title: item.title || 'Untitled',
+          location: item.location_text || null,
+          description: item.details_json?.description || null,
+          start_at: startAt,
+          status: item.status || 'draft',
+          item_type: item.type || 'event',
+        },
+      }
+    })
+    return NextResponse.json({ rows })
   }
 
-  const rows = ((data || []) as LinkRow[])
+  if (!isOptionalSchemaError(itemsPrimary.error)) return jsonError(itemsPrimary.error.message, 500)
+
+  const legacy = await supabase
+    .from('poster_event_links')
+    .select('id, bbox, created_at, events ( id, title, location, description, start_at, status )')
+    .eq('poster_upload_id', poster_upload_id)
+    .order('created_at', { ascending: false })
+  if (legacy.error) return jsonError(legacy.error.message, 500)
+
+  const rows = ((legacy.data || []) as LinkRow[])
     .map((r) => {
       const event = Array.isArray(r.events) ? r.events[0] : r.events
       if (!event) return null
-      return {
-        link_id: r.id,
-        bbox: r.bbox,
-        created_at: r.created_at,
-        event,
-      }
+      return { link_id: r.id, bbox: r.bbox, created_at: r.created_at, event }
     })
     .filter((row): row is NonNullable<typeof row> => row !== null)
 

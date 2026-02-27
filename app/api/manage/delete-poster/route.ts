@@ -31,19 +31,30 @@ export async function POST(req: Request) {
     .from('poster_event_links')
     .select('event_id')
     .eq('poster_upload_id', posterUploadId)
-  if (linkedEvents.error) return jsonError(linkedEvents.error.message, 500)
+  if (linkedEvents.error && linkedEvents.error.code !== '42P01') return jsonError(linkedEvents.error.message, 500)
 
   const eventIds = Array.from(new Set((linkedEvents.data || []).map((row) => row.event_id).filter(Boolean)))
+
+  const itemIdsRes = await supabase.from('poster_items').select('id').eq('poster_id', posterUploadId)
+  const itemIds = itemIdsRes.error ? [] : (itemIdsRes.data || []).map((row) => row.id)
+
+  if (mode === 'delete_with_events' && itemIds.length > 0) {
+    const delItems = await supabase.from('poster_items').delete().in('id', itemIds)
+    if (delItems.error) return jsonError(delItems.error.message, 500)
+  } else {
+    const delItems = await supabase.from('poster_items').delete().eq('poster_id', posterUploadId)
+    if (delItems.error && delItems.error.code !== '42P01') return jsonError(delItems.error.message, 500)
+  }
 
   const deleteLinks = await supabase
     .from('poster_event_links')
     .delete()
     .eq('poster_upload_id', posterUploadId)
-  if (deleteLinks.error) return jsonError(deleteLinks.error.message, 500)
+  if (deleteLinks.error && deleteLinks.error.code !== '42P01') return jsonError(deleteLinks.error.message, 500)
 
   if (mode === 'delete_with_events' && eventIds.length > 0) {
     const deleteEvents = await supabase.from('events').delete().in('id', eventIds)
-    if (deleteEvents.error) return jsonError(deleteEvents.error.message, 500)
+    if (deleteEvents.error && deleteEvents.error.code !== '42P01') return jsonError(deleteEvents.error.message, 500)
   }
 
   const deleteUpload = await supabase
@@ -59,4 +70,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, mode })
 }
-

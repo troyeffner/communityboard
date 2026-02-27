@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
 
 async function resizeImage(file: File): Promise<File> {
   const imageUrl = URL.createObjectURL(file)
@@ -12,7 +13,7 @@ async function resizeImage(file: File): Promise<File> {
       img.src = imageUrl
     })
 
-    const maxEdge = 1600
+    const maxEdge = 2000
     const longest = Math.max(image.width, image.height)
     const scale = longest > maxEdge ? maxEdge / longest : 1
     const width = Math.max(1, Math.round(image.width * scale))
@@ -26,7 +27,7 @@ async function resizeImage(file: File): Promise<File> {
     ctx.drawImage(image, 0, 0, width, height)
 
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((out) => (out ? resolve(out) : reject(new Error('Encoding failed'))), 'image/jpeg', 0.8)
+      canvas.toBlob((out) => (out ? resolve(out) : reject(new Error('Encoding failed'))), 'image/jpeg', 0.78)
     })
 
     return new File([blob], 'poster.jpg', { type: 'image/jpeg' })
@@ -67,9 +68,8 @@ export default function SubmitPage() {
     setMessage('Preparing image...')
     try {
       const resized = await resizeImage(file)
-      const form = new FormData()
-      form.append('file', resized)
-      form.append('seen_at_name', seenAtName)
+      console.info(`Upload compression: ${Math.round(file.size / 1024)}KB -> ${Math.round(resized.size / 1024)}KB`)
+
       if (reuseSeenAt) {
         window.localStorage.setItem('submit_seen_at_name', seenAtName.trim())
       } else {
@@ -77,12 +77,47 @@ export default function SubmitPage() {
       }
 
       setMessage('Uploading...')
-      const res = await fetch('/api/submit/upload', { method: 'POST', body: form })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
+      const signed = await fetch('/api/submit/signed-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_type: 'image/jpeg' }),
+      })
+      const signedData = await signed.json().catch(() => ({}))
+      if (!signed.ok) {
+        setMessage(signedData?.error || 'Upload failed')
+        return
+      }
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!supabaseUrl || !anonKey) {
+        setMessage('Missing public upload config')
+        return
+      }
+      const browserSupabase = createClient(supabaseUrl, anonKey)
+      const uploadRes = await browserSupabase.storage
+        .from('posters')
+        .uploadToSignedUrl(String(signedData.path), String(signedData.token), resized)
+      if (uploadRes.error) {
+        setMessage(uploadRes.error.message || 'Upload failed')
+        return
+      }
+
+      const finalize = await fetch('/api/submit/finalize-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: signedData.path, seen_at_name: seenAtName.trim() || null }),
+      })
+      const data = await finalize.json().catch(() => ({}))
+      if (!finalize.ok) {
         setMessage(data?.error || 'Upload failed')
         return
       }
+      fetch('/api/submit/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poster_upload_id: data?.poster_upload_id || data?.id || null }),
+      }).catch(() => {})
 
       setMessage('Submitted.')
       setFile(null)

@@ -19,6 +19,11 @@ export async function POST(req: Request) {
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
+  const deleteItem = await supabase.from('poster_items').delete().eq('id', linkId).select('id')
+  if (!deleteItem.error && (deleteItem.data?.length || 0) > 0) {
+    return NextResponse.json({ ok: true, mode })
+  }
+
   const lookup = await supabase
     .from('poster_event_links')
     .select('id,event_id')

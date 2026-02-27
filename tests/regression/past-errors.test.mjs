@@ -70,3 +70,18 @@ test('event vote route avoids unsupported insert onConflict option', () => {
   const src = read('app/api/vote/event/route.ts')
   assert.equal(src.includes('onConflict'), false)
 })
+
+test('no runtime recurrence_rule references remain', () => {
+  const files = listFiles(path.join(repoRoot, 'app')).filter((file) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file))
+  const offenders = []
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf8')
+    if (src.includes('recurrence_rule')) offenders.push(path.relative(repoRoot, file))
+  }
+  assert.equal(offenders.length, 0, `Found recurrence_rule references:\n${offenders.join('\n')}`)
+})
+
+test('browse API uses poster_items model (not only legacy link table)', () => {
+  const src = read('app/api/public/browse/route.ts')
+  assert.equal(src.includes(".from('poster_items')"), true)
+})

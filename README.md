@@ -59,6 +59,26 @@ Optional (only if adding client-side Supabase usage):
 - `start_at` (timestamptz)
 - `status` (`draft` | `published`)
 
+### `poster_items`
+- `id` (uuid, PK)
+- `poster_id` (uuid, FK -> `poster_uploads.id`)
+- `type` (text; e.g. `event`, `recurring_event`, `class_program`, `business_service`, `opportunity`, `announcement`)
+- `x`, `y` (float, normalized 0..1)
+- `title` (text)
+- `start_date` (date, nullable)
+- `time_of_day` (time, nullable)
+- `location_text` (text, nullable)
+- `details_json` (jsonb)
+- `status` (`draft` | `published` | `archived`)
+- `upvote_count` (int)
+
+### `poster_item_upvotes`
+- `id` (uuid, PK)
+- `poster_item_id` (uuid, FK -> `poster_items.id`)
+- `viewer_id` (uuid)
+- `created_at` (timestamptz)
+- unique `(poster_item_id, viewer_id)`
+
 ### `poster_event_links`
 - `id` (uuid, PK)
 - `poster_upload_id` (uuid, FK -> `poster_uploads.id`)
@@ -93,6 +113,16 @@ Optional (only if adding client-side Supabase usage):
 - `GET /api/manage/poster-events?poster_upload_id=<uuid>`
 - Returns rows shaped as:
 - `{ link_id, bbox, created_at, event: { id, title, location, start_at, status } }`
+- Reads `poster_items` first (legacy fallback supported).
+
+### Public browse
+- `GET /api/public/browse?poster=<id>&seenAt=<value>&tags=...`
+- Returns poster list + facets + published item pins for active poster.
+
+### Item upvotes
+- `POST /api/items/:id/upvote`
+- `DELETE /api/items/:id/upvote`
+- Uses anonymous `viewer_id` cookie (or `x-cb-vid`) and enforces one vote per viewer/item.
 
 ### Manage: delete linked event
 - `POST /api/manage/delete-poster-event` with `{ link_id }`
@@ -121,6 +151,12 @@ List uploads (verify `seen_at_name` + `linked_events_count`):
 
 ```bash
 curl http://localhost:3000/api/manage/list-uploads
+```
+
+Browse by seen-at:
+
+```bash
+curl "http://localhost:3000/api/public/browse?seenAt=Emmerson%20Cafe%20Community%20Board"
 ```
 
 ## Regression Tests

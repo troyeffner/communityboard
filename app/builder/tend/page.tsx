@@ -10,7 +10,6 @@ type Row = {
   start_at: string
   status: string
   created_at: string
-  is_recurring: boolean
   is_linked: boolean
 }
 
@@ -39,7 +38,6 @@ export default function BuilderTendPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [status, setStatus] = useState('all')
   const [linked, setLinked] = useState('all')
-  const [recurring, setRecurring] = useState(false)
   const [q, setQ] = useState('')
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -54,7 +52,6 @@ export default function BuilderTendPage() {
     const params = new URLSearchParams()
     if (status !== 'all') params.set('status', status)
     if (linked !== 'all') params.set('linked', linked)
-    if (recurring) params.set('recurring', 'true')
     if (q.trim()) params.set('q', q.trim())
     const res = await fetch(`/api/builder/events?${params.toString()}`)
     const data = await res.json().catch(() => ({}))
@@ -67,7 +64,6 @@ export default function BuilderTendPage() {
     const params = new URLSearchParams()
     if (status !== 'all') params.set('status', status)
     if (linked !== 'all') params.set('linked', linked)
-    if (recurring) params.set('recurring', 'true')
     if (q.trim()) params.set('q', q.trim())
 
     fetch(`/api/builder/events?${params.toString()}`)
@@ -82,7 +78,7 @@ export default function BuilderTendPage() {
         if (!cancelled) setError('Failed to load')
       })
     return () => { cancelled = true }
-  }, [status, linked, recurring, q])
+  }, [status, linked, q])
 
   async function publish(eventId: string) {
     const res = await fetch('/api/builder/publish-event', {
@@ -165,9 +161,6 @@ export default function BuilderTendPage() {
           <option value="linked">Linked</option>
           <option value="unlinked">Unlinked</option>
         </select>
-        <label style={{ fontSize: 13, fontWeight: 600 }}>
-          <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} /> Recurring
-        </label>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
         <button data-variant="secondary" onClick={load}>Apply</button>
       </div>

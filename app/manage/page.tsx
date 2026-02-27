@@ -29,7 +29,6 @@ type EventRecord = {
   start_at: string
   status: EventStatus
   is_recurring?: boolean
-  recurrence_rule?: string | null
   event_category?: string | null
   event_attributes?: string[] | null
   event_audience?: string[] | null
@@ -100,37 +99,6 @@ function defaultStartAt2pmLocal() {
   d.setHours(14, 0, 0, 0)
   const offsetMs = d.getTimezoneOffset() * 60_000
   return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16)
-}
-
-function parseRecurrenceRule(rule?: string | null): {
-  isRecurring: boolean
-  mode: RecurrenceMode
-  weekday: Weekday
-  monthOrdinal: MonthOrdinal
-} {
-  if (!rule) return { isRecurring: false, mode: 'weekly', weekday: 'tuesday', monthOrdinal: 'first' }
-
-  const weekly = /^weekly:(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.exec(rule)
-  if (weekly) {
-    return { isRecurring: true, mode: 'weekly', weekday: weekly[1].toLowerCase() as Weekday, monthOrdinal: 'first' }
-  }
-
-  const monthly = /^monthly:(first|second|third|fourth):(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.exec(rule)
-  if (monthly) {
-    return {
-      isRecurring: true,
-      mode: 'monthly',
-      monthOrdinal: monthly[1].toLowerCase() as MonthOrdinal,
-      weekday: monthly[2].toLowerCase() as Weekday,
-    }
-  }
-
-  return { isRecurring: true, mode: 'weekly', weekday: 'tuesday', monthOrdinal: 'first' }
-}
-
-function buildRecurrenceRule(isRecurring: boolean, mode: RecurrenceMode, weekday: Weekday, monthOrdinal: MonthOrdinal) {
-  if (!isRecurring) return null
-  return mode === 'weekly' ? `weekly:${weekday}` : `monthly:${monthOrdinal}:${weekday}`
 }
 
 export default function ManagePage() {
@@ -440,11 +408,10 @@ export default function ManagePage() {
     setStartAt(toDateTimeLocal(event.start_at))
     setStatus('published')
 
-    const parsed = parseRecurrenceRule(event.recurrence_rule)
-    setIsRecurring(Boolean(event.is_recurring) || parsed.isRecurring)
-    setRecurrenceMode(parsed.mode)
-    setRecurrenceWeekday(parsed.weekday)
-    setRecurrenceMonthOrdinal(parsed.monthOrdinal)
+    setIsRecurring(Boolean(event.is_recurring))
+    setRecurrenceMode('weekly')
+    setRecurrenceWeekday('tuesday')
+    setRecurrenceMonthOrdinal('first')
 
     setMessage('Editing item...')
     setFormError('')
@@ -510,8 +477,6 @@ export default function ManagePage() {
     if (!title.trim()) return setFormError('Title is required.')
     if (!startAt.trim()) return setFormError('Start date/time is required.')
 
-    const recurrence_rule = buildRecurrenceRule(isRecurring, recurrenceMode, recurrenceWeekday, recurrenceMonthOrdinal)
-
     setSavingForm(true)
     try {
       if (isEditMode && editingEventId) {
@@ -532,8 +497,6 @@ export default function ManagePage() {
             event_location_address: eventLocationAddress,
             start_at: startAt,
             status,
-            is_recurring: isRecurring,
-            recurrence_rule,
           }),
         })
         const data = await res.json().catch(() => ({}))
@@ -564,8 +527,6 @@ export default function ManagePage() {
           start_at: startAt,
           status,
           bbox: point,
-          is_recurring: isRecurring,
-          recurrence_rule,
         }),
       })
       const data = await res.json().catch(() => ({}))

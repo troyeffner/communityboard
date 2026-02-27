@@ -9,8 +9,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('recurrence_rule') ||
-    message.includes('is_recurring') ||
     message.includes('schema cache')
   )
 }
@@ -39,8 +37,6 @@ type EventRow = {
   start_at: string
   status: EventStatus
   created_at: string
-  is_recurring: boolean | null
-  recurrence_rule: string | null
   poster_event_links:
     | { id: string; poster_upload_id: string }
     | Array<{ id: string; poster_upload_id: string }>
@@ -56,7 +52,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('events')
-    .select('id,title,location,description,start_at,status,created_at,is_recurring,recurrence_rule,poster_event_links(id,poster_upload_id)')
+    .select('id,title,location,description,start_at,status,created_at,poster_event_links(id,poster_upload_id)')
     .in('status', ['draft', 'unpublished'])
     .order('created_at', { ascending: false })
     .limit(100)
@@ -89,8 +85,6 @@ export async function GET() {
         start_at: row.start_at,
         status: row.status,
         created_at: row.created_at,
-        is_recurring: false,
-        recurrence_rule: null,
         source_type: links.length > 0 ? 'poster' : 'manual',
         source: links.length > 0 ? 'poster' : 'manual',
         poster_upload_id: links[0]?.poster_upload_id || null,
@@ -116,8 +110,6 @@ export async function GET() {
       start_at: row.start_at,
       status: row.status,
       created_at: row.created_at,
-      is_recurring: Boolean(row.is_recurring),
-      recurrence_rule: row.recurrence_rule,
       source_type: links.length > 0 ? 'poster' : 'manual',
       source: links.length > 0 ? 'poster' : 'manual',
       poster_upload_id: links[0]?.poster_upload_id || null,

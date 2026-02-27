@@ -27,3 +27,10 @@ test('builder create page has integrated upload + next untended controls', () =>
   assert.equal(source.includes('Next untended poster'), true)
   assert.equal(source.includes('/api/builder/next-poster'), true)
 })
+
+test('item upvote endpoint exists and targets poster_item_upvotes', () => {
+  const source = read('app/api/items/[id]/upvote/route.ts')
+  assert.equal(source.includes("from('poster_item_upvotes')"), true)
+  assert.equal(source.includes('export async function POST'), true)
+  assert.equal(source.includes('export async function DELETE'), true)
+})

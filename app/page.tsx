@@ -14,8 +14,6 @@ type EventRow = {
   start_at: string
   status: EventStatus
   created_at: string
-  is_recurring?: boolean | null
-  recurrence_rule?: string | null
   event_category?: string | null
   event_attributes?: string[] | null
   event_audience?: string[] | null
@@ -43,8 +41,6 @@ function isMissingOptionalEventColumns(message: string) {
     lower.includes('event_audience') ||
     lower.includes('event_location_name') ||
     lower.includes('description') ||
-    lower.includes('is_recurring') ||
-    lower.includes('recurrence_rule') ||
     lower.includes('schema cache')
   )
 }
@@ -77,7 +73,7 @@ export default async function Home() {
 
   const primary = await supabase
     .from('events')
-    .select('id, title, location, description, start_at, status, created_at, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name,published_by,published_at')
+    .select('id, title, location, description, start_at, status, created_at, event_category, event_attributes, event_audience, event_location_name,published_by,published_at')
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
@@ -103,8 +99,6 @@ export default async function Home() {
         events = ((fallback.data || []) as EventRow[]).map((row) => ({
           ...row,
           description: null,
-          is_recurring: false,
-          recurrence_rule: null,
           event_category: null,
           event_attributes: [],
           event_audience: [],
@@ -157,10 +151,13 @@ export default async function Home() {
   const publisherIds = Array.from(new Set(events.map((e) => e.published_by).filter(Boolean))) as string[]
   const publisherNameById = new Map<string, string>()
   if (publisherIds.length > 0) {
-    const usersResult = await supabase.from('users').select('id,name').in('id', publisherIds)
+    let usersResult: any = await supabase.from('users').select('id,display_name').in('id', publisherIds)
+    if (usersResult.error) {
+      usersResult = await supabase.from('users').select('id,name').in('id', publisherIds)
+    }
     if (!usersResult.error) {
-      for (const row of (usersResult.data || []) as Array<{ id: string; name: string | null }>) {
-        publisherNameById.set(row.id, row.name || 'Community Builder')
+      for (const row of (usersResult.data || []) as Array<{ id: string; name?: string | null; display_name?: string | null }>) {
+        publisherNameById.set(row.id, row.display_name || row.name || 'Community Builder')
       }
     }
   }
@@ -209,8 +206,6 @@ export default async function Home() {
 
     return {
       ...event,
-      is_recurring: Boolean(event.is_recurring),
-      recurrence_rule: event.recurrence_rule || null,
       poster_public_url,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
       seen_at_name: latestSeenAtByEvent.get(event.id) || null,
@@ -230,8 +225,8 @@ export default async function Home() {
   const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const todayKey = nyDateKey(now)
 
-  const recurring = enriched.filter((e) => e.is_recurring)
-  const oneTime = enriched.filter((e) => !e.is_recurring)
+  const recurring = [] as typeof enriched
+  const oneTime = enriched
 
   const today = oneTime.filter((e) => nyDateKey(new Date(e.start_at)) === todayKey)
   const thisWeek = oneTime.filter((e) => {

@@ -82,3 +82,9 @@ test('status vocabulary contains create-flow queue values', () => {
   assert.equal(migration.includes("'tending'"), true)
   assert.equal(migration.includes("'done'"), true)
 })
+
+test('proxy sets viewer_id cookie and protects admin paths', () => {
+  const src = read(path.join(repoRoot, 'proxy.ts'))
+  assert.equal(src.includes('viewer_id'), true)
+  assert.equal(src.includes("pathname.startsWith('/admin')"), true)
+})

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { EVENT_STATUSES, normalizeEventStatus } from '@/lib/statuses'
+import { POSTER_STATUSES } from '@/lib/statuses'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -22,6 +22,38 @@ function defaultNy2pmLocalIso() {
   return `${year}-${month}-${day}T14:00:00`
 }
 
+function toDateAndTimeParts(value: string) {
+  const dt = new Date(value)
+  if (Number.isNaN(dt.getTime())) {
+    const [datePart, timePart] = value.split('T')
+    return {
+      start_date: datePart || null,
+      time_of_day: timePart ? `${timePart.slice(0, 5)}:00` : '14:00:00',
+    }
+  }
+  const yyyy = dt.getFullYear()
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  const hh = String(dt.getHours()).padStart(2, '0')
+  const mi = String(dt.getMinutes()).padStart(2, '0')
+  return {
+    start_date: `${yyyy}-${mm}-${dd}`,
+    time_of_day: `${hh}:${mi}:00`,
+  }
+}
+
+function isPosterItemsMissing(error: { code?: string; message?: string } | null | undefined) {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '42P01' ||
+    error?.code === '42703' ||
+    message.includes('poster_items') ||
+    message.includes('location_text') ||
+    message.includes('details_json') ||
+    message.includes('schema cache')
+  )
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
@@ -32,79 +64,64 @@ export async function POST(req: Request) {
   const startAt = String(body.start_at || '').trim()
   const bbox = body.bbox as BBox | undefined
   if (!posterUploadId) return jsonError('poster_upload_id is required')
-  if (!title) return jsonError('title is required')
   if (!bbox || typeof bbox.x !== 'number' || typeof bbox.y !== 'number') return jsonError('bbox is required')
+  const effectiveTitle = title || 'Untitled draft'
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
-  const eventAttributes =
-    body.event_attributes && typeof body.event_attributes === 'object' && !Array.isArray(body.event_attributes)
-      ? body.event_attributes
-      : {}
-  const normalizedStatus = normalizeEventStatus(body.status, EVENT_STATUSES.DRAFT)
-
   const resolvedStartAt = startAt || defaultNy2pmLocalIso()
-  const nyIsoGuess = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
-  const create = await supabase
-    .from('events')
+  const dateTime = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
+  const timeParts = toDateAndTimeParts(dateTime)
+
+  const createItem = await supabase
+    .from('poster_items')
     .insert([{
-      title,
-      location: location || null,
-      description: description || null,
-      start_at: nyIsoGuess,
-      status: normalizedStatus,
-      event_category: String(body.event_category || '').trim() || null,
-      event_attributes: eventAttributes,
-      event_audience: Array.isArray(body.event_audience) ? body.event_audience : [],
-      event_location_name: String(body.event_location_name || '').trim() || null,
-      event_location_address: String(body.event_location_address || '').trim() || null,
+      poster_id: posterUploadId,
+      type: String(body.type || 'event').trim() || 'event',
+      x: bbox.x,
+      y: bbox.y,
+      title: effectiveTitle,
+      start_date: timeParts.start_date,
+      time_of_day: timeParts.time_of_day,
+      location_text: location || null,
+      details_json: description ? { description } : {},
+      status: 'draft',
     }])
     .select('id')
     .single()
 
-  let eventId = create.data?.id as string | undefined
-  if (create.error) {
-    const message = (create.error.message || '').toLowerCase()
-    const optionalMissing =
-      create.error.code === '42703' ||
-      message.includes('event_attributes') ||
-      message.includes('event_audience') ||
-      message.includes('event_category') ||
-      message.includes('event_location_name') ||
-      message.includes('event_location_address') ||
-      message.includes('recurrence_rule') ||
-      message.includes('is_recurring') ||
-      message.includes('schema cache')
+  let itemId = createItem.data?.id as string | undefined
+  if (createItem.error && !isPosterItemsMissing(createItem.error)) {
+    return jsonError(createItem.error.message, 500)
+  }
 
-    if (!optionalMissing) return jsonError(create.error.message, 500)
-
-    const fallback = await supabase
+  if (!itemId) {
+    const createLegacy = await supabase
       .from('events')
       .insert([{
-        title,
+        title: effectiveTitle,
         location: location || null,
         description: description || null,
-        start_at: nyIsoGuess,
-        status: normalizedStatus,
+        start_at: dateTime,
+        status: 'draft',
       }])
       .select('id')
       .single()
-    if (fallback.error) return jsonError(fallback.error.message, 500)
-    eventId = fallback.data?.id as string | undefined
+    if (createLegacy.error) return jsonError(createLegacy.error.message, 500)
+    itemId = createLegacy.data?.id as string | undefined
+    if (!itemId) return jsonError('Failed to create item', 500)
+    const link = await supabase
+      .from('poster_event_links')
+      .insert([{ poster_upload_id: posterUploadId, event_id: itemId, bbox }])
+    if (link.error) return jsonError(link.error.message, 500)
   }
-  if (!eventId) return jsonError('Failed to create event', 500)
-
-  const link = await supabase
-    .from('poster_event_links')
-    .insert([{ poster_upload_id: posterUploadId, event_id: eventId, bbox }])
-  if (link.error) return jsonError(link.error.message, 500)
 
   await supabase
     .from('poster_uploads')
-    .update({ status: 'tending' })
+    .update({ status: POSTER_STATUSES.TENDING })
     .eq('id', posterUploadId)
 
-  return NextResponse.json({ ok: true, event_id: eventId, status: normalizedStatus })
+  return NextResponse.json({ ok: true, item_id: itemId, status: 'draft' })
 }

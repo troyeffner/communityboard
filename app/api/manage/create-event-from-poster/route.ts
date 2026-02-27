@@ -13,8 +13,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('recurrence_rule') ||
-    message.includes('is_recurring') ||
     message.includes('description') ||
     message.includes('source_type') ||
     message.includes('source_place') ||
@@ -56,8 +54,6 @@ export async function POST(req: Request) {
     start_at,
     status,
     bbox,
-    is_recurring,
-    recurrence_rule,
     event_category,
     event_attributes,
     event_audience,
@@ -71,8 +67,6 @@ export async function POST(req: Request) {
     start_at?: string
     status?: string
     bbox?: BBoxPoint
-    is_recurring?: boolean
-    recurrence_rule?: string | null
     event_category?: string | null
     event_attributes?: string[] | string | null
     event_audience?: string[] | string | null
@@ -81,15 +75,13 @@ export async function POST(req: Request) {
   }
 
   if (!poster_upload_id) return jsonError('poster_upload_id is required')
-  if (!title?.trim()) return jsonError('title is required')
+  const effectiveTitle = title?.trim() || 'Untitled draft'
   const normalizedStatus = normalizeEventStatus(status, EVENT_STATUSES.DRAFT)
 
   if (!bbox || typeof bbox.x !== 'number' || typeof bbox.y !== 'number') {
     return jsonError('bbox is required (x,y). Click the image to set a pin.')
   }
 
-  const recurring = Boolean(is_recurring)
-  const recurrenceRule = recurrence_rule?.trim() || null
   const categorySet = toSet(EVENT_CATEGORIES)
   const attributeSet = toSet(ATTRIBUTES)
   const audienceSet = toSet(AUDIENCE)
@@ -97,9 +89,6 @@ export async function POST(req: Request) {
   const parsedAudience = asStringArray(event_audience).filter((tag) => audienceSet.has(tag))
   const parsedCategory = event_category?.trim() || null
   if (parsedCategory && !categorySet.has(parsedCategory)) return jsonError('Invalid event_category')
-  if (recurring && !recurrenceRule) {
-    return jsonError('recurrence_rule is required when recurring')
-  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -111,7 +100,7 @@ export async function POST(req: Request) {
   const nyIsoGuess = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
 
   const eventPayload = {
-    title: title.trim(),
+    title: effectiveTitle,
     location: location?.trim() || null,
     description: description?.trim() || null,
     source_type: null,
@@ -119,8 +108,6 @@ export async function POST(req: Request) {
     source_detail: null,
     start_at: nyIsoGuess,
     status: normalizedStatus,
-    is_recurring: recurring,
-    recurrence_rule: recurring ? recurrenceRule : null,
     event_category: parsedCategory,
     event_attributes: parsedAttributes,
     event_audience: parsedAudience,

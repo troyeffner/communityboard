@@ -11,8 +11,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('recurrence_rule') ||
-    message.includes('is_recurring') ||
     message.includes('description') ||
     message.includes('event_category') ||
     message.includes('event_attributes') ||
@@ -43,13 +41,11 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
 
-  const { title, location, description, start_at, is_recurring, recurrence_rule, event_category, event_attributes, event_audience, event_location_name, event_location_address } = body as {
+  const { title, location, description, start_at, event_category, event_attributes, event_audience, event_location_name, event_location_address } = body as {
     title?: string
     location?: string
     description?: string
     start_at?: string
-    is_recurring?: boolean
-    recurrence_rule?: string | null
     event_category?: string | null
     event_attributes?: string[] | string | null
     event_audience?: string[] | string | null
@@ -58,11 +54,8 @@ export async function POST(req: Request) {
     status?: string
   }
 
-  if (!title?.trim()) return jsonError('title is required')
+  const effectiveTitle = title?.trim() || 'Untitled draft'
 
-  const recurring = Boolean(is_recurring)
-  const rule = recurrence_rule?.trim() || null
-  if (recurring && !rule) return jsonError('recurrence_rule is required when recurring')
   const categorySet = toSet(EVENT_CATEGORIES)
   const attributeSet = toSet(ATTRIBUTES)
   const audienceSet = toSet(AUDIENCE)
@@ -80,13 +73,11 @@ export async function POST(req: Request) {
   const nyIsoGuess = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
 
   const payload = {
-    title: title.trim(),
+    title: effectiveTitle,
     location: location?.trim() || null,
     description: description?.trim() || null,
     start_at: nyIsoGuess,
     status: EVENT_STATUSES.DRAFT,
-    is_recurring: recurring,
-    recurrence_rule: recurring ? rule : null,
     event_category: parsedCategory,
     event_attributes: parsedAttributes,
     event_audience: parsedAudience,

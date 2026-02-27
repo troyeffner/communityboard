@@ -10,8 +10,6 @@ type EventRow = {
   start_at: string
   status: 'draft' | 'published' | 'unpublished'
   created_at: string
-  is_recurring?: boolean | null
-  recurrence_rule?: string | null
   event_category?: string | null
   event_attributes?: string[] | null
   event_audience?: string[] | null
@@ -66,7 +64,7 @@ export async function GET(req: Request) {
   const voterVid = req.headers.get('x-cb-vid')?.trim() || null
   const primaryEvents = await supabase
     .from('events')
-    .select('id,title,location,description,start_at,status,created_at,is_recurring,recurrence_rule,event_category,event_attributes,event_audience,event_location_name')
+    .select('id,title,location,description,start_at,status,created_at,event_category,event_attributes,event_audience,event_location_name')
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
@@ -125,7 +123,7 @@ export async function GET(req: Request) {
   }
 
   const filtered = eventsData.filter((event) => {
-    if (recurringOnly && !event.is_recurring) return false
+    if (recurringOnly) return false
     if (selectedCategory && event.event_category !== selectedCategory) return false
     const eventAttrs = event.event_attributes || []
     const eventAudience = event.event_audience || []
@@ -141,8 +139,6 @@ export async function GET(req: Request) {
     const posterPublicUrl = filePath ? supabase.storage.from('posters').getPublicUrl(filePath).data.publicUrl : null
     return {
       ...event,
-      is_recurring: Boolean(event.is_recurring),
-      recurrence_rule: event.recurrence_rule || null,
       event_category: event.event_category || null,
       event_attributes: event.event_attributes || [],
       event_audience: event.event_audience || [],
@@ -157,8 +153,8 @@ export async function GET(req: Request) {
   const now = new Date()
   const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const todayKey = nyDateKey(now)
-  const recurring = filtered.filter((e) => e.is_recurring)
-  const oneTime = filtered.filter((e) => !e.is_recurring)
+  const recurring = [] as typeof filtered
+  const oneTime = filtered
   const today = oneTime.filter((e) => nyDateKey(new Date(e.start_at)) === todayKey)
   const thisWeek = oneTime.filter((e) => {
     const ts = new Date(e.start_at).getTime()

@@ -13,8 +13,6 @@ type Row = {
   start_at: string
   end_at: string | null
   status: string
-  is_recurring: boolean | null
-  recurrence_rule: string | null
   created_at: string
   event_location_name: string | null
   event_location_address: string | null
@@ -24,7 +22,6 @@ function isMissingOptionalColumns(message: string) {
   const lower = message.toLowerCase()
   return (
     lower.includes('is_recurring') ||
-    lower.includes('recurrence_rule') ||
     lower.includes('event_location_name') ||
     lower.includes('event_location_address') ||
     lower.includes('description') ||
@@ -45,13 +42,58 @@ export async function GET(req: Request) {
   const recurring = params.get('recurring')
   const q = params.get('q')?.trim().toLowerCase() || ''
 
-  const eventsResult = await supabase
-    .from('events')
-    .select('id,title,description,location,start_at,end_at,status,is_recurring,recurrence_rule,created_at,event_location_name,event_location_address')
+  const itemsResult = await supabase
+    .from('poster_items')
+    .select('id,poster_id,title,type,status,start_date,time_of_day,location_text,details_json,created_at')
     .order('created_at', { ascending: false })
     .limit(300)
 
+  if (!itemsResult.error) {
+    const rows = (itemsResult.data || [])
+      .map((row) => ({
+        id: row.id as string,
+        title: String(row.title || ''),
+        description: (row.details_json as { description?: string } | null)?.description || null,
+        location: (row.location_text as string | null) || null,
+        start_at: row.start_date ? `${row.start_date}T${row.time_of_day || '14:00:00'}` : new Date(row.created_at as string).toISOString(),
+        end_at: null,
+        status: String(row.status || 'draft'),
+        created_at: String(row.created_at),
+        event_location_name: null,
+        event_location_address: null,
+        linked_count: 1,
+        is_linked: true,
+        poster_upload_id: String(row.poster_id || ''),
+      }))
+      .filter((row) => row.poster_upload_id)
+      .filter((row) => {
+        if (status && row.status !== status) return false
+        if (linked === 'unlinked') return false
+        if (recurring === 'true') return false
+        if (q) {
+          const haystack = `${row.title} ${row.description || ''} ${row.location || ''}`.toLowerCase()
+          if (!haystack.includes(q)) return false
+        }
+        return true
+      })
+    return NextResponse.json({ rows })
+  }
+
   let events: Row[] = []
+  const itemMissing = (itemsResult.error?.message || '').toLowerCase()
+  const canFallbackToLegacy =
+    itemsResult.error?.code === '42P01' ||
+    itemsResult.error?.code === '42703' ||
+    itemMissing.includes('poster_items') ||
+    itemMissing.includes('schema cache')
+  if (!canFallbackToLegacy) return jsonError(itemsResult.error?.message || 'Failed to load items', 500)
+
+  const eventsResult = await supabase
+    .from('events')
+    .select('id,title,description,location,start_at,end_at,status,created_at,event_location_name,event_location_address')
+    .order('created_at', { ascending: false })
+    .limit(300)
+
   if (eventsResult.error) {
     if (eventsResult.error.code !== '42703' && !isMissingOptionalColumns(eventsResult.error.message || '')) {
       return jsonError(eventsResult.error.message, 500)
@@ -63,12 +105,10 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(300)
     if (fallback.error) return jsonError(fallback.error.message, 500)
-    events = ((fallback.data || []) as Array<Omit<Row, 'description' | 'end_at' | 'is_recurring' | 'recurrence_rule' | 'event_location_name' | 'event_location_address'>>).map((row) => ({
+    events = ((fallback.data || []) as Array<Omit<Row, 'description' | 'end_at' | 'event_location_name' | 'event_location_address'>>).map((row) => ({
       ...row,
       description: null,
       end_at: null,
-      is_recurring: false,
-      recurrence_rule: null,
       event_location_name: null,
       event_location_address: null,
     }))
@@ -88,7 +128,6 @@ export async function GET(req: Request) {
   const rows = events
     .map((row) => ({
       ...row,
-      is_recurring: Boolean(row.is_recurring),
       linked_count: linkCounts.get(row.id) || 0,
       is_linked: (linkCounts.get(row.id) || 0) > 0,
       poster_upload_id: posterByEvent.get(row.id) || null,
@@ -97,7 +136,7 @@ export async function GET(req: Request) {
       if (status && row.status !== status) return false
       if (linked === 'linked' && !row.is_linked) return false
       if (linked === 'unlinked' && row.is_linked) return false
-      if (recurring === 'true' && !row.is_recurring) return false
+      if (recurring === 'true') return false
       if (q) {
         const haystack = `${row.title} ${row.description || ''} ${row.location || ''}`.toLowerCase()
         if (!haystack.includes(q)) return false

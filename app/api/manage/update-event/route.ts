@@ -19,8 +19,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
-    message.includes('recurrence_rule') ||
-    message.includes('is_recurring') ||
     message.includes('description') ||
     message.includes('source_type') ||
     message.includes('source_place') ||
@@ -47,7 +45,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
 
-  const { id, poster_upload_id, seen_at_name, title, location, description, source_type, source_place, source_detail, start_at, status, is_recurring, recurrence_rule } = body as {
+  const { id, poster_upload_id, seen_at_name, title, location, description, source_type, source_place, source_detail, start_at, status } = body as {
     id?: string
     poster_upload_id?: string | null
     seen_at_name?: string | null
@@ -59,8 +57,6 @@ export async function POST(req: Request) {
     source_detail?: string
     start_at?: string
     status?: string
-    is_recurring?: boolean
-    recurrence_rule?: string | null
     event_category?: string | null
     event_attributes?: string[] | string | null
     event_audience?: string[] | string | null
@@ -80,8 +76,6 @@ export async function POST(req: Request) {
   if (!start_at?.trim()) return jsonError('start_at is required')
   const normalizedStatus = normalizeEventStatus(status, EVENT_STATUSES.DRAFT)
 
-  const recurring = Boolean(is_recurring)
-  const recurrenceRule = recurrence_rule?.trim() || null
   const sourceType = source_type?.trim().toLowerCase() || null
   const categorySet = toSet(EVENT_CATEGORIES)
   const attributeSet = toSet(ATTRIBUTES)
@@ -90,7 +84,6 @@ export async function POST(req: Request) {
   const parsedAudience = asStringArray(event_audience).filter((tag) => audienceSet.has(tag))
   const parsedCategory = event_category?.trim() || null
   if (parsedCategory && !categorySet.has(parsedCategory)) return jsonError('Invalid event_category')
-  if (recurring && !recurrenceRule) return jsonError('recurrence_rule is required when recurring')
   if (sourceType && !SOURCE_TYPES.has(sourceType)) return jsonError('Invalid source_type')
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -109,8 +102,6 @@ export async function POST(req: Request) {
     source_detail: source_detail?.trim() || null,
     start_at: nyIsoGuess,
     status: normalizedStatus,
-    is_recurring: recurring,
-    recurrence_rule: recurring ? recurrenceRule : null,
     event_category: parsedCategory,
     event_attributes: parsedAttributes,
     event_audience: parsedAudience,

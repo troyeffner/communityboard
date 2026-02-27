@@ -10,8 +10,6 @@ type PublicEventRow = {
   start_at: string
   status: 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
   created_at: string
-  is_recurring: boolean
-  recurrence_rule: string | null
   event_category?: string | null
   event_attributes?: string[]
   event_audience?: string[]
@@ -45,26 +43,6 @@ function formatNY(iso: string, options?: Intl.DateTimeFormatOptions) {
     day: 'numeric',
     ...(options || {}),
   }).format(new Date(iso))
-}
-
-function humanizeRecurrence(rule: string | null, startAt: string) {
-  if (!rule) return 'Recurring'
-
-  const time = formatNY(startAt, { hour: 'numeric', minute: '2-digit' })
-  const weekly = /^weekly:(\w+)$/i.exec(rule)
-  if (weekly) {
-    const day = weekly[1].charAt(0).toUpperCase() + weekly[1].slice(1)
-    return `Every ${day} at ${time}`
-  }
-
-  const monthly = /^monthly:(first|second|third|fourth):(\w+)$/i.exec(rule)
-  if (monthly) {
-    const ord = monthly[1].charAt(0).toUpperCase() + monthly[1].slice(1)
-    const day = monthly[2].charAt(0).toUpperCase() + monthly[2].slice(1)
-    return `${ord} ${day} of the month at ${time}`
-  }
-
-  return rule
 }
 
 function toGoogleCalendarUrl({
@@ -166,11 +144,6 @@ function EventList({
                 i
               </span>
             </div>
-            {e.is_recurring && (
-              <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-                {humanizeRecurrence(e.recurrence_rule, e.start_at)}
-              </div>
-            )}
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <button
                 data-variant="secondary"
