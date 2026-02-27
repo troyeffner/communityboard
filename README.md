@@ -200,3 +200,24 @@ select unnest(enum_range(null::event_status)) as v;
 Apply order:
 1. Apply enum/schema migration first (DEV, then PROD).
 2. Deploy app code that writes `poster_uploads.status='new'`.
+
+## New Migrations To Apply (DEV + PROD)
+
+Required for browse/item/upvote + maintenance seam:
+
+1. `supabase/migrations/20260226_poster_items_and_venues.sql`
+2. `supabase/migrations/20260227_users_and_item_upvotes.sql`
+
+If applying manually in Supabase SQL editor, run in this order:
+
+1. `db/migrations/20260226_enum_schema_alignment.sql`
+2. `supabase/migrations/20260226_poster_items_and_venues.sql`
+3. `supabase/migrations/20260227_users_and_item_upvotes.sql`
+
+Post-apply smoke checks:
+
+```sql
+select count(*) from poster_items;
+select count(*) from poster_item_upvotes;
+select id, display_name, role from users limit 5;
+```
