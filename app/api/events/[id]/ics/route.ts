@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { internalServerError } from '@/lib/apiErrors'
 
 type EventRow = {
   id: string
@@ -78,14 +79,14 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   let row: EventRow | null = null
   if (primary.error) {
     if (!isMissingDescriptionColumn(primary.error)) {
-      return NextResponse.json({ error: primary.error.message }, { status: 500 })
+      return internalServerError('events/[id]/ics primary query failed', primary.error)
     }
     const fallback = await supabase
       .from('events')
       .select('id,title,location,start_at,status')
       .eq('id', id)
       .limit(1)
-    if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 })
+    if (fallback.error) return internalServerError('events/[id]/ics fallback query failed', fallback.error)
     row = (fallback.data?.[0] || null) as EventRow | null
   } else {
     row = (primary.data?.[0] || null) as EventRow | null

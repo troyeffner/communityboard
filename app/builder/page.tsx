@@ -10,7 +10,7 @@ export default function BuilderHomePage() {
           Create (Plant from poster)
         </Link>
         <Link href="/builder/tend" style={{ display: 'inline-block', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#111827', textDecoration: 'none', fontWeight: 600 }}>
-          Tend (Publish + maintain)
+          Tend (Pin + maintain)
         </Link>
       </div>
     </main>

@@ -25,7 +25,6 @@ type EventRecord = {
   title: string
   location: string | null
   description: string | null
-  source_place?: string | null
   start_at: string
   status: EventStatus
   is_recurring?: boolean
@@ -99,6 +98,15 @@ function defaultStartAt2pmLocal() {
   d.setHours(14, 0, 0, 0)
   const offsetMs = d.getTimezoneOffset() * 60_000
   return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+function schemaAwareError(message: string | undefined, fallback: string) {
+  const raw = message || ''
+  const lower = raw.toLowerCase()
+  if (lower.includes('42703') || lower.includes('schema cache') || lower.includes('column') || lower.includes('seen_at_name')) {
+    return 'Database schema is out of date for this action. Schema check: /api/health/schema'
+  }
+  return raw || fallback
 }
 
 export default function ManagePage() {
@@ -399,7 +407,7 @@ export default function ManagePage() {
     setTitle(event.title)
     setLocation(event.location || '')
     setDescription(event.description || '')
-    setSourcePlace(event.source_place || '')
+    setSourcePlace(selectedUpload?.seen_at_name || '')
     setEventCategory(event.event_category || '')
     setEventAttributes(event.event_attributes || [])
     setEventAudience(event.event_audience || [])
@@ -489,7 +497,6 @@ export default function ManagePage() {
             title,
             location,
             description,
-            source_place: sourcePlace,
             event_category: eventCategory || null,
             event_attributes: eventAttributes,
             event_audience: eventAudience,
@@ -500,7 +507,7 @@ export default function ManagePage() {
           }),
         })
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) return setFormError(data?.error || 'Update failed')
+        if (!res.ok) return setFormError(schemaAwareError(data?.error, 'Update failed'))
 
         await refreshData()
         clearForm()
@@ -530,7 +537,7 @@ export default function ManagePage() {
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) return setFormError(data?.error || 'Create failed')
+      if (!res.ok) return setFormError(schemaAwareError(data?.error, 'Create failed'))
 
       clearForm()
       setPoint(null)
@@ -556,7 +563,7 @@ export default function ManagePage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setFormError(data?.error || 'Failed to save Seen at')
+        setFormError(schemaAwareError(data?.error, 'Failed to save Seen at'))
         return
       }
       await loadUploads()
@@ -576,7 +583,7 @@ export default function ManagePage() {
       body: JSON.stringify({ poster_upload_id: selectedPosterId, processed: !(selectedUpload?.is_done ?? selectedUpload?.done ?? Boolean(selectedUpload?.processed_at)) }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) setProcessingError(data?.error || 'Failed to mark done')
+    if (!res.ok) setProcessingError(schemaAwareError(data?.error, 'Failed to mark done'))
     else {
       await loadUploads()
       setMessage((selectedUpload?.is_done ?? selectedUpload?.done ?? Boolean(selectedUpload?.processed_at)) ? 'Marked incomplete.' : 'Marked done.')
@@ -630,7 +637,7 @@ export default function ManagePage() {
       body: JSON.stringify({ event_id: eventId }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) setApprovalError(data?.error || 'Publish failed')
+    if (!res.ok) setApprovalError(data?.error || 'Pin to board failed')
     await refreshData()
     setApprovingEventId(null)
   }
@@ -696,7 +703,7 @@ export default function ManagePage() {
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button data-variant="secondary" onClick={() => focusEvent(item as unknown as AllEventRow)}>Edit</button>
                   <button onClick={() => approveEvent(item.id)} disabled={approvingEventId === item.id}>
-                    {approvingEventId === item.id ? 'Publishing...' : 'Publish to board'}
+                    {approvingEventId === item.id ? 'Pinning...' : 'Pin to board'}
                   </button>
                 </div>
               </div>
@@ -970,7 +977,7 @@ export default function ManagePage() {
           <h3 style={{ marginTop: 18, marginBottom: 8 }}>All Items</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | EventStatus)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="all">All status</option><option value="draft">Draft</option><option value="published">Published</option>
+              <option value="all">All status</option><option value="draft">Draft</option><option value="published">Pinned</option>
             </select>
             <select value={linkedFilter} onChange={(e) => setLinkedFilter(e.target.value as 'all' | 'linked' | 'unlinked')} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="all">All link states</option><option value="linked">Linked</option><option value="unlinked">Unlinked</option>

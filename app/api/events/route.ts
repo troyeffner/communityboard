@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES, asStringArray, toSet } from '@/lib/taxonomy'
+import { ATTRIBUTES, AUDIENCE, asStringArray, toSet } from '@/lib/taxonomy'
+import { getPosterSeenAt } from '@/lib/seenAt'
 
 type EventRow = {
   id: string
@@ -8,9 +9,8 @@ type EventRow = {
   location: string | null
   description: string | null
   start_at: string
-  status: 'draft' | 'published' | 'unpublished'
+  status: 'draft' | 'published'
   created_at: string
-  event_category?: string | null
   event_attributes?: string[] | null
   event_audience?: string[] | null
   event_location_name?: string | null
@@ -47,16 +47,13 @@ export async function GET(req: Request) {
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const params = new URL(req.url).searchParams
-  const category = params.get('category')
   const q = params.get('q')?.trim().toLowerCase() || ''
   const attrs = asStringArray(params.get('attr'))
   const audience = asStringArray(params.get('aud'))
   const recurringOnly = params.get('recurringOnly') === 'true'
 
-  const categorySet = toSet(EVENT_CATEGORIES)
   const attrSet = toSet(ATTRIBUTES)
   const audSet = toSet(AUDIENCE)
-  const selectedCategory = category && categorySet.has(category) ? category : null
   const selectedAttrs = attrs.filter((tag) => attrSet.has(tag))
   const selectedAudience = audience.filter((tag) => audSet.has(tag))
 
@@ -64,7 +61,7 @@ export async function GET(req: Request) {
   const voterVid = req.headers.get('x-cb-vid')?.trim() || null
   const primaryEvents = await supabase
     .from('events')
-    .select('id,title,location,description,start_at,status,created_at,event_category,event_attributes,event_audience,event_location_name')
+    .select('id,title,location,description,start_at,status,created_at,event_attributes,event_audience,event_location_name')
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
@@ -90,7 +87,7 @@ export async function GET(req: Request) {
     if (!upload?.file_path) continue
     latestPosterPathByEvent.set(row.event_id, upload.file_path)
     latestPosterUploadByEvent.set(row.event_id, row.poster_upload_id)
-    const seenAt = upload.seen_at_name || null
+    const seenAt = getPosterSeenAt(upload)
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
   }
 
@@ -124,7 +121,6 @@ export async function GET(req: Request) {
 
   const filtered = eventsData.filter((event) => {
     if (recurringOnly) return false
-    if (selectedCategory && event.event_category !== selectedCategory) return false
     const eventAttrs = event.event_attributes || []
     const eventAudience = event.event_audience || []
     if (selectedAttrs.length > 0 && !selectedAttrs.every((tag) => eventAttrs.includes(tag))) return false
@@ -139,7 +135,6 @@ export async function GET(req: Request) {
     const posterPublicUrl = filePath ? supabase.storage.from('posters').getPublicUrl(filePath).data.publicUrl : null
     return {
       ...event,
-      event_category: event.event_category || null,
       event_attributes: event.event_attributes || [],
       event_audience: event.event_audience || [],
       poster_public_url: posterPublicUrl,

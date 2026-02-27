@@ -33,6 +33,7 @@ test('no legacy object_type or seen_at_label references in app/lib runtime code'
     'object_type',
     'submit_object_type',
     'event_poster',
+    'seen_at_label',
   ]
 
   const offenders = []
@@ -86,4 +87,11 @@ test('proxy sets viewer_id cookie and protects admin paths', () => {
   const src = read(path.join(repoRoot, 'proxy.ts'))
   assert.equal(src.includes('viewer_id'), true)
   assert.equal(src.includes("pathname.startsWith('/admin')"), true)
+})
+
+test('schema check links are surfaced in user-facing error paths', () => {
+  const createSrc = read(path.join(repoRoot, 'app/builder/create/CreateClient.tsx'))
+  const posterSrc = read(path.join(repoRoot, 'app/poster/[id]/page.tsx'))
+  assert.equal(createSrc.includes('/api/health/schema'), true)
+  assert.equal(posterSrc.includes('Check schema health'), true)
 })

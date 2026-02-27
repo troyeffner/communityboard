@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createClient } from '@supabase/supabase-js'
 
 const repoRoot = process.cwd()
 
@@ -45,20 +46,22 @@ test('upload/list APIs no longer depend on poster_uploads.object_type', () => {
 test('list uploads route has missing done-column fallback', () => {
   const src = read('app/api/manage/list-uploads-with-counts/route.ts')
   assert.equal(src.includes('isMissingDoneColumns'), true)
-  assert.equal(src.includes(".select('id,file_path,status,created_at,seen_at_name,seen_at_label')"), true)
+  assert.equal(src.includes(".select('id,file_path,status,created_at,seen_at_name')"), true)
 })
 
-test('seen_at source of truth remains seen_at_name with compatibility fallback', () => {
+test('seen_at source of truth is seen_at_name only (no legacy fallback columns)', () => {
   const files = listFiles(path.join(repoRoot, 'app')).filter((file) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file))
   let seenAtNameCount = 0
-  let seenAtLabelCount = 0
+  const offenders = []
   for (const file of files) {
     const src = fs.readFileSync(file, 'utf8')
     if (src.includes('seen_at_name')) seenAtNameCount += 1
-    if (src.includes('seen_at_label')) seenAtLabelCount += 1
+    if (src.includes('seen_at_label')) {
+      offenders.push(path.relative(repoRoot, file))
+    }
   }
   assert.equal(seenAtNameCount > 0, true, 'Expected seen_at_name usage')
-  assert.equal(seenAtLabelCount > 0, true, 'Expected compatibility fallback usage while prod migrates')
+  assert.equal(offenders.length, 0, `Legacy seen-at fallback columns found:\n${offenders.join('\n')}`)
 })
 
 test('builder create avoids useSearchParams prerender trap', () => {
@@ -95,4 +98,26 @@ test('create image click does not reset typed form state', () => {
   assert.notEqual(clickIndex, -1, 'expected image click pin setter')
   const snippet = src.slice(clickIndex, clickIndex + 260)
   assert.equal(snippet.includes('resetFormToNew()'), false)
+})
+
+test('schema healthcheck requirement exists: poster_uploads.seen_at_name (when env configured)', async (t) => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) {
+    t.skip('Supabase env vars not configured in test environment')
+    return
+  }
+
+  const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
+  const probe = await supabase
+    .schema('information_schema')
+    .from('columns')
+    .select('table_name,column_name')
+    .eq('table_schema', 'public')
+    .eq('table_name', 'poster_uploads')
+    .eq('column_name', 'seen_at_name')
+    .limit(1)
+
+  assert.equal(Boolean(probe.error), false, probe.error?.message || 'Schema probe failed')
+  assert.equal((probe.data || []).length > 0, true, 'Missing public.poster_uploads.seen_at_name')
 })

@@ -1,19 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getViewerIdFromCookie } from '@/lib/viewer-id'
-
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status })
-}
+import { getPosterSeenAt } from '@/lib/seenAt'
+import { internalServerError, jsonError } from '@/lib/apiErrors'
 
 type PosterRow = {
   id: string
   file_path: string | null
   created_at: string
+  status?: string | null
   seen_at_name?: string | null
-  seen_at_label?: string | null
-  venue_id?: string | null
-  venues?: { name: string | null } | { name: string | null }[] | null
 }
 
 type ItemRow = {
@@ -56,47 +52,32 @@ export async function GET(req: Request) {
 
   const postersWithVenue = await supabase
     .from('poster_uploads')
-    .select('id,file_path,created_at,seen_at_name,seen_at_label,venue_id,venues(name)')
+    .select('id,file_path,created_at,status,seen_at_name')
     .order('created_at', { ascending: false })
     .limit(200)
 
-  const useNoJoinFallback =
-    Boolean(postersWithVenue.error) &&
-    (() => {
-      const msg = (postersWithVenue.error?.message || '').toLowerCase()
-      return msg.includes('could not find a relationship') || msg.includes('relation')
-    })()
-
-  const postersNoJoin = useNoJoinFallback
-      ? await supabase
-        .from('poster_uploads')
-        .select('id,file_path,created_at,seen_at_name,seen_at_label,venue_id')
-        .order('created_at', { ascending: false })
-        .limit(200)
-    : null
-
-  const postersError = postersNoJoin?.error || postersWithVenue.error
+  const postersError = postersWithVenue.error
 
   if (postersError) {
     const msg = (postersError.message || '').toLowerCase()
     const maybeMissingColumns =
       postersError.code === '42703' ||
       msg.includes('seen_at_name') ||
-      msg.includes('seen_at_label') ||
-      msg.includes('venue_id') ||
       msg.includes('schema cache')
-    if (!maybeMissingColumns) return jsonError(postersError.message, 500)
+    if (!maybeMissingColumns) return internalServerError('public/browse posters query failed', postersError)
 
     const fallback = await supabase
       .from('poster_uploads')
       .select('id,file_path,created_at')
       .order('created_at', { ascending: false })
       .limit(200)
-    if (fallback.error) return jsonError(fallback.error.message, 500)
+    if (fallback.error) return internalServerError('public/browse fallback posters query failed', fallback.error)
 
     const rows = ((fallback.data || []) as PosterRow[]).map((row) => ({
       id: row.id,
       created_at: row.created_at,
+      status: row.status || 'uploaded',
+      item_count: 0,
       seen_at_name: null,
       public_url: row.file_path ? supabase.storage.from('posters').getPublicUrl(row.file_path).data.publicUrl : null,
     }))
@@ -110,19 +91,53 @@ export async function GET(req: Request) {
     })
   }
 
-  const posterRows = ((postersNoJoin?.data || postersWithVenue.data || []) as PosterRow[])
-  const posters = posterRows
+  const posterRows = ((postersWithVenue.data || []) as PosterRow[])
+  const filteredPosterRows = posterRows
     .map((row) => {
-      const venue = Array.isArray(row.venues) ? row.venues[0] : row.venues
-      const seenAtName = (venue?.name || row.seen_at_name || row.seen_at_label || null)
+      const seenAtName = getPosterSeenAt(row)
       return {
         id: row.id,
         created_at: row.created_at,
+        status: row.status || 'uploaded',
         seen_at_name: seenAtName,
         public_url: row.file_path ? supabase.storage.from('posters').getPublicUrl(row.file_path).data.publicUrl : null,
       }
     })
     .filter((row) => (seenAt ? (row.seen_at_name || '') === seenAt : true))
+
+  const filteredPosterIds = filteredPosterRows.map((p) => p.id)
+  const countMap = new Map<string, number>()
+  if (filteredPosterIds.length > 0) {
+    const countsRes = await supabase
+      .from('poster_items')
+      .select('poster_id')
+      .in('poster_id', filteredPosterIds)
+
+    if (!countsRes.error) {
+      for (const row of countsRes.data || []) {
+        const key = String((row as { poster_id?: string }).poster_id || '')
+        if (!key) continue
+        countMap.set(key, (countMap.get(key) || 0) + 1)
+      }
+    } else {
+      const legacyCounts = await supabase
+        .from('poster_event_links')
+        .select('poster_upload_id')
+        .in('poster_upload_id', filteredPosterIds)
+      if (!legacyCounts.error) {
+        for (const row of legacyCounts.data || []) {
+          const key = String((row as { poster_upload_id?: string }).poster_upload_id || '')
+          if (!key) continue
+          countMap.set(key, (countMap.get(key) || 0) + 1)
+        }
+      }
+    }
+  }
+
+  const posters = filteredPosterRows.map((row) => ({
+    ...row,
+    item_count: countMap.get(row.id) || 0,
+  }))
 
   const activePosterId = selectedPoster || posters[0]?.id || null
   const seenAtFacets = Array.from(new Set(posters.map((p) => p.seen_at_name || '').filter(Boolean))).sort()

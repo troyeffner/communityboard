@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getPosterSeenAt } from '@/lib/seenAt'
+import { internalServerError, jsonError } from '@/lib/apiErrors'
 
-type EventStatus = 'draft' | 'published' | 'unpublished'
+type EventStatus = 'draft' | 'published'
 
 type EventRow = {
   id: string
@@ -16,10 +18,6 @@ type LinkRow = {
   event_id: string
   created_at: string
   poster_uploads: { file_path: string; seen_at_name?: string | null } | { file_path: string; seen_at_name?: string | null }[] | null
-}
-
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status })
 }
 
 function isMissingRecurrenceColumnError(error: { code?: string; message?: string } | null | undefined) {
@@ -55,7 +53,7 @@ export async function GET() {
 
   let events: EventRow[] = []
   if (primary.error) {
-    if (!isMissingRecurrenceColumnError(primary.error)) return jsonError(primary.error.message, 500)
+    if (!isMissingRecurrenceColumnError(primary.error)) return internalServerError('public/events-grouped primary events query failed', primary.error)
 
     const fallback = await supabase
       .from('events')
@@ -63,7 +61,7 @@ export async function GET() {
       .eq('status', 'published')
       .order('start_at', { ascending: true })
 
-    if (fallback.error) return jsonError(fallback.error.message, 500)
+    if (fallback.error) return internalServerError('public/events-grouped fallback events query failed', fallback.error)
 
     events = (fallback.data || []) as EventRow[]
   } else {
@@ -83,14 +81,14 @@ export async function GET() {
       message.includes('seen_at_name') ||
       message.includes('schema cache')
 
-    if (!missingSeenLabel) return jsonError(linksPrimary.error.message, 500)
+    if (!missingSeenLabel) return internalServerError('public/events-grouped links query failed', linksPrimary.error)
 
     const fallbackLinks = await supabase
       .from('poster_event_links')
       .select('event_id, created_at, poster_uploads(file_path)')
       .order('created_at', { ascending: false })
 
-    if (fallbackLinks.error) return jsonError(fallbackLinks.error.message, 500)
+    if (fallbackLinks.error) return internalServerError('public/events-grouped fallback links query failed', fallbackLinks.error)
     links = (fallbackLinks.data || []) as LinkRow[]
   }
 
@@ -101,7 +99,7 @@ export async function GET() {
     const upload = Array.isArray(row.poster_uploads) ? row.poster_uploads[0] : row.poster_uploads
     if (!upload?.file_path) continue
     latestPosterPathByEvent.set(row.event_id, upload.file_path)
-    const seenAt = upload.seen_at_name || null
+    const seenAt = getPosterSeenAt(upload)
     if (seenAt) latestSeenAtByEvent.set(row.event_id, seenAt)
   }
 

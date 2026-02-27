@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
-
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status })
-}
+import { internalServerError, jsonError } from '@/lib/apiErrors'
 
 function fingerprintFromRequest(req: Request) {
   const cbVid = req.headers.get('x-cb-vid')?.trim()
@@ -36,21 +33,21 @@ export async function POST(req: Request) {
   if (recentVotes.error) {
     const message = (recentVotes.error.message || '').toLowerCase()
     if (message.includes('relation "tag_votes"')) return jsonError('Tag voting is not enabled yet. Run migrations.', 500)
-    return jsonError(recentVotes.error.message, 500)
+    return internalServerError('public/tag/vote recent vote query failed', recentVotes.error)
   }
   if ((recentVotes.count || 0) >= 30) return jsonError('Vote limit reached (30 per 24h).', 429)
 
   const insertVote = await supabase
     .from('tag_votes')
     .upsert([{ event_id: eventId, tag_id: tagId, voter_fingerprint: fingerprint }], { onConflict: 'event_id,tag_id,voter_fingerprint' })
-  if (insertVote.error) return jsonError(insertVote.error.message, 500)
+  if (insertVote.error) return internalServerError('public/tag/vote insert failed', insertVote.error)
 
   const countVotes = await supabase
     .from('tag_votes')
     .select('event_id', { count: 'exact', head: true })
     .eq('event_id', eventId)
     .eq('tag_id', tagId)
-  if (countVotes.error) return jsonError(countVotes.error.message, 500)
+  if (countVotes.error) return internalServerError('public/tag/vote count query failed', countVotes.error)
 
   const votes = countVotes.count || 0
   let promoted = false
@@ -58,7 +55,7 @@ export async function POST(req: Request) {
     const promote = await supabase
       .from('event_tags')
       .upsert([{ event_id: eventId, tag_id: tagId, source: 'community' }], { onConflict: 'event_id,tag_id' })
-    if (promote.error) return jsonError(promote.error.message, 500)
+    if (promote.error) return internalServerError('public/tag/vote promote failed', promote.error)
     promoted = true
   }
 

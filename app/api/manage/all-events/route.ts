@@ -14,7 +14,6 @@ type EventRow = {
   location: string | null
   description: string | null
   source_type: string | null
-  source_place: string | null
   source_detail: string | null
   start_at: string
   status: EventStatus
@@ -37,7 +36,6 @@ function isMissingOptionalColumns(error: { code?: string; message?: string } | n
     error?.code === '42703' ||
     message.includes('description') ||
     message.includes('source_type') ||
-    message.includes('source_place') ||
     message.includes('source_detail') ||
     message.includes('event_category') ||
     message.includes('event_attributes') ||
@@ -61,7 +59,7 @@ export async function GET(req: Request) {
 
   const primary = await supabase
     .from('events')
-    .select('id,title,location,description,source_type,source_place,source_detail,start_at,status,created_at,event_category,event_attributes,event_audience,event_location_name,event_location_address')
+    .select('id,title,location,description,source_type,source_detail,start_at,status,created_at,event_category,event_attributes,event_audience,event_location_name,event_location_address')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -77,11 +75,10 @@ export async function GET(req: Request) {
 
     if (fallback.error) return jsonError(fallback.error.message, 500)
 
-    events = ((fallback.data || []) as Array<Omit<EventRow, 'description' | 'source_type' | 'source_place' | 'source_detail'>>).map((e) => ({
+    events = ((fallback.data || []) as Array<Omit<EventRow, 'description' | 'source_type' | 'source_detail'>>).map((e) => ({
       ...e,
       description: null,
       source_type: null,
-      source_place: null,
       source_detail: null,
       event_category: null,
       event_attributes: [],
@@ -111,7 +108,6 @@ export async function GET(req: Request) {
   const rows = events.map((e) => ({
     ...e,
     source_type: e.source_type || null,
-    source_place: e.source_place || null,
     source_detail: e.source_detail || null,
     event_category: e.event_category || null,
     event_attributes: e.event_attributes || [],

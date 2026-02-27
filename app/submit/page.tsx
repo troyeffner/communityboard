@@ -1,48 +1,39 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { compressPosterImage, type CompressedImageResult } from '@/lib/imageCompress'
 
-async function resizeImage(file: File): Promise<File> {
-  const imageUrl = URL.createObjectURL(file)
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image()
-      img.onload = () => resolve(img)
-      img.onerror = () => reject(new Error('Failed to load image'))
-      img.src = imageUrl
-    })
+function bytesToMB(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
 
-    const maxEdge = 2000
-    const longest = Math.max(image.width, image.height)
-    const scale = longest > maxEdge ? maxEdge / longest : 1
-    const width = Math.max(1, Math.round(image.width * scale))
-    const height = Math.max(1, Math.round(image.height * scale))
+function makeUploadFile(compressed: CompressedImageResult) {
+  return new File([compressed.blob], 'poster.jpg', { type: compressed.mime || 'image/jpeg' })
+}
 
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Canvas unavailable')
-    ctx.drawImage(image, 0, 0, width, height)
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((out) => (out ? resolve(out) : reject(new Error('Encoding failed'))), 'image/jpeg', 0.78)
-    })
-
-    return new File([blob], 'poster.jpg', { type: 'image/jpeg' })
-  } finally {
-    URL.revokeObjectURL(imageUrl)
-  }
+function formatSubmitError(rawMessage: string, status: number) {
+  const msg = rawMessage.toLowerCase()
+  if (msg.includes('missing supabase env vars')) return 'Upload service is not configured yet. Please try again later.'
+  if (msg.includes('file must be an image')) return 'That file type is not supported. Please choose a photo.'
+  if (msg.includes('missing file')) return 'No photo was attached. Please pick a photo again.'
+  if (msg.includes('run migration')) return 'Upload storage is not ready yet. Please notify the admin.'
+  if (msg.includes('payload too large') || status === 413) return 'Photo is still too large after compression. Try a closer crop or lower-resolution photo.'
+  return rawMessage || `Upload failed (HTTP ${status}). You can retry without reselecting.`
 }
 
 export default function SubmitPage() {
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const pickerInputRef = useRef<HTMLInputElement | null>(null)
 
-  const [file, setFile] = useState<File | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [compressed, setCompressed] = useState<CompressedImageResult | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [compressing, setCompressing] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [statusText, setStatusText] = useState('')
+  const [errorText, setErrorText] = useState('')
+  const [successText, setSuccessText] = useState('')
   const [seenAtName, setSeenAtName] = useState('')
   const [reuseSeenAt, setReuseSeenAt] = useState(true)
 
@@ -51,103 +42,162 @@ export default function SubmitPage() {
     if (saved) setSeenAtName(saved)
   }, [])
 
-  function onFileChange(nextFile: File | null) {
-    setFile(nextFile)
-    setMessage('')
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setPreviewUrl(nextFile ? URL.createObjectURL(nextFile) : null)
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
+
+  async function prepareCompressed(nextFile: File) {
+    setCompressing(true)
+    setStatusText('Compressing photo...')
+    setProgress(10)
+    try {
+      const result = await compressPosterImage(nextFile, 2_000_000)
+      const nextUrl = URL.createObjectURL(result.blob)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(nextUrl)
+      setCompressed(result)
+      setStatusText('Ready to upload')
+      setProgress(35)
+    } catch (err) {
+      setCompressed(null)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
+      setStatusText('')
+      setProgress(0)
+      setErrorText(err instanceof Error ? err.message : 'Failed to prepare image. Try another photo.')
+    } finally {
+      setCompressing(false)
+    }
   }
 
+  async function onFileSelected(nextFile: File | null) {
+    setErrorText('')
+    setSuccessText('')
+    setStatusText('')
+    setProgress(0)
+    setSelectedFile(nextFile)
+    if (!nextFile) {
+      setCompressed(null)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
+      return
+    }
+    await prepareCompressed(nextFile)
+  }
+
+  const originalStats = useMemo(() => {
+    if (!selectedFile || !compressed) return null
+    return {
+      size: bytesToMB(selectedFile.size),
+      width: compressed.originalWidth,
+      height: compressed.originalHeight,
+    }
+  }, [selectedFile, compressed])
+
+  const compressedStats = useMemo(() => {
+    if (!compressed) return null
+    return {
+      size: bytesToMB(compressed.bytes),
+      width: compressed.width,
+      height: compressed.height,
+      withinTarget: compressed.bytes <= compressed.targetMaxBytes,
+    }
+  }, [compressed])
+
   async function submitPhoto() {
-    if (!file) {
-      setMessage('Pick a photo first.')
+    if (!compressed) {
+      setErrorText('Take or choose a photo first.')
       return
     }
 
     setSubmitting(true)
-    setMessage('Preparing image...')
+    setErrorText('')
+    setSuccessText('')
+    setStatusText('Uploading photo...')
+    setProgress(55)
     try {
-      const resized = await resizeImage(file)
-      console.info(`Upload compression: ${Math.round(file.size / 1024)}KB -> ${Math.round(resized.size / 1024)}KB`)
-
       if (reuseSeenAt) {
         window.localStorage.setItem('submit_seen_at_name', seenAtName.trim())
       } else {
         window.localStorage.removeItem('submit_seen_at_name')
       }
 
-      setMessage('Uploading...')
-      const signed = await fetch('/api/submit/signed-upload', {
+      const form = new FormData()
+      form.append('file', makeUploadFile(compressed))
+      if (seenAtName.trim()) form.append('seen_at_name', seenAtName.trim())
+
+      const upload = await fetch('/api/submit/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content_type: 'image/jpeg' }),
+        body: form,
       })
-      const signedData = await signed.json().catch(() => ({}))
-      if (!signed.ok) {
-        setMessage(signedData?.error || 'Upload failed')
+      const uploadData = await upload.json().catch(() => ({}))
+      if (!upload.ok) {
+        setStatusText('Upload failed')
+        setProgress(40)
+        setErrorText(formatSubmitError(String(uploadData?.error || ''), upload.status))
         return
       }
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (!supabaseUrl || !anonKey) {
-        setMessage('Missing public upload config')
-        return
-      }
-      const browserSupabase = createClient(supabaseUrl, anonKey)
-      const uploadRes = await browserSupabase.storage
-        .from('posters')
-        .uploadToSignedUrl(String(signedData.path), String(signedData.token), resized)
-      if (uploadRes.error) {
-        setMessage(uploadRes.error.message || 'Upload failed')
-        return
-      }
-
-      const finalize = await fetch('/api/submit/finalize-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: signedData.path, seen_at_name: seenAtName.trim() || null }),
-      })
-      const data = await finalize.json().catch(() => ({}))
-      if (!finalize.ok) {
-        setMessage(data?.error || 'Upload failed')
-        return
-      }
+      setStatusText('Processing...')
+      setProgress(88)
       fetch('/api/submit/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ poster_upload_id: data?.poster_upload_id || data?.id || null }),
+        body: JSON.stringify({ poster_upload_id: uploadData?.poster_upload_id || uploadData?.id || null }),
       }).catch(() => {})
 
-      setMessage('Submitted.')
-      setFile(null)
+      setProgress(100)
+      setStatusText('Submitted')
+      setSuccessText('Submitted.')
+      setSelectedFile(null)
+      setCompressed(null)
       if (!reuseSeenAt) setSeenAtName('')
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       setPreviewUrl(null)
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
+      if (pickerInputRef.current) pickerInputRef.current.value = ''
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Upload failed')
+      setStatusText('Upload failed')
+      setProgress(40)
+      setErrorText(`${err instanceof Error ? err.message : 'Upload failed'}. You can retry without reselecting.`)
     } finally {
       setSubmitting(false)
     }
   }
 
+  function openCamera() {
+    if (!cameraInputRef.current) return
+    cameraInputRef.current.value = ''
+    cameraInputRef.current.click()
+  }
+
+  function openPicker() {
+    if (!pickerInputRef.current) return
+    pickerInputRef.current.value = ''
+    pickerInputRef.current.click()
+  }
+
+  const canRetry = Boolean(compressed && errorText && !compressing && !submitting)
+  const targetSizeLabel = compressed ? bytesToMB(compressed.targetMaxBytes) : null
+
   return (
-    <main style={{ maxWidth: 640, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: '20px 16px 28px', fontFamily: 'sans-serif' }}>
       <h1 style={{ margin: 0 }}>Submit</h1>
-      <p style={{ marginTop: 8, opacity: 0.75 }}>Capture a poster photo and submit.</p>
+      <p style={{ marginTop: 8, opacity: 0.75 }}>Take or choose a poster photo, then upload.</p>
 
-      <section style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 24, display: 'grid', gap: 16, marginTop: 16 }}>
-        <p style={{ margin: 0, fontWeight: 600 }}>Take as clear a shot as possible.</p>
-        <div style={{ opacity: 0.75 }}>
-          <p style={{ margin: 0 }}>Fill frame</p>
-          <p style={{ margin: '8px 0 0 0' }}>Avoid glare</p>
-          <p style={{ margin: '8px 0 0 0' }}>Ensure text readable</p>
-        </div>
-
+      <section style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 16, display: 'grid', gap: 12, marginTop: 14 }}>
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
           <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Seen at</h3>
-          <label style={{ display: 'block', marginTop: 8 }}>Seen at (optional)
-            <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="e.g., Emmerson Cafe Community Board" style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+          <label style={{ display: 'block' }}>
+            Seen at (optional)
+            <input
+              value={seenAtName}
+              onChange={(e) => setSeenAtName(e.target.value)}
+              placeholder="e.g., Emmerson Cafe Community Board"
+              style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}
+            />
           </label>
           <label style={{ display: 'block', marginTop: 8, fontSize: 13 }}>
             <input type="checkbox" checked={reuseSeenAt} onChange={(e) => setReuseSeenAt(e.target.checked)} /> Use same seen-at for next submit
@@ -155,30 +205,65 @@ export default function SubmitPage() {
         </div>
 
         <input
-          ref={fileInputRef}
-          id="file"
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
           capture="environment"
-          onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+          onChange={(e) => onFileSelected(e.target.files?.[0] || null)}
+          style={{ display: 'none' }}
+        />
+        <input
+          ref={pickerInputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => onFileSelected(e.target.files?.[0] || null)}
           style={{ display: 'none' }}
         />
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => fileInputRef.current?.click()} style={{ minHeight: 44 }} disabled={submitting}>
-            Take photo / Upload
+          <button data-variant="secondary" onClick={openCamera} disabled={submitting || compressing} style={{ minHeight: 44 }}>
+            Take photo
+          </button>
+          <button data-variant="secondary" onClick={openPicker} disabled={submitting || compressing} style={{ minHeight: 44 }}>
+            Choose photo
           </button>
         </div>
 
-        {file && <p style={{ margin: 0, color: '#166534', fontWeight: 600 }}>✓ Photo selected</p>}
-        {previewUrl && <img src={previewUrl} alt="Poster preview" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />}
+        {compressing ? <p style={{ margin: 0 }}>Preparing image...</p> : null}
+        {previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={previewUrl} alt="Compressed preview" style={{ width: '100%', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+        ) : null}
 
-        <button onClick={submitPhoto} style={{ width: '100%', minHeight: 44 }} disabled={!file || submitting}>
+        {(originalStats && compressedStats) ? (
+          <div style={{ fontSize: 13, opacity: 0.85, display: 'grid', gap: 4 }}>
+            <div>Original: {originalStats.size} ({originalStats.width} x {originalStats.height})</div>
+            <div>Compressed: {compressedStats.size} ({compressedStats.width} x {compressedStats.height})</div>
+            <div style={{ color: compressedStats.withinTarget ? '#166534' : '#92400e' }}>
+              Target: {targetSizeLabel} max {compressedStats.withinTarget ? 'met' : 'not met; best effort used'}
+            </div>
+          </div>
+        ) : null}
+
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, background: '#fff' }}>
+          <div style={{ height: 8, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
+            <div style={{ width: `${progress}%`, height: '100%', background: '#2563eb', transition: 'width 160ms ease' }} />
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>{statusText || 'Waiting for photo'}</div>
+        </div>
+
+        <button onClick={submitPhoto} style={{ width: '100%', minHeight: 44 }} disabled={!compressed || submitting || compressing}>
           {submitting ? 'Submitting...' : 'Submit'}
         </button>
+        {canRetry ? (
+          <button data-variant="secondary" onClick={submitPhoto} style={{ width: '100%', minHeight: 44 }} disabled={submitting || compressing}>
+            Retry upload
+          </button>
+        ) : null}
       </section>
 
-      {message && <p style={{ marginTop: 12 }}>{message}</p>}
+      {errorText ? <p style={{ marginTop: 12, color: '#b91c1c' }}>{errorText}</p> : null}
+      {successText ? <p style={{ marginTop: 12, color: '#166534' }}>{successText}</p> : null}
     </main>
   )
 }

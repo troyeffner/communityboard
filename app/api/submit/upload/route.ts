@@ -76,7 +76,6 @@ export async function POST(req: Request) {
     const missingSeenAtName =
       insertErr.code === '42703' ||
       message.includes('seen_at_name') ||
-      message.includes('seen_at_label') ||
       message.includes('schema cache')
 
     if (invalidStatusEnum) {
@@ -94,28 +93,10 @@ export async function POST(req: Request) {
 
       row = fallbackLegacyStatus.data
       insertErr = fallbackLegacyStatus.error
-    } else if (!missingSeenAtName && !message.includes('seen_at_') && !message.includes('done')) {
+    } else if (missingSeenAtName) {
+      return jsonError('Run migration: poster_uploads.seen_at_name', 500)
+    } else if (!message.includes('seen_at_') && !message.includes('done')) {
       return jsonError(insertErr.message, 500)
-    }
-
-    if (insertErr) {
-      if (seen_at_name) {
-        const fallbackLegacyLabel = await supabase
-          .from('poster_uploads')
-          .insert([
-            {
-              file_path: filePath,
-              status: POSTER_STATUSES.UPLOADED,
-              seen_at_label: seen_at_name,
-            },
-          ])
-          .select('id')
-          .single()
-        if (!fallbackLegacyLabel.error) {
-          row = fallbackLegacyLabel.data
-          insertErr = fallbackLegacyLabel.error
-        }
-      }
     }
 
     if (insertErr) {

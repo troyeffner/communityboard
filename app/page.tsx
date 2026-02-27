@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { headers } from 'next/headers'
 import PublicEventsList from './components/PublicEventsList'
 
-type EventStatus = 'draft' | 'published' | 'unpublished'
+type EventStatus = 'draft' | 'published'
 
 type EventRow = {
   id: string
@@ -14,7 +14,6 @@ type EventRow = {
   start_at: string
   status: EventStatus
   created_at: string
-  event_category?: string | null
   event_attributes?: string[] | null
   event_audience?: string[] | null
   event_location_name?: string | null
@@ -36,7 +35,6 @@ function isMissingOptionalEventColumns(message: string) {
   return (
     lower.includes('published_by') ||
     lower.includes('published_at') ||
-    lower.includes('event_category') ||
     lower.includes('event_attributes') ||
     lower.includes('event_audience') ||
     lower.includes('event_location_name') ||
@@ -73,7 +71,7 @@ export default async function Home() {
 
   const primary = await supabase
     .from('events')
-    .select('id, title, location, description, start_at, status, created_at, event_category, event_attributes, event_audience, event_location_name,published_by,published_at')
+    .select('id, title, location, description, start_at, status, created_at, event_attributes, event_audience, event_location_name,published_by,published_at')
     .eq('status', 'published')
     .order('start_at', { ascending: true })
 
@@ -99,7 +97,6 @@ export default async function Home() {
         events = ((fallback.data || []) as EventRow[]).map((row) => ({
           ...row,
           description: null,
-          event_category: null,
           event_attributes: [],
           event_audience: [],
           event_location_name: null,
@@ -212,7 +209,6 @@ export default async function Home() {
       poster_public_url,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
       seen_at_name: latestSeenAtByEvent.get(event.id) || null,
-      event_category: event.event_category || null,
       event_attributes: event.event_attributes || [],
       event_audience: event.event_audience || [],
       event_location_name: event.event_location_name || null,
@@ -246,10 +242,14 @@ export default async function Home() {
         maxWidth: 760,
         margin: '0 auto',
         fontSize: 16,
+        overflowX: 'clip',
       }}
     >
-      <h1>Utica Community Board</h1>
-      <p style={{ marginTop: 0, marginBottom: 12 }}>
+      <h1 style={{ margin: '2px 0 8px', fontWeight: 500, letterSpacing: '-0.01em', lineHeight: 1.05 }}>
+        Utica <span style={{ opacity: 0.7, fontWeight: 400 }}>Community Board</span>
+      </h1>
+      <p style={{ marginTop: 0, marginBottom: 12, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline', fontSize: 14 }}>
+        <a href="/submit" style={{ fontWeight: 700, textDecoration: 'none' }}>Submit a poster photo</a>
         <a href="/businesses">Browse Businesses & Services</a>
       </p>
 

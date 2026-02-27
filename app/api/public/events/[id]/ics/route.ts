@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { internalServerError } from '@/lib/apiErrors'
 
 type EventStatus = 'draft' | 'published'
 
@@ -9,7 +10,6 @@ type EventRow = {
   location: string | null
   description?: string | null
   source_type?: string | null
-  source_place?: string | null
   source_detail?: string | null
   start_at: string
   status: EventStatus
@@ -38,21 +38,12 @@ function toIcsDateTime(iso: string) {
   ].join('')
 }
 
-function sourceTypeLabel(value: string | null | undefined) {
-  if (!value) return 'Unknown source'
-  return value
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
 function isMissingColumns(error: { code?: string; message?: string } | null | undefined) {
   const message = (error?.message || '').toLowerCase()
   return (
     error?.code === '42703' ||
     message.includes('description') ||
     message.includes('source_type') ||
-    message.includes('source_place') ||
     message.includes('source_detail') ||
     message.includes('schema cache')
   )
@@ -71,7 +62,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
   const primary = await supabase
     .from('events')
-    .select('id,title,location,description,source_type,source_place,source_detail,start_at,status')
+    .select('id,title,location,description,source_type,source_detail,start_at,status')
     .eq('id', id)
     .eq('status', 'published')
     .limit(1)
@@ -79,7 +70,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   let row: EventRow | null = null
   if (primary.error) {
     if (!isMissingColumns(primary.error)) {
-      return NextResponse.json({ error: primary.error.message }, { status: 500 })
+      return internalServerError('public/events/[id]/ics primary query failed', primary.error)
     }
     const fallback = await supabase
       .from('events')
@@ -88,7 +79,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       .eq('status', 'published')
       .limit(1)
     if (fallback.error) {
-      return NextResponse.json({ error: fallback.error.message }, { status: 500 })
+      return internalServerError('public/events/[id]/ics fallback query failed', fallback.error)
     }
     row = (fallback.data?.[0] || null) as EventRow | null
   } else {
@@ -99,10 +90,6 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
   const descriptionLines: string[] = []
   if (row.description) descriptionLines.push(row.description)
-  if (row.source_place) {
-    const sourceLine = `Poster found: ${row.source_place} — ${sourceTypeLabel(row.source_type)}`
-    descriptionLines.push(row.source_detail ? `${sourceLine} (${row.source_detail})` : sourceLine)
-  }
 
   const dtstamp = toIcsDateTime(new Date().toISOString())
   const dtstart = toIcsDateTime(row.start_at)

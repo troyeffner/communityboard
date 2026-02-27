@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { POSTER_STATUSES } from '@/lib/statuses'
+import { normalizeItemType } from '@/lib/itemTypes'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -74,11 +75,13 @@ export async function POST(req: Request) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
-  const resolvedStartAt = startAt || defaultNy2pmLocalIso()
+  const type = normalizeItemType(body.type, 'event')
+  const requiresStartAt = type === 'event' || type === 'recurring_event' || type === 'class_program'
+  const resolvedStartAt = (requiresStartAt ? (startAt || defaultNy2pmLocalIso()) : (startAt || '')).trim()
+  if (requiresStartAt && !resolvedStartAt) return jsonError('start_at is required for this item type')
   const dateTime = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
-  const timeParts = toDateAndTimeParts(dateTime)
+  const timeParts = requiresStartAt ? toDateAndTimeParts(dateTime) : { start_date: null, time_of_day: null }
 
-  const type = String(body.type || 'event').trim() || 'event'
   const detailsJson: Record<string, string> = {}
   if (description) detailsJson.description = description
   if (type === 'recurring_event') {

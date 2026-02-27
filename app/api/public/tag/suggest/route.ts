@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
-
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status })
-}
+import { internalServerError, jsonError } from '@/lib/apiErrors'
 
 function fingerprintFromRequest(req: Request) {
   const cbVid = req.headers.get('x-cb-vid')?.trim()
@@ -45,7 +42,7 @@ export async function POST(req: Request) {
     .select('id,label,kind,slug')
     .eq('slug', slug)
     .maybeSingle()
-  if (existingTag.error) return jsonError(existingTag.error.message, 500)
+  if (existingTag.error) return internalServerError('public/tag/suggest tag lookup failed', existingTag.error)
 
   let tagId = existingTag.data?.id as string | undefined
   if (!tagId) {
@@ -53,10 +50,10 @@ export async function POST(req: Request) {
     if (insertTag.error) {
       if (insertTag.error.code === '23505') {
         const retry = await supabase.from('tags').select('id').eq('slug', slug).single()
-        if (retry.error) return jsonError(retry.error.message, 500)
+        if (retry.error) return internalServerError('public/tag/suggest retry tag lookup failed', retry.error)
         tagId = retry.data?.id as string | undefined
       } else {
-        return jsonError(insertTag.error.message, 500)
+        return internalServerError('public/tag/suggest insert tag failed', insertTag.error)
       }
     } else {
       tagId = insertTag.data?.id as string | undefined
@@ -71,20 +68,20 @@ export async function POST(req: Request) {
     .select('event_id', { count: 'exact', head: true })
     .eq('voter_fingerprint', fingerprint)
     .gte('created_at', cutoff)
-  if (recentVotes.error) return jsonError(recentVotes.error.message, 500)
+  if (recentVotes.error) return internalServerError('public/tag/suggest recent votes query failed', recentVotes.error)
   if ((recentVotes.count || 0) >= 30) return jsonError('Vote limit reached (30 per 24h).', 429)
 
   const insertVote = await supabase
     .from('tag_votes')
     .upsert([{ event_id: eventId, tag_id: tagId, voter_fingerprint: fingerprint }], { onConflict: 'event_id,tag_id,voter_fingerprint' })
-  if (insertVote.error) return jsonError(insertVote.error.message, 500)
+  if (insertVote.error) return internalServerError('public/tag/suggest insert vote failed', insertVote.error)
 
   const countVotes = await supabase
     .from('tag_votes')
     .select('event_id', { count: 'exact', head: true })
     .eq('event_id', eventId)
     .eq('tag_id', tagId)
-  if (countVotes.error) return jsonError(countVotes.error.message, 500)
+  if (countVotes.error) return internalServerError('public/tag/suggest count votes query failed', countVotes.error)
 
   const votes = countVotes.count || 0
   let promoted = false
@@ -92,7 +89,7 @@ export async function POST(req: Request) {
     const promote = await supabase
       .from('event_tags')
       .upsert([{ event_id: eventId, tag_id: tagId, source: 'community' }], { onConflict: 'event_id,tag_id' })
-    if (promote.error) return jsonError(promote.error.message, 500)
+    if (promote.error) return internalServerError('public/tag/suggest promote failed', promote.error)
     promoted = true
   }
 

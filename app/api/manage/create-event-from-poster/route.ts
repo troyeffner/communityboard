@@ -15,7 +15,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
     error?.code === '42703' ||
     message.includes('description') ||
     message.includes('source_type') ||
-    message.includes('source_place') ||
     message.includes('source_detail') ||
     message.includes('event_category') ||
     message.includes('event_attributes') ||
@@ -104,7 +103,6 @@ export async function POST(req: Request) {
     location: location?.trim() || null,
     description: description?.trim() || null,
     source_type: null,
-    source_place: null,
     source_detail: null,
     start_at: nyIsoGuess,
     status: normalizedStatus,

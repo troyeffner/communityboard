@@ -21,7 +21,6 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
     error?.code === '42703' ||
     message.includes('description') ||
     message.includes('source_type') ||
-    message.includes('source_place') ||
     message.includes('source_detail') ||
     message.includes('event_category') ||
     message.includes('event_attributes') ||
@@ -32,29 +31,16 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   )
 }
 
-function isMissingSeenAtColumnError(error: { code?: string; message?: string } | null | undefined) {
-  const message = (error?.message || '').toLowerCase()
-  return (
-    error?.code === '42703' ||
-    message.includes('seen_at_name') ||
-    message.includes('seen_at_label') ||
-    message.includes('schema cache')
-  )
-}
-
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
 
-  const { id, poster_upload_id, seen_at_name, title, location, description, source_type, source_place, source_detail, start_at, status } = body as {
+  const { id, title, location, description, source_type, source_detail, start_at, status } = body as {
     id?: string
-    poster_upload_id?: string | null
-    seen_at_name?: string | null
     title?: string
     location?: string
     description?: string
     source_type?: string
-    source_place?: string
     source_detail?: string
     start_at?: string
     status?: string
@@ -99,7 +85,6 @@ export async function POST(req: Request) {
     location: location?.trim() || null,
     description: description?.trim() || null,
     source_type: sourceType,
-    source_place: source_place?.trim() || null,
     source_detail: source_detail?.trim() || null,
     start_at: nyIsoGuess,
     status: normalizedStatus,
@@ -129,29 +114,6 @@ export async function POST(req: Request) {
       .eq('id', id)
 
     if (fallback.error) return jsonError(fallback.error.message, 500)
-  }
-
-  if (typeof seen_at_name === 'string' && poster_upload_id) {
-    const seenAtValue = seen_at_name.trim() || null
-    const primarySeenAt = await supabase
-      .from('poster_uploads')
-      .update({ seen_at_name: seenAtValue })
-      .eq('id', poster_upload_id)
-
-    if (primarySeenAt.error && isMissingSeenAtColumnError(primarySeenAt.error)) {
-      const fallbackSeenAt = await supabase
-        .from('poster_uploads')
-        .update({ seen_at_label: seenAtValue })
-        .eq('id', poster_upload_id)
-      if (fallbackSeenAt.error && !isMissingSeenAtColumnError(fallbackSeenAt.error)) {
-        return jsonError(fallbackSeenAt.error.message, 500)
-      }
-      if (fallbackSeenAt.error && isMissingSeenAtColumnError(fallbackSeenAt.error)) {
-        return jsonError('Seen at columns are missing on poster_uploads. Run the DB migration for seen_at_name.', 500)
-      }
-    } else if (primarySeenAt.error) {
-      return jsonError(primarySeenAt.error.message, 500)
-    }
   }
 
   return NextResponse.json({ ok: true })

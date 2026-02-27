@@ -42,11 +42,27 @@ export default function PosterTagVoting({
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [pendingKey, setPendingKey] = useState<Record<string, boolean>>({})
   const [errorByEvent, setErrorByEvent] = useState<Record<string, string>>({})
+  const [pickerOpen, setPickerOpen] = useState(false)
   const uniqueEvents = useMemo(() => uniqEvents(events), [events])
 
   useEffect(() => {
     setTagsByEvent(initialTagsByEvent)
   }, [initialTagsByEvent])
+
+  useEffect(() => {
+    const onOpenPicker = (event: Event) => {
+      setPickerOpen(true)
+      const custom = event as CustomEvent<{ eventId?: string }>
+      const targetEventId = custom.detail?.eventId || uniqueEvents[0]?.event_id || ''
+      if (!targetEventId) return
+      window.requestAnimationFrame(() => {
+        const el = document.getElementById(`tag-input-${targetEventId}`) as HTMLInputElement | null
+        el?.focus()
+      })
+    }
+    window.addEventListener('cb-open-tag-picker', onOpenPicker)
+    return () => window.removeEventListener('cb-open-tag-picker', onOpenPicker)
+  }, [uniqueEvents])
 
   useEffect(() => {
     try {
@@ -163,25 +179,31 @@ export default function PosterTagVoting({
   if (uniqueEvents.length === 0) return null
 
   return (
-    <section style={{ marginTop: 16 }}>
-      <p style={{ margin: '0 0 10px 0', fontSize: 14, opacity: 0.9 }}>
-        Help tend this listing. Upvote tags that fit.
-      </p>
-      <div style={{ display: 'grid', gap: 10 }}>
-        {uniqueEvents.map((event) => {
-          const bundle = tagsByEvent[event.event_id] || { official: [], suggested: [] }
-          return (
-            <article
-              key={event.event_id}
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 12,
-                padding: 12,
-                background: '#fff',
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>{event.title}</div>
-              <div style={{ display: 'grid', gap: 8 }}>
+    <section id="help-identify-board" style={{ marginTop: 16 }}>
+      <details
+        open={pickerOpen}
+        onToggle={(e) => setPickerOpen((e.currentTarget as HTMLDetailsElement).open)}
+        style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#fff' }}
+      >
+        <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>Suggest tags</summary>
+        <p style={{ margin: '8px 0 10px 0', fontSize: 14, opacity: 0.9 }}>
+          Help tend this listing. Pin tags that fit each item.
+        </p>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {uniqueEvents.map((event) => {
+            const bundle = tagsByEvent[event.event_id] || { official: [], suggested: [] }
+            return (
+              <article
+                key={event.event_id}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  padding: 12,
+                  background: '#fff',
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>{event.title}</div>
+                <div style={{ display: 'grid', gap: 8 }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, opacity: 0.8 }}>Official tags</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -237,7 +259,7 @@ export default function PosterTagVoting({
                               type="button"
                               onClick={() => voteTag(event.event_id, tag.id)}
                               disabled={Boolean(pendingKey[voteKey])}
-                              title="Upvote tag"
+                              title="Pin tag to board"
                               style={{
                                 border: '1px solid #94a3b8',
                                 background: '#fff',
@@ -269,6 +291,7 @@ export default function PosterTagVoting({
                   style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
                 >
                   <input
+                    id={`tag-input-${event.event_id}`}
                     value={inputs[event.event_id] || ''}
                     onChange={(e) => setInputs((prev) => ({ ...prev, [event.event_id]: e.target.value }))}
                     placeholder="Suggest a tag"
@@ -293,11 +316,12 @@ export default function PosterTagVoting({
                 {errorByEvent[event.event_id] && (
                   <p style={{ margin: 0, color: 'crimson', fontSize: 13 }}>{errorByEvent[event.event_id]}</p>
                 )}
-              </div>
-            </article>
-          )
-        })}
-      </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </details>
     </section>
   )
 }

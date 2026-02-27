@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES } from '@/lib/taxonomy'
+import { ATTRIBUTES, AUDIENCE } from '@/lib/taxonomy'
 
 type PublicEventRow = {
   id: string
@@ -8,9 +8,8 @@ type PublicEventRow = {
   location: string | null
   seen_at_name: string | null
   start_at: string
-  status: 'planted' | 'on_board' | 'archived' | 'draft' | 'published' | 'unpublished'
+  status: 'draft' | 'published'
   created_at: string
-  event_category?: string | null
   event_attributes?: string[]
   event_audience?: string[]
   event_location_name?: string | null
@@ -75,11 +74,13 @@ function EventList({
   votes,
   pendingVoteIds,
   onVote,
+  onOpenPoster,
 }: {
   rows: PublicEventRow[]
   votes: Record<string, VoteState>
   pendingVoteIds: Record<string, boolean>
   onVote: (eventId: string) => void
+  onOpenPoster: () => void
 }) {
   if (rows.length === 0) return <p style={{ opacity: 0.7 }}>None.</p>
 
@@ -107,11 +108,6 @@ function EventList({
                 })}
               </div>
             {(e.event_location_name || e.location) && <div style={{ marginTop: 4, fontSize: 15, color: '#1f2937' }}>Location: {e.event_location_name || e.location}</div>}
-            {e.event_category && (
-              <div style={{ marginTop: 6 }}>
-                <span style={{ fontSize: 12, borderRadius: 999, border: '1px solid #cbd5e1', padding: '2px 8px', background: '#f8fafc' }}>{e.event_category}</span>
-              </div>
-            )}
             {e.event_attributes && e.event_attributes.length > 0 && (
               <div style={{ marginTop: 4, fontSize: 13, opacity: 0.85 }}>
                 {e.event_attributes.slice(0, 4).join(' • ')}
@@ -149,17 +145,18 @@ function EventList({
                 data-variant="secondary"
                 onClick={() => onVote(e.id)}
                 disabled={Boolean(votes[e.id]?.votedByMe) || Boolean(pendingVoteIds[e.id])}
-                title={votes[e.id]?.votedByMe ? 'You already upvoted this event' : 'Upvote this event'}
+                title={votes[e.id]?.votedByMe ? 'This item is pinned' : 'Pin this item to the board'}
               >
-                {votes[e.id]?.votedByMe ? 'Upvoted' : 'Upvote'} · {votes[e.id]?.upvotes || 0}
+                {votes[e.id]?.votedByMe ? 'Pinned' : 'Pin to board'} · {votes[e.id]?.upvotes || 0}
               </button>
-              <span style={{ fontSize: 12, opacity: 0.75 }}>Upvotes help the community surface what’s useful.</span>
+              <span style={{ fontSize: 12, opacity: 0.75 }}>Pinning helps the community surface useful items.</span>
             </div>
             {e.poster_public_url && (
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {e.poster_upload_id && (
                   <a
                     href={`/poster/${encodeURIComponent(e.poster_upload_id)}?event_id=${encodeURIComponent(e.id)}`}
+                    onClick={onOpenPoster}
                     style={{
                       display: 'inline-block',
                       padding: '6px 12px',
@@ -272,10 +269,10 @@ function EventList({
 }
 
 export default function PublicEventsList({ sections }: { sections: Sections }) {
-  const [categoryFilter, setCategoryFilter] = useState('')
   const [searchText, setSearchText] = useState('')
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
   const [selectedAudience, setSelectedAudience] = useState<string[]>([])
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [collapsed, setCollapsed] = useState({
     today: false,
     thisWeek: false,
@@ -285,6 +282,7 @@ export default function PublicEventsList({ sections }: { sections: Sections }) {
   const [voteState, setVoteState] = useState<Record<string, VoteState>>({})
   const [pendingVoteIds, setPendingVoteIds] = useState<Record<string, boolean>>({})
   const [cbVid, setCbVid] = useState<string>('')
+  const RETURN_SCROLL_KEY = 'communityboard:return-scroll'
 
   useEffect(() => {
     let vid = ''
@@ -315,6 +313,21 @@ export default function PublicEventsList({ sections }: { sections: Sections }) {
     setVoteState((prev) => ({ ...next, ...prev }))
   }, [sections])
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(RETURN_SCROLL_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { path?: string; y?: number }
+      const current = `${window.location.pathname}${window.location.search}`
+      if (parsed?.path === current && typeof parsed?.y === 'number') {
+        window.requestAnimationFrame(() => window.scrollTo({ top: parsed.y, behavior: 'auto' }))
+      }
+      window.localStorage.removeItem(RETURN_SCROLL_KEY)
+    } catch {
+      // ignore storage errors
+    }
+  }, [])
+
   function toggleTag(values: string[], setValues: (next: string[]) => void, tag: string) {
     setValues(values.includes(tag) ? values.filter((value) => value !== tag) : [...values, tag])
   }
@@ -322,7 +335,6 @@ export default function PublicEventsList({ sections }: { sections: Sections }) {
   function applyFilters(rows: PublicEventRow[]) {
     const search = searchText.trim().toLowerCase()
     return rows.filter((row) => {
-      if (categoryFilter && row.event_category !== categoryFilter) return false
       if (selectedAttributes.length > 0 && !selectedAttributes.every((tag) => (row.event_attributes || []).includes(tag))) return false
       if (selectedAudience.length > 0 && !selectedAudience.every((tag) => (row.event_audience || []).includes(tag))) return false
       if (search) {
@@ -331,6 +343,18 @@ export default function PublicEventsList({ sections }: { sections: Sections }) {
       }
       return true
     })
+  }
+
+  function rememberCommunityBoardScroll() {
+    try {
+      const payload = {
+        path: `${window.location.pathname}${window.location.search}`,
+        y: window.scrollY || 0,
+      }
+      window.localStorage.setItem(RETURN_SCROLL_KEY, JSON.stringify(payload))
+    } catch {
+      // ignore storage errors
+    }
   }
 
   async function handleVote(eventId: string) {
@@ -375,7 +399,7 @@ export default function PublicEventsList({ sections }: { sections: Sections }) {
         </div>
         {!isCollapsed && (
           <div style={{ marginTop: 8 }}>
-            <EventList rows={applyFilters(rows)} votes={voteState} pendingVoteIds={pendingVoteIds} onVote={handleVote} />
+            <EventList rows={applyFilters(rows)} votes={voteState} pendingVoteIds={pendingVoteIds} onVote={handleVote} onOpenPoster={rememberCommunityBoardScroll} />
           </div>
         )}
       </section>
@@ -385,23 +409,30 @@ export default function PublicEventsList({ sections }: { sections: Sections }) {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <section style={{ border: '1px solid #dbe3f0', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Filters</h2>
+        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Search</h2>
         <div style={{ display: 'grid', gap: 8 }}>
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-            <option value="">All item types</option>
-            {EVENT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
           <input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search title, description, location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {ATTRIBUTES.filter((tag) => ['free', 'donation', 'ticketed', 'in_person', 'online', 'hybrid'].includes(tag)).map((tag) => (
-              <button key={tag} data-variant={selectedAttributes.includes(tag) ? undefined : 'secondary'} onClick={() => toggleTag(selectedAttributes, setSelectedAttributes, tag)}>{tag}</button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {AUDIENCE.map((tag) => (
-              <button key={tag} data-variant={selectedAudience.includes(tag) ? undefined : 'secondary'} onClick={() => toggleTag(selectedAudience, setSelectedAudience, tag)}>{tag}</button>
-            ))}
-          </div>
+          <details
+            open={!filtersCollapsed}
+            onToggle={(e) => setFiltersCollapsed(!(e.currentTarget as HTMLDetailsElement).open)}
+            style={{ border: '1px solid #dbe3f0', borderRadius: 8, padding: 8, background: '#fff' }}
+          >
+            <summary style={{ cursor: 'pointer', fontWeight: 600, userSelect: 'none' }}>
+              {filtersCollapsed ? '▸ Filters' : '▾ Filters'}
+            </summary>
+            <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {ATTRIBUTES.filter((tag) => ['free', 'donation', 'ticketed', 'in_person', 'online', 'hybrid'].includes(tag)).map((tag) => (
+                  <button key={tag} data-variant={selectedAttributes.includes(tag) ? undefined : 'secondary'} onClick={() => toggleTag(selectedAttributes, setSelectedAttributes, tag)}>{tag}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {AUDIENCE.map((tag) => (
+                  <button key={tag} data-variant={selectedAudience.includes(tag) ? undefined : 'secondary'} onClick={() => toggleTag(selectedAudience, setSelectedAudience, tag)}>{tag}</button>
+                ))}
+              </div>
+            </div>
+          </details>
         </div>
       </section>
       {renderSection('today', 'Today', sections.today)}

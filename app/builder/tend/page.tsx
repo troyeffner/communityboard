@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { EVENT_STATUSES, eventStatusLabel, normalizeEventStatus } from '@/lib/statuses'
 
 type Row = {
   id: string
@@ -14,9 +16,7 @@ type Row = {
 }
 
 function normalizeStatusForEdit(raw?: string | null) {
-  const value = (raw || '').toLowerCase()
-  if (value === 'published' || value === 'on_board') return 'published'
-  return 'draft'
+  return normalizeEventStatus(raw, EVENT_STATUSES.DRAFT)
 }
 
 function toDateTimeLocal(value?: string | null) {
@@ -28,10 +28,7 @@ function toDateTimeLocal(value?: string | null) {
 }
 
 function statusLabel(statusValue: string) {
-  const value = statusValue.toLowerCase()
-  if (value === 'planted' || value === 'draft') return 'Draft'
-  if (value === 'published' || value === 'on_board') return 'Published'
-  return statusValue
+  return eventStatusLabel(statusValue)
 }
 
 export default function BuilderTendPage() {
@@ -87,12 +84,12 @@ export default function BuilderTendPage() {
       body: JSON.stringify({ event_id: eventId }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Publish failed')
+    if (!res.ok) return setError(data?.error || 'Pin to board failed')
     await load()
   }
 
   async function removeEvent(eventId: string) {
-    if (!confirm('Remove this event?')) return
+    if (!confirm('Remove this item?')) return
     const res = await fetch('/api/builder/delete-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,58 +143,70 @@ export default function BuilderTendPage() {
   }
 
   return (
-    <main style={{ padding: 16, fontFamily: 'sans-serif' }}>
+    <main style={{ padding: 16, fontFamily: 'sans-serif', maxWidth: '100%', overflowX: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <Link href="/builder/create" style={{ display: 'inline-block', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#111827', textDecoration: 'none', fontWeight: 700 }}>
+          Create drafts
+        </Link>
+        <Link href="/builder/tend" style={{ display: 'inline-block', padding: '8px 12px', borderRadius: 8, border: '1px solid #1d4ed8', background: '#eff6ff', color: '#1d4ed8', textDecoration: 'none', fontWeight: 700 }}>
+          Tend board
+        </Link>
+      </div>
       <h1 style={{ margin: 0 }}>Builder Tend</h1>
-      <p style={{ marginTop: 6, opacity: 0.8 }}>Tend events and publish to board</p>
+      <p style={{ marginTop: 6, opacity: 0.8 }}>Tend items and pin to board</p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">All status</option>
           <option value="draft">Draft</option>
-          <option value="published">Published</option>
+          <option value="published">Pinned</option>
         </select>
         <select value={linked} onChange={(e) => setLinked(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">Linked + unlinked</option>
           <option value="linked">Linked</option>
           <option value="unlinked">Unlinked</option>
         </select>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1', minWidth: 160, maxWidth: '100%' }} />
         <button data-variant="secondary" onClick={load}>Apply</button>
       </div>
 
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: 'left', padding: 8 }}>Title</th>
-            <th style={{ textAlign: 'left', padding: 8 }}>Start</th>
-            <th style={{ textAlign: 'left', padding: 8 }}>Status</th>
-            <th style={{ textAlign: 'left', padding: 8 }}>Link</th>
-            <th style={{ textAlign: 'left', padding: 8 }} />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{row.title}</td>
-              <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{new Date(row.start_at).toLocaleString()}</td>
-              <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{statusLabel(row.status)}</td>
-              <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{row.is_linked ? 'linked' : 'unlinked'}</td>
-              <td style={{ borderTop: '1px solid #eee', padding: 8, display: 'flex', gap: 6 }}>
-                {row.status !== 'on_board' && row.status !== 'published' && (
-                  <button onClick={() => publish(row.id)}>Publish to board</button>
-                )}
-                <button data-variant="secondary" onClick={() => beginEdit(row)}>Edit</button>
-                <button data-variant="danger" onClick={() => removeEvent(row.id)}>Remove</button>
-              </td>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', minWidth: 760, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: 8 }}>Title</th>
+              <th style={{ textAlign: 'left', padding: 8 }}>Start</th>
+              <th style={{ textAlign: 'left', padding: 8 }}>Status</th>
+              <th style={{ textAlign: 'left', padding: 8 }}>Link</th>
+              <th style={{ textAlign: 'left', padding: 8 }} />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{row.title}</td>
+                <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{new Date(row.start_at).toLocaleString()}</td>
+                <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{statusLabel(row.status)}</td>
+                <td style={{ borderTop: '1px solid #eee', padding: 8 }}>{row.is_linked ? 'linked' : 'unlinked'}</td>
+                <td style={{ borderTop: '1px solid #eee', padding: 8 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {normalizeEventStatus(row.status, EVENT_STATUSES.DRAFT) !== EVENT_STATUSES.PUBLISHED && (
+                      <button onClick={() => publish(row.id)}>Pin to board</button>
+                    )}
+                    <button data-variant="secondary" onClick={() => beginEdit(row)}>Edit</button>
+                    <button data-variant="danger" onClick={() => removeEvent(row.id)}>Remove</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {editingId && (
         <section style={{ marginTop: 14, border: '1px solid #e5e7eb', borderRadius: 10, padding: 10, maxWidth: 560 }}>
-          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Edit event</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 8 }}>Edit item</h3>
           <div style={{ display: 'grid', gap: 8 }}>
             <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
             <input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="Location" style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
@@ -205,7 +214,7 @@ export default function BuilderTendPage() {
             <input type="datetime-local" value={editStartAt} onChange={(e) => setEditStartAt(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
             <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
               <option value="draft">Draft</option>
-              <option value="published">Published</option>
+              <option value="published">Pinned</option>
             </select>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={saveEdit}>Save changes</button>

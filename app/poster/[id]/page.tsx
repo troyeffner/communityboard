@@ -1,13 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
+import Link from 'next/link'
 import PosterViewer from './PosterViewer'
 import PosterTagVoting from './PosterTagVoting'
+import { getPosterSeenAt } from '@/lib/seenAt'
 
 type PosterRow = {
   id: string
   file_path: string
   created_at?: string
   seen_at_name?: string | null
-  seen_at_label?: string | null
 }
 
 type LinkRow = {
@@ -47,6 +48,71 @@ type EventTagBundle = {
   suggested: Array<TagRow & { votes: number }>
 }
 
+function renderLoadError(scope: string, detail: string) {
+  console.error(`[poster/page] ${scope} failed:`, detail)
+  return (
+    <main style={{ padding: 24, fontFamily: 'sans-serif' }}>
+
+      {/* E2E nav guardrails (keep labels stable) */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '8px 0 12px' }}>
+        <a href="/">← Return to Community Board</a>
+        <a href="/browse">← Browse posters</a>
+      </div>
+
+      <p style={{ marginTop: 0 }}>We could not load this poster right now.</p>
+      <p style={{ marginBottom: 8, opacity: 0.8 }}>{scope}: {detail}</p>
+      <a href="/api/health/schema" style={{ color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
+        Check schema health
+      </a>
+    </main>
+  )
+}
+
+function getE2eFixturePoster(id: string) {
+  if (process.env.E2E_MOCK_POSTER_DATA !== '1') return null
+  if (id !== 'e2e-fixture') return null
+
+  return {
+    poster: {
+      id,
+      file_path:
+        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><rect width="100%" height="100%" fill="%23eef2ff"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="56" fill="%23334155">E2E Poster Fixture</text></svg>',
+      created_at: '2026-02-27T14:00:00.000Z',
+      seen_at_name: 'E2E Community Board',
+    } as PosterRow,
+    pins: [
+      {
+        link_id: 'e2e-link-1',
+        event_id: 'e2e-event-1',
+        title: 'Neighborhood Cleanup',
+        start_at: '2026-03-07T14:00:00',
+        location: 'Main Street Plaza',
+        status: 'published',
+        item_type: 'event',
+        upvote_count: 3,
+        did_upvote: false,
+        bbox: { x: 0.24, y: 0.31 },
+      },
+      {
+        link_id: 'e2e-link-2',
+        event_id: 'e2e-event-2',
+        title: 'Open Studio Night',
+        start_at: '2026-03-08T18:30:00',
+        location: 'Cedar Arts',
+        status: 'published',
+        item_type: 'event',
+        upvote_count: 6,
+        did_upvote: false,
+        bbox: { x: 0.71, y: 0.58 },
+      },
+    ],
+    tagsByEvent: {
+      'e2e-event-1': { official: [{ id: 't1', label: 'volunteer', kind: 'topic', slug: 'volunteer' }], suggested: [] },
+      'e2e-event-2': { official: [{ id: 't2', label: 'arts', kind: 'topic', slug: 'arts' }], suggested: [] },
+    } as Record<string, EventTagBundle>,
+  }
+}
+
 export default async function PosterPage({
   params,
   searchParams,
@@ -57,6 +123,54 @@ export default async function PosterPage({
   const { id } = await params
   const currentParams = await searchParams
   const { event_id } = currentParams
+  const fixture = getE2eFixturePoster(id)
+  if (fixture) {
+    const browseParams = new URLSearchParams()
+    Object.entries(currentParams || {}).forEach(([key, value]) => {
+      if (!value || key === 'poster') return
+      if (key === 'event_id') return
+      browseParams.set(key, String(value))
+    })
+    const browseHref = `/browse${browseParams.toString() ? `?${browseParams.toString()}` : ''}`
+    const seenAtParams = new URLSearchParams(browseParams.toString())
+    seenAtParams.set('seenAt', fixture.poster.seen_at_name || '')
+    const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
+    return (
+      <main className="cb-page-container" style={{ scrollBehavior: 'smooth' }}>
+        <header style={{ marginBottom: 10 }}>
+          <Link
+            href="/"
+            style={{
+              display: 'inline-block',
+              marginBottom: 8,
+              fontSize: 14,
+              color: '#1d4ed8',
+              textDecoration: 'none',
+              fontWeight: 600,
+            }}
+          >
+            ← Return to Community Board
+          </Link>
+          <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 32, lineHeight: 1.15 }}>{fixture.poster.seen_at_name}</h1>
+          <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>Community Board</p>
+        </header>
+        <PosterViewer
+          key={`${id}:${event_id || 'none'}`}
+          imageUrls={[fixture.poster.file_path]}
+          pins={fixture.pins}
+          activeEventId={event_id || null}
+          photoTakenAt={fixture.poster.created_at || null}
+          seenAt={fixture.poster.seen_at_name || null}
+          browseHref={browseHref}
+          seenAtHref={seenAtHref}
+        />
+        <PosterTagVoting
+          events={fixture.pins.map((pin) => ({ event_id: pin.event_id, title: pin.title }))}
+          initialTagsByEvent={fixture.tagsByEvent}
+        />
+      </main>
+    )
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -69,7 +183,7 @@ export default async function PosterPage({
 
   const primary = await supabase
     .from('poster_uploads')
-    .select('id,file_path,created_at,seen_at_name,seen_at_label')
+    .select('id,file_path,created_at,seen_at_name')
     .eq('id', id)
     .limit(1)
 
@@ -78,11 +192,11 @@ export default async function PosterPage({
     const message = (primary.error.message || '').toLowerCase()
     const missingSeen = primary.error.code === '42703' || message.includes('seen_at_') || message.includes('schema cache')
     if (!missingSeen) {
-      return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load poster: {primary.error.message}</main>
+      return renderLoadError('Poster query', primary.error.message)
     }
     const fallbackWithName = await supabase
       .from('poster_uploads')
-      .select('id,file_path,created_at,seen_at_name,seen_at_label')
+      .select('id,file_path,created_at,seen_at_name')
       .eq('id', id)
       .limit(1)
     if (!fallbackWithName.error) {
@@ -94,7 +208,7 @@ export default async function PosterPage({
         .eq('id', id)
         .limit(1)
       if (fallback.error) {
-        return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load poster: {fallback.error.message}</main>
+        return renderLoadError('Poster fallback query', fallback.error.message)
       }
       poster = (fallback.data?.[0] || null) as PosterRow | null
     }
@@ -115,6 +229,7 @@ export default async function PosterPage({
       title: row.title || 'Item',
       start_at: row.start_date ? `${row.start_date}T${row.time_of_day || '14:00:00'}` : '',
       location: row.location_text || null,
+      status: row.status || null,
       item_type: row.type || 'event',
       upvote_count: Number(row.upvote_count || 0),
       did_upvote: false,
@@ -127,7 +242,7 @@ export default async function PosterPage({
       .select('id,event_id,bbox,events(id,title,start_at,location,status)')
       .eq('poster_upload_id', id)
     if (legacy.error) {
-      return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load pins: {legacy.error.message}</main>
+      return renderLoadError('Poster pins query', legacy.error.message)
     }
     pins = (legacy.data || [])
       .map((row) => {
@@ -140,6 +255,7 @@ export default async function PosterPage({
           title: event.title || 'Item',
           start_at: event.start_at || '',
           location: event.location || null,
+          status: event.status || null,
           item_type: 'event',
           upvote_count: 0,
           did_upvote: false,
@@ -148,9 +264,6 @@ export default async function PosterPage({
       })
       .filter((row): row is NonNullable<typeof row> => row !== null)
   }
-
-  const selectedEvent =
-    (event_id ? pins.find((pin) => pin.event_id === event_id) : pins[0]) || null
 
   const uniqueEventIds = Array.from(new Set(pins.map((pin) => pin.event_id)))
   const tagsByEvent: Record<string, EventTagBundle> = {}
@@ -179,10 +292,10 @@ export default async function PosterPage({
     }
 
     if (officialRes.error && !hasMissingTagTables(officialRes.error.message || '')) {
-      return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load tags: {officialRes.error.message}</main>
+      return renderLoadError('Poster tags query', officialRes.error.message)
     }
     if (votesRes.error && !hasMissingTagTables(votesRes.error.message || '')) {
-      return <main style={{ padding: 24, fontFamily: 'sans-serif' }}>Failed to load tags: {votesRes.error.message}</main>
+      return renderLoadError('Poster tag votes query', votesRes.error.message)
     }
 
     const officialRows = (officialRes.data || []) as EventTagRow[]
@@ -248,12 +361,41 @@ export default async function PosterPage({
   })
   const browseHref = `/browse${browseParams.toString() ? `?${browseParams.toString()}` : ''}`
   const seenAtParams = new URLSearchParams(browseParams.toString())
-  const seenAtValue = poster.seen_at_name || poster.seen_at_label || null
+  const seenAtValue = getPosterSeenAt(poster)
+  const hasSeenAt = Boolean(seenAtValue)
+  const pageTitle = hasSeenAt ? seenAtValue! : 'Community Board'
+  const boardKindLabel = pins.length > 1 ? 'Community Board' : 'Poster'
   if (seenAtValue) seenAtParams.set('seenAt', seenAtValue)
   const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
   return (
-    <main style={{ width: '100%', padding: '16px 20px 24px', fontFamily: 'sans-serif' }}>
-      <h1 style={{ marginTop: 0, marginBottom: 10, fontSize: 28 }}>{selectedEvent?.title || 'Poster View'}</h1>
+    <main className="cb-page-container" style={{ scrollBehavior: 'smooth' }}>
+      <header style={{ marginBottom: 10 }}>
+        <Link
+          href="/"
+          style={{
+            display: 'inline-block',
+            marginBottom: 8,
+            fontSize: 14,
+            color: '#1d4ed8',
+            textDecoration: 'none',
+            fontWeight: 600,
+          }}
+        >
+          ← Return to Community Board
+        </Link>
+        <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 32, lineHeight: 1.15 }}>{pageTitle}</h1>
+        <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>{boardKindLabel}</p>
+        {hasSeenAt ? (
+          null
+        ) : (
+          <div style={{ display: 'grid', gap: 2, marginTop: 2 }}>
+            <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>Location not yet identified</p>
+            <a href="#help-identify-board" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none' }}>
+              Help identify this board
+            </a>
+          </div>
+        )}
+      </header>
       <PosterViewer
         key={`${id}:${event_id || 'none'}`}
         imageUrls={imageUrls}

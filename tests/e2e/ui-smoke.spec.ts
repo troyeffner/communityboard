@@ -45,8 +45,8 @@ test.describe('CommunityBoard Verification Guardrails', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/poster/e2e-fixture')
 
-    await expect(page.getByRole('link', { name: '← Return to Community Board' })).toBeVisible()
-    await expect(page.getByRole('link', { name: '← Browse posters' })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Return to Community Board/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Browse posters/ })).toBeVisible()
 
     await assertPosterStageFits(page)
     await assertNoHorizontalOverflow(page)
@@ -81,4 +81,17 @@ test.describe('CommunityBoard Verification Guardrails', () => {
       animations: 'disabled',
     })
   })
+})
+
+// --- Visual Regression Freeze ---
+test('poster view visual snapshot', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/poster/e2e-fixture')
+  await expect(page).toHaveScreenshot('poster-view-mobile.png', { fullPage: true })
+})
+
+test('builder create visual snapshot', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/builder/create')
+  await expect(page).toHaveScreenshot('builder-create-desktop.png', { fullPage: true })
 })

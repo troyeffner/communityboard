@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { EVENT_STATUSES, normalizeEventStatus } from '@/lib/statuses'
+import { normalizeItemType } from '@/lib/itemTypes'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -14,8 +16,8 @@ export async function PATCH(req: Request) {
   const title = typeof body.title === 'string' ? body.title.trim() : ''
   const description = typeof body.description === 'string' ? body.description.trim() : ''
   const location = typeof body.location === 'string' ? body.location.trim() : ''
-  const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : ''
-  const itemType = typeof body.type === 'string' ? body.type.trim().toLowerCase() : ''
+  const status = typeof body.status === 'string' ? normalizeEventStatus(body.status, EVENT_STATUSES.DRAFT) : ''
+  const itemType = typeof body.type === 'string' ? normalizeItemType(body.type, 'event') : ''
   const recurrenceMode = typeof body.recurrence_mode === 'string' ? body.recurrence_mode.trim().toLowerCase() : ''
   const recurrenceWeekday = typeof body.recurrence_weekday === 'string' ? body.recurrence_weekday.trim().toLowerCase() : ''
   const recurrenceMonthOrdinal = typeof body.recurrence_month_ordinal === 'string' ? body.recurrence_month_ordinal.trim().toLowerCase() : ''

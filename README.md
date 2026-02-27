@@ -173,11 +173,37 @@ Run full regression gate (tests + lint + build):
 npm run test:regression
 ```
 
+Run UI + API guardrails bundle (regression + Playwright smoke):
+
+```bash
+npm run verify:guardrails
+```
+
 Optional DB enum/status smoke test (runs real inserts/links against Supabase):
 
 ```bash
 RUN_DB_REGRESSION=1 npm test -- tests/regression/db-status-smoke.test.mjs
 ```
+
+## Schema Health Gate
+
+Runtime schema health endpoint:
+
+```bash
+curl http://localhost:3000/api/health/schema
+```
+
+Expected:
+
+```json
+{ "ok": true, "missing": [] }
+```
+
+CI gate:
+- GitHub Actions workflow at `.github/workflows/ci.yml` runs `npm test`, `npm run lint`, `npm run build`, and Playwright smoke tests (`npm run test:e2e`) on push/PR.
+
+Pre-deploy checklist:
+- Use [docs/verification-guardrails.md](/Users/troyeffner/Dropbox/DEV/communityboard/docs/verification-guardrails.md)
 
 ## Enum / Schema Alignment (DEV + PROD)
 
