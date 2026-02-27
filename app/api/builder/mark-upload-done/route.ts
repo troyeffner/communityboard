@@ -17,6 +17,15 @@ function isMissingDoneColumns(error: { code?: string; message?: string } | null 
   )
 }
 
+function isStatusEnumError(error: { code?: string; message?: string } | null | undefined) {
+  const message = (error?.message || '').toLowerCase()
+  return (
+    error?.code === '22P02' ||
+    message.includes('invalid input value for enum') ||
+    (message.includes('poster_status') && message.includes('enum'))
+  )
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
@@ -39,10 +48,24 @@ export async function POST(req: Request) {
     .from('poster_uploads')
     .update({ status: nextStatus, is_done: isDone, done: isDone, processed_at: isDone ? new Date().toISOString() : null })
     .eq('id', posterUploadId)
+  if (update.error && isStatusEnumError(update.error)) {
+    // Environment has a poster_status enum that does not include our "done/processed" value yet.
+    // Preserve behavior via completion flags instead of failing the action.
+    update = await supabase
+      .from('poster_uploads')
+      .update({ is_done: isDone, done: isDone, processed_at: isDone ? new Date().toISOString() : null })
+      .eq('id', posterUploadId)
+  }
   if (update.error && isMissingDoneColumns(update.error)) {
     update = await supabase
       .from('poster_uploads')
       .update({ status: nextStatus, processed_at: isDone ? new Date().toISOString() : null })
+      .eq('id', posterUploadId)
+  }
+  if (update.error && isStatusEnumError(update.error)) {
+    update = await supabase
+      .from('poster_uploads')
+      .update({ processed_at: isDone ? new Date().toISOString() : null })
       .eq('id', posterUploadId)
   }
   if (update.error && isMissingDoneColumns(update.error)) {

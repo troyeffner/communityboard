@@ -678,7 +678,7 @@ export default function BuilderCreatePage({
           </div>
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
-          {uploads.filter((u) => normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE).map((u) => (
+          {uploads.filter((u) => !Boolean(u.is_done) && normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE).map((u) => (
             <button
               key={u.id}
               type="button"

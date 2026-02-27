@@ -13,14 +13,32 @@ export async function GET() {
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
 
-  const query = await supabase
+  const primary = await supabase
     .from('poster_uploads')
-    .select('id,created_at,status')
+    .select('id,created_at,status,done,is_done,processed_at')
     .order('created_at', { ascending: true })
     .limit(200)
 
-  if (query.error) return jsonError(query.error.message, 500)
-  const rows = (query.data || []) as Array<{ id: string; created_at: string; status: string | null }>
-  const next = rows.find((row) => normalizePosterStatus(row.status || '') !== POSTER_STATUSES.DONE) || null
+  let rows: Array<{ id: string; created_at: string; status: string | null; done?: boolean | null; is_done?: boolean | null; processed_at?: string | null }> = []
+
+  if (primary.error) {
+    const message = (primary.error.message || '').toLowerCase()
+    const missingDone = primary.error.code === '42703' || message.includes('done') || message.includes('is_done') || message.includes('processed_at') || message.includes('schema cache')
+    if (!missingDone) return jsonError(primary.error.message, 500)
+    const fallback = await supabase
+      .from('poster_uploads')
+      .select('id,created_at,status')
+      .order('created_at', { ascending: true })
+      .limit(200)
+    if (fallback.error) return jsonError(fallback.error.message, 500)
+    rows = (fallback.data || []) as Array<{ id: string; created_at: string; status: string | null }>
+  } else {
+    rows = (primary.data || []) as Array<{ id: string; created_at: string; status: string | null; done?: boolean | null; is_done?: boolean | null; processed_at?: string | null }>
+  }
+  const next = rows.find((row) => {
+    const doneByStatus = normalizePosterStatus(row.status || '') === POSTER_STATUSES.DONE
+    const doneByFlags = Boolean(row.done ?? row.is_done ?? row.processed_at)
+    return !doneByStatus && !doneByFlags
+  }) || null
   return NextResponse.json({ poster: next })
 }
