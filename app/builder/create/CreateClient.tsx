@@ -614,6 +614,7 @@ export default function BuilderCreatePage({
                 borderRadius: 8,
                 padding: 8,
                 background: '#fff',
+                color: '#0f172a',
                 display: 'grid',
                 gridTemplateColumns: '108px 1fr',
                 gap: 10,
