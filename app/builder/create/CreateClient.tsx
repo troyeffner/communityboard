@@ -612,10 +612,13 @@ export default function BuilderCreatePage({
               style={{
                 border: selectedPosterId === u.id ? '2px solid #2563eb' : '1px solid #e5e7eb',
                 borderRadius: 8,
-                padding: 4,
+                padding: 8,
                 background: '#fff',
                 display: 'grid',
-                placeItems: 'center',
+                gridTemplateColumns: '108px 1fr',
+                gap: 10,
+                alignItems: 'center',
+                textAlign: 'left',
               }}
             >
               {u.public_url ? (
@@ -627,6 +630,20 @@ export default function BuilderCreatePage({
               ) : (
                 <div style={{ width: '100%', maxWidth: 108, height: 108, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc' }} />
               )}
+              <div style={{ minWidth: 0, display: 'grid', gap: 4 }}>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>Captured</div>
+                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {formatCaptureHour(u.created_at)}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>Seen at</div>
+                <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {u.seen_at_name || '—'}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>Status / Items</div>
+                <div style={{ fontSize: 13 }}>
+                  {normalizePosterStatus(u.status)} / {u.linked_count ?? u.event_count ?? 0}
+                </div>
+              </div>
             </button>
           ))}
           {uploads.length === 0 && <p style={{ opacity: 0.7 }}>No incomplete posters.</p>}
