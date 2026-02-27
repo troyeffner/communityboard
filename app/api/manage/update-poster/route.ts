@@ -7,7 +7,14 @@ function jsonError(message: string, status = 400) {
 
 function isMissingSeenAtName(error: { code?: string; message?: string } | null | undefined) {
   const message = (error?.message || '').toLowerCase()
-  return error?.code === '42703' || message.includes('seen_at_name') || message.includes('seen_at_label') || message.includes('schema cache')
+  return (
+    error?.code === '42703' ||
+    message.includes('seen_at_name') ||
+    message.includes('seen_at_label') ||
+    message.includes('seen_at') ||
+    message.includes('source_place') ||
+    message.includes('schema cache')
+  )
 }
 
 export async function PATCH(req: Request) {
@@ -63,11 +70,49 @@ export async function PATCH(req: Request) {
           },
         })
       }
+
+      const seenAtUpdate = await supabase
+        .from('poster_uploads')
+        .update({
+          ...(typeof statusValue !== 'undefined' ? { status: statusValue } : {}),
+          seen_at: seenAtValue,
+        })
+        .eq('id', posterUploadId)
+        .select('id,file_path,status,created_at,seen_at')
+        .maybeSingle()
+      if (!seenAtUpdate.error) {
+        return NextResponse.json({
+          ok: true,
+          row: {
+            ...(seenAtUpdate.data || {}),
+            seen_at_name: (seenAtUpdate.data as { seen_at?: string | null } | null)?.seen_at || null,
+          },
+        })
+      }
+
+      const sourcePlaceUpdate = await supabase
+        .from('poster_uploads')
+        .update({
+          ...(typeof statusValue !== 'undefined' ? { status: statusValue } : {}),
+          source_place: seenAtValue,
+        })
+        .eq('id', posterUploadId)
+        .select('id,file_path,status,created_at,source_place')
+        .maybeSingle()
+      if (!sourcePlaceUpdate.error) {
+        return NextResponse.json({
+          ok: true,
+          row: {
+            ...(sourcePlaceUpdate.data || {}),
+            seen_at_name: (sourcePlaceUpdate.data as { source_place?: string | null } | null)?.source_place || null,
+          },
+        })
+      }
     }
 
     const fallbackUpdates = { ...updates }
     delete fallbackUpdates.seen_at_name
-    if (Object.keys(fallbackUpdates).length === 0) return jsonError('Seen at column is missing on this environment. Run DB migrations.', 500)
+    if (Object.keys(fallbackUpdates).length === 0) return jsonError('Seen-at field is not configured in this environment yet. Run DB migration for poster_uploads.seen_at_name.', 500)
 
     result = await supabase
       .from('poster_uploads')

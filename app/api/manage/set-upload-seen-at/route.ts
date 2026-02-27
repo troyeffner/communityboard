@@ -25,13 +25,25 @@ export async function POST(req: Request) {
     .eq('id', posterUploadId)
   if (result.error) {
     const msg = (result.error.message || '').toLowerCase()
-    const missingSeenAt = result.error.code === '42703' || msg.includes('seen_at_name') || msg.includes('schema cache')
+    const missingSeenAt = result.error.code === '42703' || msg.includes('seen_at_name') || msg.includes('seen_at') || msg.includes('source_place') || msg.includes('schema cache')
     if (!missingSeenAt) return jsonError(result.error.message, 500)
     const fallback = await supabase
       .from('poster_uploads')
       .update({ seen_at_label: seenAtName })
       .eq('id', posterUploadId)
-    if (fallback.error) return jsonError(fallback.error.message, 500)
+    if (!fallback.error) return NextResponse.json({ ok: true, seen_at_name: seenAtName })
+
+    const fallbackSeenAt = await supabase
+      .from('poster_uploads')
+      .update({ seen_at: seenAtName })
+      .eq('id', posterUploadId)
+    if (!fallbackSeenAt.error) return NextResponse.json({ ok: true, seen_at_name: seenAtName })
+
+    const fallbackSourcePlace = await supabase
+      .from('poster_uploads')
+      .update({ source_place: seenAtName })
+      .eq('id', posterUploadId)
+    if (fallbackSourcePlace.error) return jsonError(fallbackSourcePlace.error.message, 500)
   }
 
   return NextResponse.json({ ok: true, seen_at_name: seenAtName })
