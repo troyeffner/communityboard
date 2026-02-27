@@ -148,6 +148,16 @@ export default function BuilderCreatePage({
   const [isMobile, setIsMobile] = useState(false)
   const panelsRef = useRef<HTMLDivElement | null>(null)
   const [stageSize, setStageSize] = useState({ width: 1, height: 1 })
+  const posterControlButtonStyle = {
+    height: 40,
+    minHeight: 40,
+    padding: '0 12px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    whiteSpace: 'nowrap' as const,
+    flex: '0 0 auto',
+  }
 
   async function loadUploads() {
     const res = await fetch('/api/manage/list-uploads-with-counts')
@@ -668,12 +678,12 @@ export default function BuilderCreatePage({
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Status</div><div style={{ fontSize: 13 }}>{normalizePosterStatus(selectedUpload.status)}</div></div>
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Items</div><div style={{ fontSize: 13 }}>{rows.length}</div></div>
             </div>
-            <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button data-variant="secondary" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom out</button>
-              <button data-variant="secondary" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom in</button>
-              <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-              <button data-variant="secondary" onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit-to-pins</button>
-              <button data-variant="secondary" onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center active pin</button>
+            <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', alignContent: 'flex-start', minHeight: 40 }}>
+              <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom out</button>
+              <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom in</button>
+              <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
+              <button data-variant="secondary" style={posterControlButtonStyle} onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit-to-pins</button>
+              <button data-variant="secondary" style={posterControlButtonStyle} onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center active pin</button>
             </div>
             <div
               ref={stageRef}
