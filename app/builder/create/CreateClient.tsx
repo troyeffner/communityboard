@@ -642,7 +642,7 @@ export default function BuilderCreatePage({
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Captured</div><div style={{ fontSize: 13 }}>{formatCaptureHour(selectedUpload.created_at)}</div></div>
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Seen at</div><div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUpload.seen_at_name || '—'}</div></div>
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Status</div><div style={{ fontSize: 13 }}>{normalizePosterStatus(selectedUpload.status)}</div></div>
-              <div><div style={{ fontSize: 12, opacity: 0.75 }}>Events</div><div style={{ fontSize: 13 }}>{rows.length}</div></div>
+              <div><div style={{ fontSize: 12, opacity: 0.75 }}>Items</div><div style={{ fontSize: 13 }}>{rows.length}</div></div>
             </div>
             <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button data-variant="secondary" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom out</button>
@@ -771,6 +771,7 @@ export default function BuilderCreatePage({
                     padding: '8px 10px',
                     background: inspectorTab === 'event' ? '#eff6ff' : '#fff',
                     fontWeight: 600,
+                    color: '#0f172a',
                   }}
                 >
                   Event
@@ -784,6 +785,7 @@ export default function BuilderCreatePage({
                     padding: '8px 10px',
                     background: inspectorTab === 'business' ? '#eff6ff' : '#fff',
                     fontWeight: 600,
+                    color: '#0f172a',
                   }}
                 >
                   Business/Service
@@ -797,6 +799,7 @@ export default function BuilderCreatePage({
                     padding: '8px 10px',
                     background: inspectorTab === 'posterMeta' ? '#eff6ff' : '#fff',
                     fontWeight: 600,
+                    color: '#0f172a',
                   }}
                 >
                   Poster meta
