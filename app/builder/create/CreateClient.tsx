@@ -486,6 +486,42 @@ export default function BuilderCreatePage({
     return { stageW, stageH, baseW, baseH, offsetX, offsetY }
   }
 
+  function clampPan(nextPan: { x: number; y: number }, nextZoom = zoom) {
+    const m = getStageMetrics()
+    if (!m) return nextPan
+
+    const renderedW = m.baseW * nextZoom
+    const renderedH = m.baseH * nextZoom
+    const offsetScaledX = m.offsetX * nextZoom
+    const offsetScaledY = m.offsetY * nextZoom
+
+    let clampedX = nextPan.x
+    let clampedY = nextPan.y
+
+    if (renderedW <= m.stageW) {
+      clampedX = (m.stageW - renderedW) / 2 - offsetScaledX
+    } else {
+      const minX = m.stageW - (offsetScaledX + renderedW)
+      const maxX = -offsetScaledX
+      clampedX = Math.max(minX, Math.min(maxX, clampedX))
+    }
+
+    if (renderedH <= m.stageH) {
+      clampedY = (m.stageH - renderedH) / 2 - offsetScaledY
+    } else {
+      const minY = m.stageH - (offsetScaledY + renderedH)
+      const maxY = -offsetScaledY
+      clampedY = Math.max(minY, Math.min(maxY, clampedY))
+    }
+
+    return { x: Number(clampedX.toFixed(1)), y: Number(clampedY.toFixed(1)) }
+  }
+
+  useEffect(() => {
+    if (!selectedUpload?.public_url) return
+    setPan((prev) => clampPan(prev, zoom))
+  }, [selectedUpload?.public_url, zoom, stageSize.width, stageSize.height, imageNatural.width, imageNatural.height])
+
   function centerOnPoint(pointToCenter: { x: number; y: number }, targetZoom = zoom) {
     const m = getStageMetrics()
     if (!m) return
@@ -693,7 +729,7 @@ export default function BuilderCreatePage({
                 const dx = e.clientX - dragRef.current.x
                 const dy = e.clientY - dragRef.current.y
                 if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDragRef.current = true
-                setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }))
+                setPan((prev) => clampPan({ x: prev.x + dx, y: prev.y + dy }))
                 dragRef.current = { x: e.clientX, y: e.clientY }
               }}
               onMouseUp={() => { dragRef.current = null }}
