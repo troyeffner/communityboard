@@ -16,6 +16,9 @@ export async function PATCH(req: Request) {
   const location = typeof body.location === 'string' ? body.location.trim() : ''
   const status = typeof body.status === 'string' ? body.status.trim().toLowerCase() : ''
   const itemType = typeof body.type === 'string' ? body.type.trim().toLowerCase() : ''
+  const recurrenceMode = typeof body.recurrence_mode === 'string' ? body.recurrence_mode.trim().toLowerCase() : ''
+  const recurrenceWeekday = typeof body.recurrence_weekday === 'string' ? body.recurrence_weekday.trim().toLowerCase() : ''
+  const recurrenceMonthOrdinal = typeof body.recurrence_month_ordinal === 'string' ? body.recurrence_month_ordinal.trim().toLowerCase() : ''
   const startAtRaw = typeof body.start_at === 'string' ? body.start_at.trim() : ''
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -26,7 +29,17 @@ export async function PATCH(req: Request) {
   const updates: Record<string, unknown> = {}
   if (title) updates.title = title
   if ('location' in body) updates.location_text = location || null
-  if ('description' in body) updates.details_json = description ? { description } : {}
+  if ('description' in body || 'recurrence_mode' in body || 'recurrence_weekday' in body || 'recurrence_month_ordinal' in body || 'type' in body) {
+    const nextDetails: Record<string, string> = {}
+    if (description) nextDetails.description = description
+    const effectiveType = itemType || 'event'
+    if (effectiveType === 'recurring_event') {
+      if (recurrenceMode === 'weekly' || recurrenceMode === 'monthly') nextDetails.recurrence_mode = recurrenceMode
+      if (recurrenceWeekday) nextDetails.recurrence_weekday = recurrenceWeekday
+      if (recurrenceMode === 'monthly' && recurrenceMonthOrdinal) nextDetails.recurrence_month_ordinal = recurrenceMonthOrdinal
+    }
+    updates.details_json = nextDetails
+  }
   if (status) updates.status = status
   if (itemType) updates.type = itemType
   if (startAtRaw) {

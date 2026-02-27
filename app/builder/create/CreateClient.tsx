@@ -25,6 +25,9 @@ type PosterEventRow = {
     title: string
     location: string | null
     description?: string | null
+    recurrence_mode?: 'weekly' | 'monthly' | null
+    recurrence_weekday?: string | null
+    recurrence_month_ordinal?: 'first' | 'second' | 'third' | 'fourth' | null
     start_at: string
     status: string
   }
@@ -95,6 +98,10 @@ function statusLabel(statusValue: string) {
   return statusValue
 }
 
+function isTimeBoundType(type: string) {
+  return type === 'event' || type === 'recurring_event' || type === 'class_program'
+}
+
 function friendlyError(message: string | undefined, fallback: string) {
   const msg = (message || '').toLowerCase()
   if (msg.includes('enum')) return 'Status value is not supported by this environment yet.'
@@ -122,6 +129,9 @@ export default function BuilderCreatePage({
 
   const [title, setTitle] = useState('')
   const [itemType, setItemType] = useState<'event' | 'recurring_event' | 'class_program' | 'business_service' | 'opportunity' | 'announcement'>('event')
+  const [recurrenceMode, setRecurrenceMode] = useState<'weekly' | 'monthly'>('weekly')
+  const [recurrenceWeekday, setRecurrenceWeekday] = useState<'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'>('monday')
+  const [recurrenceMonthOrdinal, setRecurrenceMonthOrdinal] = useState<'first' | 'second' | 'third' | 'fourth'>('first')
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [startAt, setStartAt] = useState(defaultStartAt2pmLocal())
@@ -255,6 +265,9 @@ export default function BuilderCreatePage({
     setPoint(null)
     setTitle(row.event.title || '')
     setItemType((row.event.item_type as typeof itemType) || 'event')
+    setRecurrenceMode(row.event.recurrence_mode || 'weekly')
+    setRecurrenceWeekday((row.event.recurrence_weekday as typeof recurrenceWeekday) || 'monday')
+    setRecurrenceMonthOrdinal((row.event.recurrence_month_ordinal as typeof recurrenceMonthOrdinal) || 'first')
     setLocation(row.event.location || '')
     setDescription(row.event.description || '')
     setStartAt(toDateTimeLocal(row.event.start_at))
@@ -270,6 +283,9 @@ export default function BuilderCreatePage({
     setActiveLinkId(null)
     setTitle('')
     setItemType('event')
+    setRecurrenceMode('weekly')
+    setRecurrenceWeekday('monday')
+    setRecurrenceMonthOrdinal('first')
     setLocation('')
     setDescription('')
     setStartAt(defaultStartAt2pmLocal())
@@ -307,7 +323,7 @@ export default function BuilderCreatePage({
   async function saveEvent() {
     setError('')
     setMessage('')
-    if (!startAt.trim()) return setError('Start time is required.')
+    if (isTimeBoundType(itemType) && !startAt.trim()) return setError('Start time is required for this item type.')
     if (!selectedPosterId && !manualMode) return setError('Select a poster first.')
     const effectiveTitle = title.trim() || 'Untitled draft'
 
@@ -321,6 +337,9 @@ export default function BuilderCreatePage({
             event_id: editingEventId,
             type: itemType,
             title: effectiveTitle,
+            recurrence_mode: itemType === 'recurring_event' ? recurrenceMode : null,
+            recurrence_weekday: itemType === 'recurring_event' ? recurrenceWeekday : null,
+            recurrence_month_ordinal: itemType === 'recurring_event' && recurrenceMode === 'monthly' ? recurrenceMonthOrdinal : null,
             location,
             description,
             start_at: startAt,
@@ -340,6 +359,9 @@ export default function BuilderCreatePage({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: effectiveTitle,
+            recurrence_mode: itemType === 'recurring_event' ? recurrenceMode : null,
+            recurrence_weekday: itemType === 'recurring_event' ? recurrenceWeekday : null,
+            recurrence_month_ordinal: itemType === 'recurring_event' && recurrenceMode === 'monthly' ? recurrenceMonthOrdinal : null,
             location,
             description,
             start_at: startAt,
@@ -714,7 +736,7 @@ export default function BuilderCreatePage({
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Status</div><div style={{ fontSize: 13 }}>{normalizePosterStatus(selectedUpload.status)}</div></div>
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Items</div><div style={{ fontSize: 13 }}>{rows.length}</div></div>
             </div>
-            <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', alignContent: 'flex-start', minHeight: 40 }}>
+              <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', alignContent: 'flex-start', minHeight: 40 }}>
               <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom out</button>
               <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom in</button>
               <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
@@ -884,31 +906,7 @@ export default function BuilderCreatePage({
                 </button>
               </div>
               <div>
-                <h3 style={{ margin: '6px 0 8px 0' }}>Items on this poster</h3>
-                {rows.length === 0 ? (
-                  <p style={{ opacity: 0.75, margin: 0 }}>No items yet. Click image to add a new pin and item.</p>
-                ) : (
-                  <div style={{ display: 'grid', gap: 8, maxHeight: 260, overflow: 'auto' }}>
-                    {rows.map((row) => (
-                      <div key={row.link_id} style={{ border: activeLinkId === row.link_id ? '2px solid #ef4444' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
-                        <button
-                          type="button"
-                          onClick={() => startEdit(row)}
-                          style={{ textAlign: 'left', border: 'none', padding: 0, background: 'transparent', width: '100%' }}
-                        >
-                          <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft item)'}</div>
-                          <div style={{ fontSize: 12, opacity: 0.85 }}>
-                            {new Date(row.event.start_at).toLocaleString()} • {(row.event.item_type || 'event').replaceAll('_', ' ')} • {statusLabel(row.event.status)}
-                          </div>
-                        </button>
-                        <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
-                          <button data-variant="secondary" onClick={() => startEdit(row)}>Edit</button>
-                          <button data-variant="danger" onClick={() => deleteEventRow(row)}>Delete</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <h3 style={{ margin: '6px 0 8px 0' }}>{editingEventId ? 'Edit item' : 'New item'}</h3>
               </div>
             </>
           )}
@@ -939,23 +937,90 @@ export default function BuilderCreatePage({
           {selectedPosterId && inspectorTab === 'event' && (
             <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
               <div style={{ display: 'grid', gap: 8 }}>
+                <label style={{ display: 'grid', gap: 4 }}>
+                  <span style={{ fontSize: 12, opacity: 0.8 }}>Item type</span>
+                  <select value={itemType} onChange={(e) => setItemType(e.target.value as typeof itemType)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                    <option value="event">event</option>
+                    <option value="recurring_event">recurring event</option>
+                    <option value="class_program">class/program</option>
+                    <option value="business_service">business/service</option>
+                    <option value="opportunity">opportunity</option>
+                    <option value="announcement">announcement</option>
+                  </select>
+                </label>
+                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>Item details</div>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
-                <select value={itemType} onChange={(e) => setItemType(e.target.value as typeof itemType)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-                  <option value="event">Item type: event</option>
-                  <option value="recurring_event">Item type: recurring event</option>
-                  <option value="class_program">Item type: class/program</option>
-                  <option value="business_service">Item type: business/service</option>
-                  <option value="opportunity">Item type: opportunity</option>
-                  <option value="announcement">Item type: announcement</option>
-                </select>
                 <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, resize: 'vertical' }} />
-                <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                {isTimeBoundType(itemType) ? (
+                  <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                ) : null}
+                {itemType === 'recurring_event' ? (
+                  <div style={{ display: 'grid', gap: 8, border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>Recurring cadence</div>
+                    <select value={recurrenceMode} onChange={(e) => setRecurrenceMode(e.target.value as typeof recurrenceMode)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                    {recurrenceMode === 'monthly' ? (
+                      <select value={recurrenceMonthOrdinal} onChange={(e) => setRecurrenceMonthOrdinal(e.target.value as typeof recurrenceMonthOrdinal)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                        <option value="first">First</option>
+                        <option value="second">Second</option>
+                        <option value="third">Third</option>
+                        <option value="fourth">Fourth</option>
+                      </select>
+                    ) : null}
+                    <select value={recurrenceWeekday} onChange={(e) => setRecurrenceWeekday(e.target.value as typeof recurrenceWeekday)} style={{ padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
+                      <option value="monday">Monday</option>
+                      <option value="tuesday">Tuesday</option>
+                      <option value="wednesday">Wednesday</option>
+                      <option value="thursday">Thursday</option>
+                      <option value="friday">Friday</option>
+                      <option value="saturday">Saturday</option>
+                      <option value="sunday">Sunday</option>
+                    </select>
+                  </div>
+                ) : null}
                 {!editingEventId && !point ? <p style={{ margin: 0, color: '#92400e', fontSize: 13 }}>Click the poster to place a pin.</p> : null}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
                   {(editingEventId || point) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
                 </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <h3 style={{ margin: '6px 0 8px 0' }}>Items on this poster</h3>
+                {rows.length === 0 ? (
+                  <p style={{ opacity: 0.75, margin: 0 }}>No items yet. Click image to add a new pin and item.</p>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8, maxHeight: 260, overflow: 'auto' }}>
+                    {rows.map((row) => {
+                      const parsedStart = new Date(row.event.start_at)
+                      const startLabel = Number.isNaN(parsedStart.getTime()) ? 'No date/time yet' : parsedStart.toLocaleString()
+                      const recurrenceLabel = row.event.item_type === 'recurring_event'
+                        ? `${row.event.recurrence_mode === 'monthly' ? (row.event.recurrence_month_ordinal || 'first') : 'weekly'} ${row.event.recurrence_weekday || 'monday'}`
+                        : null
+                      return (
+                        <div key={row.link_id} style={{ border: activeLinkId === row.link_id ? '2px solid #ef4444' : '1px solid #e5e7eb', borderRadius: 8, padding: 8 }}>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(row)}
+                            style={{ textAlign: 'left', border: 'none', padding: 0, background: 'transparent', width: '100%', color: '#0f172a' }}
+                          >
+                            <div style={{ fontWeight: 600 }}>{row.event.title || '(Draft item)'}</div>
+                            <div style={{ fontSize: 12, opacity: 0.85 }}>
+                              {startLabel} • {(row.event.item_type || 'event').replaceAll('_', ' ')} • {statusLabel(row.event.status)}
+                            </div>
+                            {recurrenceLabel ? <div style={{ fontSize: 12, opacity: 0.75 }}>Cadence: {recurrenceLabel}</div> : null}
+                          </button>
+                          <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                            <button data-variant="secondary" onClick={() => startEdit(row)}>Edit</button>
+                            <button data-variant="danger" onClick={() => deleteEventRow(row)}>Delete</button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}

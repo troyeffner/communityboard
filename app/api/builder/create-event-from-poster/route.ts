@@ -61,6 +61,9 @@ export async function POST(req: Request) {
   const title = String(body.title || '').trim()
   const location = String(body.location || '').trim()
   const description = String(body.description || '').trim()
+  const recurrenceMode = typeof body.recurrence_mode === 'string' ? body.recurrence_mode.trim().toLowerCase() : ''
+  const recurrenceWeekday = typeof body.recurrence_weekday === 'string' ? body.recurrence_weekday.trim().toLowerCase() : ''
+  const recurrenceMonthOrdinal = typeof body.recurrence_month_ordinal === 'string' ? body.recurrence_month_ordinal.trim().toLowerCase() : ''
   const startAt = String(body.start_at || '').trim()
   const bbox = body.bbox as BBox | undefined
   if (!posterUploadId) return jsonError('poster_upload_id is required')
@@ -75,18 +78,27 @@ export async function POST(req: Request) {
   const dateTime = resolvedStartAt.length === 16 ? `${resolvedStartAt}:00` : resolvedStartAt
   const timeParts = toDateAndTimeParts(dateTime)
 
+  const type = String(body.type || 'event').trim() || 'event'
+  const detailsJson: Record<string, string> = {}
+  if (description) detailsJson.description = description
+  if (type === 'recurring_event') {
+    if (recurrenceMode === 'weekly' || recurrenceMode === 'monthly') detailsJson.recurrence_mode = recurrenceMode
+    if (recurrenceWeekday) detailsJson.recurrence_weekday = recurrenceWeekday
+    if (recurrenceMode === 'monthly' && recurrenceMonthOrdinal) detailsJson.recurrence_month_ordinal = recurrenceMonthOrdinal
+  }
+
   const createItem = await supabase
     .from('poster_items')
     .insert([{
       poster_id: posterUploadId,
-      type: String(body.type || 'event').trim() || 'event',
+      type,
       x: bbox.x,
       y: bbox.y,
       title: effectiveTitle,
       start_date: timeParts.start_date,
       time_of_day: timeParts.time_of_day,
       location_text: location || null,
-      details_json: description ? { description } : {},
+      details_json: detailsJson,
       status: 'draft',
     }])
     .select('id')

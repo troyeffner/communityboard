@@ -24,7 +24,12 @@ type ItemRow = {
   title: string
   type?: string | null
   location_text?: string | null
-  details_json?: { description?: string | null } | null
+  details_json?: {
+    description?: string | null
+    recurrence_mode?: 'weekly' | 'monthly' | null
+    recurrence_weekday?: string | null
+    recurrence_month_ordinal?: 'first' | 'second' | 'third' | 'fourth' | null
+  } | null
   time_of_day?: string | null
   start_date?: string | null
   status: ItemStatus
@@ -45,6 +50,9 @@ type EventRow = {
   title: string
   location: string | null
   description?: string | null
+  recurrence_mode?: 'weekly' | 'monthly' | null
+  recurrence_weekday?: string | null
+  recurrence_month_ordinal?: 'first' | 'second' | 'third' | 'fourth' | null
   start_at: string
   status: string
   item_type?: string | null
@@ -81,6 +89,9 @@ export async function GET(req: Request) {
           title: item.title || 'Untitled',
           location: item.location_text || null,
           description: item.details_json?.description || null,
+          recurrence_mode: item.details_json?.recurrence_mode || null,
+          recurrence_weekday: item.details_json?.recurrence_weekday || null,
+          recurrence_month_ordinal: item.details_json?.recurrence_month_ordinal || null,
           start_at: startAt,
           status: item.status || 'draft',
           item_type: item.type || 'event',
