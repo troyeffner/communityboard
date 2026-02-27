@@ -730,9 +730,26 @@ export default function BuilderCreatePage({
         {!selectedUpload?.public_url && <p style={{ opacity: 0.7 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
           <>
-            <div style={{ minHeight: 64, border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ minHeight: 64, border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8, alignItems: 'start', marginBottom: 8 }}>
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Captured</div><div style={{ fontSize: 13 }}>{formatCaptureHour(selectedUpload.created_at)}</div></div>
-              <div><div style={{ fontSize: 12, opacity: 0.75 }}>Seen at</div><div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUpload.seen_at_name || '—'}</div></div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, opacity: 0.75 }}>Seen at</div>
+                <input
+                  value={seenAtName}
+                  onChange={(e) => setSeenAtName(e.target.value)}
+                  placeholder="Seen at"
+                  style={{ width: '100%', marginTop: 4, padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 13 }}
+                />
+                <button
+                  data-variant="secondary"
+                  type="button"
+                  onClick={saveSeenAt}
+                  disabled={!selectedPosterId || savingSeenAt}
+                  style={{ marginTop: 6, height: 32, minHeight: 32, padding: '0 10px', fontSize: 12 }}
+                >
+                  {savingSeenAt ? 'Saving...' : 'Save'}
+                </button>
+              </div>
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Status</div><div style={{ fontSize: 13 }}>{normalizePosterStatus(selectedUpload.status)}</div></div>
               <div><div style={{ fontSize: 12, opacity: 0.75 }}>Items</div><div style={{ fontSize: 13 }}>{rows.length}</div></div>
             </div>
@@ -917,15 +934,7 @@ export default function BuilderCreatePage({
               <div style={{ display: 'grid', gap: 8 }}>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>Captured</div>
                 <div>{formatCaptureHour(selectedUpload?.created_at || null)}</div>
-                <input
-                  value={seenAtName}
-                  onChange={(e) => setSeenAtName(e.target.value)}
-                  placeholder="Seen at"
-                  style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}
-                />
-                <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
-                  {savingSeenAt ? 'Saving...' : 'Save metadata'}
-                </button>
+                <p style={{ margin: 0, opacity: 0.75 }}>Edit poster metadata in the Poster workspace section above the image.</p>
               </div>
             </div>
           )}
