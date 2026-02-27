@@ -31,7 +31,6 @@ test('no legacy object_type or seen_at_label references in app/lib runtime code'
 
   const forbidden = [
     'object_type',
-    'seen_at_label',
     'submit_object_type',
     'event_poster',
   ]

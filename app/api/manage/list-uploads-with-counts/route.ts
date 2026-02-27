@@ -10,6 +10,7 @@ type UploadRow = {
   is_done?: boolean | null
   processed_at?: string | null
   seen_at_name?: string | null
+  seen_at_label?: string | null
   venues?: { name: string | null } | { name: string | null }[] | null
 }
 
@@ -24,6 +25,7 @@ function isMissingDoneColumns(error: { code?: string; message?: string } | null 
     message.includes('is_done') ||
     message.includes('processed_at') ||
     message.includes('seen_at_name') ||
+    message.includes('seen_at_label') ||
     message.includes('relationship') ||
     message.includes('schema cache')
   )
@@ -40,7 +42,7 @@ export async function GET() {
 
   const uploadsRes = await supabase
     .from('poster_uploads')
-    .select('id,file_path,status,created_at,done,is_done,processed_at,seen_at_name,venue_id,venues(name)')
+    .select('id,file_path,status,created_at,done,is_done,processed_at,seen_at_name,seen_at_label,venue_id,venues(name)')
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -52,7 +54,7 @@ export async function GET() {
 
     const fallback = await supabase
       .from('poster_uploads')
-      .select('id,file_path,status,created_at,seen_at_name')
+      .select('id,file_path,status,created_at,seen_at_name,seen_at_label')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -110,7 +112,7 @@ export async function GET() {
     created_at: u.created_at,
     status: u.status,
     public_url: u.file_path ? supabase.storage.from('posters').getPublicUrl(u.file_path).data.publicUrl : null,
-    seen_at_name: (Array.isArray(u.venues) ? u.venues[0]?.name : u.venues?.name) || u.seen_at_name || null,
+    seen_at_name: (Array.isArray(u.venues) ? u.venues[0]?.name : u.venues?.name) || u.seen_at_name || u.seen_at_label || null,
     done: ['done', 'processed'].includes((u.status || '').toLowerCase()) || Boolean(u.is_done ?? u.done ?? u.processed_at),
     is_done: ['done', 'processed'].includes((u.status || '').toLowerCase()) || Boolean(u.is_done ?? u.done ?? u.processed_at),
     event_count: linkedCountByUpload[u.id] || 0,

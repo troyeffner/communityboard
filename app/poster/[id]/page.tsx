@@ -7,6 +7,7 @@ type PosterRow = {
   file_path: string
   created_at?: string
   seen_at_name?: string | null
+  seen_at_label?: string | null
 }
 
 type LinkRow = {
@@ -68,7 +69,7 @@ export default async function PosterPage({
 
   const primary = await supabase
     .from('poster_uploads')
-    .select('id,file_path,created_at,seen_at_name')
+    .select('id,file_path,created_at,seen_at_name,seen_at_label')
     .eq('id', id)
     .limit(1)
 
@@ -81,7 +82,7 @@ export default async function PosterPage({
     }
     const fallbackWithName = await supabase
       .from('poster_uploads')
-      .select('id,file_path,created_at,seen_at_name')
+      .select('id,file_path,created_at,seen_at_name,seen_at_label')
       .eq('id', id)
       .limit(1)
     if (!fallbackWithName.error) {
@@ -247,7 +248,8 @@ export default async function PosterPage({
   })
   const browseHref = `/browse${browseParams.toString() ? `?${browseParams.toString()}` : ''}`
   const seenAtParams = new URLSearchParams(browseParams.toString())
-  if (poster.seen_at_name) seenAtParams.set('seenAt', poster.seen_at_name)
+  const seenAtValue = poster.seen_at_name || poster.seen_at_label || null
+  if (seenAtValue) seenAtParams.set('seenAt', seenAtValue)
   const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
   return (
     <main style={{ width: '100%', padding: '16px 20px 24px', fontFamily: 'sans-serif' }}>
@@ -258,7 +260,7 @@ export default async function PosterPage({
         pins={pins}
         activeEventId={event_id || null}
         photoTakenAt={poster.created_at || null}
-        seenAt={poster.seen_at_name || null}
+        seenAt={seenAtValue}
         browseHref={browseHref}
         seenAtHref={seenAtHref}
       />

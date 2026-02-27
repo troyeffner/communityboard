@@ -45,17 +45,20 @@ test('upload/list APIs no longer depend on poster_uploads.object_type', () => {
 test('list uploads route has missing done-column fallback', () => {
   const src = read('app/api/manage/list-uploads-with-counts/route.ts')
   assert.equal(src.includes('isMissingDoneColumns'), true)
-  assert.equal(src.includes(".select('id,file_path,status,created_at,seen_at_name')"), true)
+  assert.equal(src.includes(".select('id,file_path,status,created_at,seen_at_name,seen_at_label')"), true)
 })
 
-test('seen_at source of truth is poster_uploads.seen_at_name (not seen_at_label)', () => {
+test('seen_at source of truth remains seen_at_name with compatibility fallback', () => {
   const files = listFiles(path.join(repoRoot, 'app')).filter((file) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file))
-  const offenders = []
+  let seenAtNameCount = 0
+  let seenAtLabelCount = 0
   for (const file of files) {
     const src = fs.readFileSync(file, 'utf8')
-    if (src.includes('seen_at_label')) offenders.push(path.relative(repoRoot, file))
+    if (src.includes('seen_at_name')) seenAtNameCount += 1
+    if (src.includes('seen_at_label')) seenAtLabelCount += 1
   }
-  assert.equal(offenders.length, 0, `Found deprecated seen_at_label usage:\n${offenders.join('\n')}`)
+  assert.equal(seenAtNameCount > 0, true, 'Expected seen_at_name usage')
+  assert.equal(seenAtLabelCount > 0, true, 'Expected compatibility fallback usage while prod migrates')
 })
 
 test('builder create avoids useSearchParams prerender trap', () => {

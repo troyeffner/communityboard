@@ -37,6 +37,7 @@ function isMissingSeenAtColumnError(error: { code?: string; message?: string } |
   return (
     error?.code === '42703' ||
     message.includes('seen_at_name') ||
+    message.includes('seen_at_label') ||
     message.includes('schema cache')
   )
 }
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
     if (primarySeenAt.error && isMissingSeenAtColumnError(primarySeenAt.error)) {
       const fallbackSeenAt = await supabase
         .from('poster_uploads')
-        .update({ seen_at_name: seenAtValue })
+        .update({ seen_at_label: seenAtValue })
         .eq('id', poster_upload_id)
       if (fallbackSeenAt.error && !isMissingSeenAtColumnError(fallbackSeenAt.error)) {
         return jsonError(fallbackSeenAt.error.message, 500)

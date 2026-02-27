@@ -40,6 +40,20 @@ export async function POST(req: Request) {
     const msg = (insert.error.message || '').toLowerCase()
     const missingSeenAt = insert.error.code === '42703' || msg.includes('seen_at_name') || msg.includes('schema cache')
     if (missingSeenAt) {
+      if (seenAtName) {
+        const legacyLabel = await supabase
+          .from('poster_uploads')
+          .insert([{ file_path: filePath, status: POSTER_STATUSES.UPLOADED, seen_at_label: seenAtName }])
+          .select('id')
+          .single()
+        if (!legacyLabel.error) insert = legacyLabel
+      }
+    }
+  }
+  if (insert.error) {
+    const msg = (insert.error.message || '').toLowerCase()
+    const missingSeenAtAny = insert.error.code === '42703' || msg.includes('seen_at_name') || msg.includes('seen_at_label') || msg.includes('schema cache')
+    if (missingSeenAtAny) {
       insert = await supabase
         .from('poster_uploads')
         .insert([{ file_path: filePath, status: POSTER_STATUSES.UPLOADED }])

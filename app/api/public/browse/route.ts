@@ -11,6 +11,7 @@ type PosterRow = {
   file_path: string | null
   created_at: string
   seen_at_name?: string | null
+  seen_at_label?: string | null
   venue_id?: string | null
   venues?: { name: string | null } | { name: string | null }[] | null
 }
@@ -55,7 +56,7 @@ export async function GET(req: Request) {
 
   const postersWithVenue = await supabase
     .from('poster_uploads')
-    .select('id,file_path,created_at,seen_at_name,venue_id,venues(name)')
+    .select('id,file_path,created_at,seen_at_name,seen_at_label,venue_id,venues(name)')
     .order('created_at', { ascending: false })
     .limit(200)
 
@@ -67,9 +68,9 @@ export async function GET(req: Request) {
     })()
 
   const postersNoJoin = useNoJoinFallback
-    ? await supabase
+      ? await supabase
         .from('poster_uploads')
-        .select('id,file_path,created_at,seen_at_name,venue_id')
+        .select('id,file_path,created_at,seen_at_name,seen_at_label,venue_id')
         .order('created_at', { ascending: false })
         .limit(200)
     : null
@@ -81,6 +82,7 @@ export async function GET(req: Request) {
     const maybeMissingColumns =
       postersError.code === '42703' ||
       msg.includes('seen_at_name') ||
+      msg.includes('seen_at_label') ||
       msg.includes('venue_id') ||
       msg.includes('schema cache')
     if (!maybeMissingColumns) return jsonError(postersError.message, 500)
@@ -112,7 +114,7 @@ export async function GET(req: Request) {
   const posters = posterRows
     .map((row) => {
       const venue = Array.isArray(row.venues) ? row.venues[0] : row.venues
-      const seenAtName = (venue?.name || row.seen_at_name || null)
+      const seenAtName = (venue?.name || row.seen_at_name || row.seen_at_label || null)
       return {
         id: row.id,
         created_at: row.created_at,

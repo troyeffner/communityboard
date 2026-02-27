@@ -7,7 +7,7 @@ function jsonError(message: string, status = 400) {
 
 function isMissingSeenAtName(error: { code?: string; message?: string } | null | undefined) {
   const message = (error?.message || '').toLowerCase()
-  return error?.code === '42703' || message.includes('seen_at_name') || message.includes('schema cache')
+  return error?.code === '42703' || message.includes('seen_at_name') || message.includes('seen_at_label') || message.includes('schema cache')
 }
 
 export async function PATCH(req: Request) {
@@ -42,9 +42,32 @@ export async function PATCH(req: Request) {
     .maybeSingle()
 
   if (result.error && isMissingSeenAtName(result.error)) {
+    const seenAtValue = updates.seen_at_name
+    const statusValue = updates.status
+    if (typeof seenAtValue !== 'undefined') {
+      const labelUpdate = await supabase
+        .from('poster_uploads')
+        .update({
+          ...(typeof statusValue !== 'undefined' ? { status: statusValue } : {}),
+          seen_at_label: seenAtValue,
+        })
+        .eq('id', posterUploadId)
+        .select('id,file_path,status,created_at,seen_at_label')
+        .maybeSingle()
+      if (!labelUpdate.error) {
+        return NextResponse.json({
+          ok: true,
+          row: {
+            ...(labelUpdate.data || {}),
+            seen_at_name: (labelUpdate.data as { seen_at_label?: string | null } | null)?.seen_at_label || null,
+          },
+        })
+      }
+    }
+
     const fallbackUpdates = { ...updates }
     delete fallbackUpdates.seen_at_name
-    if (Object.keys(fallbackUpdates).length === 0) return jsonError('seen_at_name column is missing on this environment', 500)
+    if (Object.keys(fallbackUpdates).length === 0) return jsonError('Seen at column is missing on this environment. Run DB migrations.', 500)
 
     result = await supabase
       .from('poster_uploads')
