@@ -6,12 +6,12 @@ type SearchParams = {
   manual?: string
 }
 
-export default function Page({
+export default async function Page({
   searchParams,
 }: {
   searchParams?: SearchParams
 }) {
-  const params = searchParams
+  const params = await searchParams
   const posterFromShort = typeof params?.poster === 'string' ? params.poster : null
   const posterFromUpload = typeof params?.poster_upload_id === 'string' ? params.poster_upload_id : null
   const initialPosterId = posterFromShort || posterFromUpload

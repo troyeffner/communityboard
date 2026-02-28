@@ -192,7 +192,6 @@ export default function BrowseClient({
             activeEventId={pinRows[0]?.event_id || null}
             photoTakenAt={activePoster?.created_at || null}
             seenAt={activePoster?.seen_at_name || null}
-            browseHref={`/browse${seenAt ? `?seenAt=${encodeURIComponent(seenAt)}` : ''}`}
           />
         </section>
       </div>

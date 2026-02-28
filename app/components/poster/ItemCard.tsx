@@ -42,20 +42,20 @@ export default function ItemCard({
       style={{
         ...uiStyles.itemCard,
         ...(selected ? uiStyles.itemCardSelected : {}),
-        ...(selected ? { border: '1px solid #ef4444' } : {}),
+        ...(selected ? { border: uiTokens.border.strong, background: uiTokens.colors.bgSubtle, boxShadow: 'inset 3px 0 0 #94a3b8' } : {}),
         padding: uiTokens.spacing[2],
         cursor: onClick ? 'pointer' : 'default',
       }}
     >
-      {selected ? <div style={{ fontSize: uiTokens.typography.selectedPill, fontWeight: 700, color: uiTokens.colors.muted, marginBottom: 2 }}>Selected</div> : null}
+      {selected ? <div style={{ fontSize: uiTokens.typography.selectedPill, fontWeight: 700, color: uiTokens.colors.muted, marginBottom: 1 }}>Selected</div> : null}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <strong>{title}</strong>
         {typeLabel ? (
           <span style={{ fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 999, padding: '2px 8px' }}>{typeLabel}</span>
         ) : null}
       </div>
-      {subtitle ? <div style={{ fontSize: uiTokens.typography.body, marginTop: 4, ...uiStyles.mutedText }}>{subtitle}</div> : null}
-      <div style={{ fontSize: uiTokens.typography.body, marginTop: 2, ...uiStyles.mutedText }}>{location || 'Location: —'}</div>
+      {subtitle ? <div style={{ fontSize: uiTokens.typography.label, marginTop: 3, ...uiStyles.mutedText }}>{subtitle}</div> : null}
+      <div style={{ fontSize: uiTokens.typography.label, marginTop: 2, ...uiStyles.mutedText }}>{location || 'Location: —'}</div>
       {status ? <div style={{ fontSize: uiTokens.typography.label, marginTop: 2, ...uiStyles.mutedText }}>{status}</div> : null}
       {children ? <div style={{ marginTop: 8 }}>{children}</div> : null}
     </div>

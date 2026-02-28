@@ -747,14 +747,16 @@ export default function BuilderCreatePage({
         display: 'grid',
         gridTemplateColumns: isMobile ? 'repeat(3, calc(100vw - 32px))' : 'minmax(260px, 280px) minmax(0, 1fr) minmax(320px, 360px)',
         gap: 16,
+        alignItems: 'start',
         minHeight: 'calc(100vh - 64px)',
         overflowX: isMobile ? 'auto' : 'hidden',
         scrollSnapType: isMobile ? 'x mandatory' : 'none',
       }}
     >
       <section data-testid="builder-panel-submissions" className="cb-panel" style={{ minWidth: 0, overflow: 'auto', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
-        <h1 className="cb-section-header" style={{ marginTop: 0, marginBottom: 8 }}>Submissions</h1>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <h1 className="cb-section-header" style={{ marginTop: 0, marginBottom: 4 }}>1. Submissions</h1>
+        <p className="cb-muted-text" style={{ margin: '0 0 10px 0' }}>Choose a poster, then place pins and draft items.</p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           <a
             href="/builder/create"
             className="cb-tab-button cb-tab-button-active"
@@ -838,8 +840,9 @@ export default function BuilderCreatePage({
           scrollSnapAlign: isMobile ? 'start' : 'none',
         }}
       >
-        <h2 className="cb-section-header">Poster workspace</h2>
-        {!selectedUpload?.public_url && <p className="cb-muted-text">{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
+        <h2 className="cb-section-header" style={{ marginBottom: 4 }}>2. Poster workspace</h2>
+        <p className="cb-muted-text" style={{ margin: '0 0 8px 0' }}>Click the image to place or edit a pin, then use Inspector to save.</p>
+        {!selectedUpload?.public_url && <p className="cb-muted-text" style={{ margin: 0 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
           <>
             <PosterMetaStrip
@@ -1003,7 +1006,8 @@ export default function BuilderCreatePage({
       </section>
 
       <section data-testid="builder-panel-inspector" className="cb-panel" style={{ minWidth: 0, overflow: 'auto', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
-        <h2 className="cb-section-header" style={{ marginTop: 0, marginBottom: 8 }}>Inspector</h2>
+        <h2 className="cb-section-header" style={{ marginTop: 0, marginBottom: 4 }}>3. Inspector</h2>
+        <p className="cb-muted-text" style={{ margin: '0 0 10px 0' }}>Draft item details and review items on the selected poster.</p>
         <div style={{ display: 'grid', gap: 10 }}>
           {!selectedPosterId && <p className="cb-muted-text" style={{ margin: 0 }}>Select a submission to begin.</p>}
           {selectedPosterId && (
@@ -1033,20 +1037,17 @@ export default function BuilderCreatePage({
                   </button>
                 </div>
               </div>
-              <div className="cb-surface" style={{ padding: 10 }}>
-                <h3 style={{ margin: '6px 0 8px 0' }}>{editingEventId ? 'Edit item' : 'New item'}</h3>
-              </div>
             </>
           )}
           {error && (
-            <p style={{ color: 'crimson', margin: 0 }}>
+            <p style={{ color: '#b91c1c', margin: 0, border: '1px solid #fecaca', borderRadius: 8, background: '#fff1f2', padding: '8px 10px' }}>
               {error}{' '}
               <a href="/api/health/schema" target="_blank" rel="noreferrer" style={{ color: '#991b1b', textDecoration: 'underline' }}>
                 Check schema health
               </a>
             </p>
           )}
-          {message && <p style={{ margin: 0 }}>{message}</p>}
+          {message && <p style={{ margin: 0, border: '1px solid #bfdbfe', borderRadius: 8, background: '#eff6ff', padding: '8px 10px', color: '#1e3a8a' }}>{message}</p>}
           {selectedPosterId && inspectorTab === 'posterMeta' && (
             <div className="cb-surface" style={{ padding: 12 }}>
               <div style={{ display: 'grid', gap: 8 }}>
@@ -1064,6 +1065,7 @@ export default function BuilderCreatePage({
           {selectedPosterId && inspectorTab === 'event' && (
             <div className="cb-surface" style={{ padding: 12 }}>
               <div style={{ display: 'grid', gap: 8 }}>
+                <h3 style={{ margin: '0 0 2px 0' }}>{editingEventId ? 'Edit item' : 'New item'}</h3>
                 <label style={{ display: 'grid', gap: 4 }}>
                   <span className="cb-meta-label">Item type</span>
                   <select value={itemType} onChange={(e) => setItemType(normalizeItemType(e.target.value, 'event'))}>
@@ -1080,7 +1082,7 @@ export default function BuilderCreatePage({
                   <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} />
                 ) : null}
                 {itemType === 'recurring_event' ? (
-                  <div style={{ display: 'grid', gap: 8, border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
+                  <div style={{ display: 'grid', gap: 8, border: '1px solid #dbe2ea', borderRadius: 8, padding: 10, background: '#f8fafc' }}>
                     <div className="cb-meta-label">Recurring cadence</div>
                     <select value={recurrenceMode} onChange={(e) => setRecurrenceMode(e.target.value as typeof recurrenceMode)}>
                       <option value="weekly">Weekly</option>
@@ -1106,7 +1108,7 @@ export default function BuilderCreatePage({
                   </div>
                 ) : null}
                 {!editingEventId && !point ? <p className="cb-muted-text" style={{ margin: 0 }}>Click the poster to place a pin.</p> : null}
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
                   {(editingEventId || point || isFormDirty) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
                 </div>

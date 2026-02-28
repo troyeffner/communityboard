@@ -234,3 +234,440 @@ textarea:focus {
   color: #b91c1c;
   margin-bottom: 3px;
 }
+
+/* FORCE POSTER VIEW GRID */
+.cb-posterViewGrid {
+  height: calc(100vh - 64px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+}
+
+.cb-posterViewGrid > *:first-child {
+  min-height: 0;
+}
+
+.cb-posterViewGrid > *:last-child {
+  min-height: 0;
+  overflow: auto;
+}
+
+
+/* CB_TRELLO_POSTER_VIEW */
+.cbPosterView {
+  /* use most of the viewport; adjust if you have a global header */
+  height: calc(100vh - 56px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 980px) {
+  .cbPosterView {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
+.cbPosterStageCol,
+.cbPosterRailCol {
+  min-height: 0; /* allows children to scroll */
+}
+
+.cbPosterStageCard,
+.cbPosterRailCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+}
+
+/* Stage area behaves like a Trello board region */
+.cbPosterStageCard {
+  display: grid;
+  grid-template-rows: auto 1fr auto; /* header, canvas, footer */
+  overflow: hidden;
+}
+
+/* Sticky header for stage controls */
+.cbPosterStageHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  border-bottom: 1px solid #eef2f7;
+  padding: 10px 12px;
+}
+
+/* Canvas region scrolls if needed */
+.cbPosterStageCanvas {
+  overflow: auto;
+  padding: 12px;
+}
+
+/* Footer actions */
+.cbPosterStageFooter {
+  border-top: 1px solid #eef2f7;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+/* Right rail = Trello list */
+.cbPosterRailCard {
+  display: grid;
+  grid-template-rows: auto 1fr; /* header + scroll list */
+  overflow: hidden;
+}
+
+.cbPosterRailHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  border-bottom: 1px solid #eef2f7;
+  padding: 10px 12px;
+}
+
+.cbPosterRailScroll {
+  overflow: auto;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+/* Trello-ish item cards inside rail */
+.cbPosterItemCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+
+.cbPosterItemCard:hover {
+  border-color: #cbd5e1;
+}
+
+.cbPosterItemTitleRow {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.cbPosterItemTitle {
+  font-weight: 600;
+  font-size: 14px;
+  color: #111827;
+}
+
+.cbPosterItemMeta {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.cbPosterItemActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+
+/* CB_POSTER_DEBUG_BADGE */
+.cbPosterDebugBadge {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 9999;
+  background: #111827;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+/* CB_POSTER_FULLBLEED */
+.cbPosterPageFullBleed {
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 16px !important;
+}
+
+/* marketing-page styles */
+.mk-page {
+  min-height: 100vh;
+  background: #0b0c0f;
+  color: #eaeaf0;
+}
+
+.mk-container {
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.mk-hero {
+  padding: 56px 0 28px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(99, 102, 241, 0.24), transparent 60%),
+    radial-gradient(800px 500px at 90% 10%, rgba(16, 185, 129, 0.18), transparent 60%),
+    #0b0c0f;
+}
+
+.mk-kicker {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(234,234,240,0.72);
+  margin-bottom: 10px;
+}
+
+.mk-h1 {
+  font-size: 40px;
+  line-height: 1.08;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+}
+
+.mk-lede {
+  font-size: 18px;
+  line-height: 1.5;
+  color: rgba(234,234,240,0.82);
+  max-width: 56ch;
+  margin: 0 0 18px;
+}
+
+.mk-ctaRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 18px 0 10px;
+}
+
+.mk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.16);
+  text-decoration: none;
+  color: #eaeaf0;
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mk-btnPrimary {
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(99, 102, 241, 0.55);
+}
+
+.mk-btnGhost {
+  background: rgba(255,255,255,0.04);
+}
+
+.mk-note {
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(234,234,240,0.62);
+}
+
+.mk-section {
+  padding: 28px 0;
+}
+
+.mk-surface {
+  background: rgba(255,255,255,0.03);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.mk-grid2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+@media (min-width: 900px) {
+  .mk-grid2 { grid-template-columns: 1fr 1fr; gap: 24px; }
+}
+
+.mk-h2 {
+  font-size: 22px;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+
+.mk-h3 {
+  font-size: 18px;
+  margin: 0 0 10px;
+  color: rgba(234,234,240,0.92);
+}
+
+.mk-body {
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(234,234,240,0.82);
+  margin: 0;
+  max-width: 72ch;
+}
+
+.mk-list {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(234,234,240,0.82);
+}
+
+.mk-list li { margin: 8px 0; }
+
+.mk-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(234,234,240,0.82);
+}
+
+.mk-steps li { margin: 10px 0; }
+
+.mk-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+  margin: 18px 0;
+}
+
+.mk-cards3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+@media (min-width: 900px) {
+  .mk-cards3 { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+.mk-card {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.mk-cardTitle {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.mk-cardBody {
+  color: rgba(234,234,240,0.74);
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.mk-interest {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.mk-interestGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 600px) {
+  .mk-interestGrid { grid-template-columns: 1fr 1fr; }
+}
+
+.mk-choice {
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: #eaeaf0;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.mk-choice.is-on {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.mk-choiceTitle { font-weight: 700; margin-bottom: 4px; }
+.mk-choiceDetail { color: rgba(234,234,240,0.72); font-size: 13px; line-height: 1.35; }
+
+.mk-interestMeta {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.mk-field { display: grid; gap: 6px; }
+.mk-label { font-size: 12px; color: rgba(234,234,240,0.72); }
+
+.mk-input, .mk-textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.25);
+  color: #eaeaf0;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.mk-small { font-size: 12px; color: rgba(234,234,240,0.72); }
+.mk-dim { color: rgba(234,234,240,0.58); }
+
+.mk-footer {
+  padding: 22px 0 36px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.mk-footerInner {
+  display: grid;
+  gap: 6px;
+}
+
+.mk-footerTitle { font-weight: 800; letter-spacing: -0.01em; }
+.mk-footerMeta { font-size: 13px; color: rgba(234,234,240,0.62); }
+
+/* marketing:mk */
+.mk-page { min-height: 100vh; }
+.mk-container { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+.mk-hero { padding: 48px 0 24px; }
+.mk-kicker { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.mk-h1 { font-size: 34px; line-height: 1.1; margin: 10px 0 8px; }
+.mk-h2 { font-size: 18px; margin: 0 0 10px; }
+.mk-lede { font-size: 16px; line-height: 1.5; opacity: .9; max-width: 70ch; }
+.mk-body { font-size: 14px; line-height: 1.5; opacity: .9; max-width: 75ch; }
+.mk-section { padding: 18px 0; }
+.mk-grid2 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.mk-grid3 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@media (min-width: 860px) {
+  .mk-grid2 { grid-template-columns: 1fr 1fr; }
+  .mk-grid3 { grid-template-columns: 1fr 1fr 1fr; }
+}
+.mk-card { border: 1px solid rgba(0,0,0,.1); border-radius: 12px; padding: 14px; background: rgba(255,255,255,.8); }
+.mk-stat { font-size: 32px; font-weight: 700; }
+.mk-list { margin: 0; padding-left: 18px; }
+.mk-ctaRow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.mk-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(0,0,0,.14); text-decoration: none; cursor: pointer; background: transparent; }
+.mk-btnPrimary { background: rgba(0,0,0,.9); color: white; border-color: rgba(0,0,0,.9); }
+.mk-btnGhost { background: transparent; }
+.mk-field { display: block; margin-bottom: 10px; }
+.mk-label { font-size: 12px; opacity: .75; margin-bottom: 6px; }
+.mk-input, .mk-textarea { width: 100%; border: 1px solid rgba(0,0,0,.14); border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,.9); }
+.mk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mk-table th, .mk-table td { border-bottom: 1px solid rgba(0,0,0,.1); padding: 8px; vertical-align: top; text-align: left; }

@@ -78,16 +78,16 @@ export default function PosterViewer({
   activeEventId,
   photoTakenAt,
   seenAt,
-  browseHref = '/browse',
   seenAtHref = '',
+  debug = false,
 }: {
   imageUrls: string[]
   pins: Pin[]
   activeEventId: string | null
   photoTakenAt?: string | null
   seenAt?: string | null
-  browseHref?: string
   seenAtHref?: string
+  debug?: boolean
 }) {
   const router = useRouter()
   const stageRef = useRef<HTMLDivElement | null>(null)
@@ -116,11 +116,13 @@ export default function PosterViewer({
       })
     })
     observer.observe(stageRef.current)
-    return () => observer.disconnect()
+    return (
+    <div className="cbPosterDebugBadge">PosterViewer rendered</div>
+) => observer.disconnect()
   }, [])
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return
+    if (!debug) return
     let cancelled = false
     const run = async () => {
       try {
@@ -140,7 +142,7 @@ export default function PosterViewer({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [debug])
 
   const validPins = useMemo(
     () => pins.filter((p): p is Pin & { bbox: { x: number; y: number } } => Boolean(p.bbox)),
@@ -268,36 +270,17 @@ export default function PosterViewer({
   }
 
   return (
-    <div
-      className="poster-view-grid"
-      data-testid="poster-view-grid"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 420px',
-        gap: 12,
-        alignItems: 'stretch',
-        width: '100%',
-        maxWidth: '100%',
-        overflowX: 'clip',
-      }}
-    >{/* E2E nav guardrails (keep labels stable) */}
-<div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '8px 0 12px' }}>
-  <a href="/" aria-label="← Return to Community Board">← Return to Community Board</a>
-  <a href="/browse" aria-label="← Browse posters">← Browse posters</a>
-</div>
-
+  <div className="cb-posterViewGrid cbPosterView">
       <div style={{ minWidth: 0, display: 'grid', gap: 8, alignContent: 'start' }}>
       <section
         style={{
           ...uiStyles.panel,
-          padding: uiTokens.spacing[2],
+          padding: 10,
           minWidth: 0,
           overflow: 'hidden',
-          minHeight: 'clamp(560px, 78vh, 920px)',
-          height: '100%',
           display: 'grid',
-          gridTemplateRows: 'auto 1fr',
-          gap: 6,
+          gridTemplateRows: 'auto auto 1fr',
+          gap: 4,
         }}
       >
         {process.env.NODE_ENV !== 'production' && schemaStatus ? (
@@ -317,7 +300,7 @@ export default function PosterViewer({
             { label: 'Status', value: selectedPin ? pinStatusLabel(selectedPin.status) : '—' },
           ]}
         />
-        <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr auto', gap: 6, minHeight: 0 }}>
+        <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr auto', gap: 4, minHeight: 0 }}>
           <PosterControls style={{ gap: uiTokens.spacing[1] }}>
             <button data-variant="secondary" onClick={() => {
             const nextZoom = clamp(Number((zoom - 0.2).toFixed(2)), 1, 5)
@@ -404,34 +387,19 @@ export default function PosterViewer({
           </a>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginLeft: 2 }}>
-        <a
-          href={browseHref}
-          style={{
-            display: 'inline-block',
-            fontSize: 14,
-            color: '#1d4ed8',
-            textDecoration: 'none',
-            fontWeight: 600,
-          }}
-        >
-          ← Browse posters
-        </a>
-      </div>
       </div>
 
       <aside
         style={{
           ...uiStyles.panel,
           display: 'grid',
-          gap: 10,
-          minHeight: 'clamp(560px, 78vh, 920px)',
-          height: '100%',
+          gap: 8,
+          padding: 10,
           gridTemplateRows: 'auto 1fr',
         }}
       >
         <div style={{ display: 'grid', gap: 2 }}>
-          <h2 className="cb-section-header">Other items on this poster</h2>
+          <h2 className="cb-section-header cb-railScroll cbPosterRailCard">Other items on this poster</h2>
           <p style={{ margin: 0, fontSize: uiTokens.typography.helper, color: uiTokens.colors.muted }}>Tap an item to center its pin.</p>
         </div>
         <PosterItemsList title="" maxHeight={10000}>
@@ -449,7 +417,6 @@ export default function PosterViewer({
             >
               <div>
                 <button
-                  data-variant="secondary"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleUpvote(pin)

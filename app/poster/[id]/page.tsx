@@ -51,7 +51,7 @@ type EventTagBundle = {
 function renderLoadError(scope: string, detail: string) {
   console.error(`[poster/page] ${scope} failed:`, detail)
   return (
-    <main style={{ padding: 24, fontFamily: 'sans-serif' }}>
+    <main style={{ padding: 24, fontFamily: 'sans-serif' }} className="cbPosterPageFullBleed">
 
       {/* E2E nav guardrails (keep labels stable) */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '8px 0 12px' }}>
@@ -118,11 +118,12 @@ export default async function PosterPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ event_id?: string; seenAt?: string; tags?: string; poster?: string }>
+  searchParams: Promise<{ event_id?: string; seenAt?: string; tags?: string; poster?: string; debug?: string }>
 }) {
   const { id } = await params
   const currentParams = await searchParams
   const { event_id } = currentParams
+  const debug = currentParams.debug === '1'
   const fixture = getE2eFixturePoster(id)
   if (fixture) {
     const browseParams = new URLSearchParams()
@@ -137,21 +138,16 @@ export default async function PosterPage({
     const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
     return (
       <main className="cb-page-container" style={{ scrollBehavior: 'smooth' }}>
-        <header style={{ marginBottom: 10 }}>
-          <Link
-            href="/"
-            style={{
-              display: 'inline-block',
-              marginBottom: 8,
-              fontSize: 14,
-              color: '#1d4ed8',
-              textDecoration: 'none',
-              fontWeight: 600,
-            }}
-          >
-            ← Return to Community Board
-          </Link>
-          <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 32, lineHeight: 1.15 }}>{fixture.poster.seen_at_name}</h1>
+        <header className="cb-panel" style={{ marginBottom: 10, padding: 10 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
+            <Link href="/" style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
+              ← Return to Community Board
+            </Link>
+            <a href={browseHref} style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 500 }}>
+              Browse posters
+            </a>
+          </div>
+          <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 26, lineHeight: 1.15 }}>{fixture.poster.seen_at_name}</h1>
           <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>Community Board</p>
         </header>
         <PosterViewer
@@ -161,8 +157,8 @@ export default async function PosterPage({
           activeEventId={event_id || null}
           photoTakenAt={fixture.poster.created_at || null}
           seenAt={fixture.poster.seen_at_name || null}
-          browseHref={browseHref}
           seenAtHref={seenAtHref}
+          debug={debug}
         />
         <PosterTagVoting
           events={fixture.pins.map((pin) => ({ event_id: pin.event_id, title: pin.title }))}
@@ -369,21 +365,16 @@ export default async function PosterPage({
   const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
   return (
     <main className="cb-page-container" style={{ scrollBehavior: 'smooth' }}>
-      <header style={{ marginBottom: 10 }}>
-        <Link
-          href="/"
-          style={{
-            display: 'inline-block',
-            marginBottom: 8,
-            fontSize: 14,
-            color: '#1d4ed8',
-            textDecoration: 'none',
-            fontWeight: 600,
-          }}
-        >
-          ← Return to Community Board
-        </Link>
-        <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 32, lineHeight: 1.15 }}>{pageTitle}</h1>
+      <header className="cb-panel" style={{ marginBottom: 10, padding: 10 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
+          <Link href="/" style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
+            ← Return to Community Board
+          </Link>
+          <a href={browseHref} style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 500 }}>
+            Browse posters
+          </a>
+        </div>
+        <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 26, lineHeight: 1.15 }}>{pageTitle}</h1>
         <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>{boardKindLabel}</p>
         {hasSeenAt ? (
           null
@@ -403,8 +394,8 @@ export default async function PosterPage({
         activeEventId={event_id || null}
         photoTakenAt={poster.created_at || null}
         seenAt={seenAtValue}
-        browseHref={browseHref}
         seenAtHref={seenAtHref}
+        debug={debug}
       />
       <PosterTagVoting
         events={pins.map((pin) => ({ event_id: pin.event_id, title: pin.title }))}
