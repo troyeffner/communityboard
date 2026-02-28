@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { ITEM_TYPES, type ItemType, normalizeItemType } from '@/lib/itemTypes'
 import { POSTER_STATUSES, eventStatusLabel, posterStatusLabel, normalizePosterStatus } from '@/lib/statuses'
+import { BoardHeader, BoardLayout } from '@/app/components/layout/BoardLayout'
+import { Panel, PanelSection } from '@/app/components/layout/Panel'
+import { PosterDetailsList, PosterDetailsRail } from '@/app/components/layout/RightRail'
 
 type Upload = {
   id: string
@@ -184,6 +187,10 @@ export default function CreateClient({
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [formBaseline, setFormBaseline] = useState(() => getFormFingerprint(getNewItemFormState()))
+
+  useEffect(() => {
+    document.title = 'Create posters'
+  }, [])
 
   const selectedRow = useMemo(() => rows.find((row) => row.link_id === selectedItemId) || null, [rows, selectedItemId])
   const editingEventId = selectedRow?.event.id || null
@@ -730,77 +737,67 @@ export default function CreateClient({
 
   function SubmissionsPanel() {
     return (
-      <section data-testid="builder-panel-submissions" className="cbPanel">
-        <header className="cbPanelHeader">
-          <h1 className="cb-section-header">Submissions</h1>
-          <p className="cb-muted-text">Choose a poster, then place pins and draft items.</p>
-        </header>
-        <div className="cbPanelScroll cbSubmissionsBody">
+      <Panel title="Submissions" subtitle="Choose a poster, then place pins and draft items." testId="builder-panel-submissions">
+        <PanelSection>
           <div className="cbSubmissionsNav">
             <a href="/builder/create" className="cb-tab-button cb-tab-button-active">Create drafts</a>
             <a href="/builder/tend" className="cb-tab-button">Tend board</a>
           </div>
+        </PanelSection>
 
-          <section className="cbSubmissionsUpload">
-            <h3 className="cbSubhead">Upload poster</h3>
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-              className="cbUploadInput"
-            />
-            <div className="cbRow">
-              <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
-                {uploadFile ? 'Change photo' : 'Choose file'}
-              </button>
-              <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
-                {uploadingPoster ? 'Uploading...' : 'Upload and select'}
-              </button>
-            </div>
-            <div className="cbRow">
-              <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
-              <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
-            </div>
-          </section>
-
-          <div className="cbSubmissionList">
-            {visibleUploads.map((upload) => {
-              const isSelected = selectedPoster?.id === upload.id
-              const itemsCount = upload.linked_count ?? upload.event_count ?? 0
-              return (
-                <button key={upload.id} type="button" className={isSelected ? 'cbSubmissionCard cbSubmissionCardActive' : 'cbSubmissionCard'} onClick={() => selectPosterById(upload.id)}>
-                  <div className="cbSubmissionMeta">
-                    <div><span>Captured:</span> {formatCaptureHour(upload.created_at)}</div>
-                    <div><span>Status:</span> {posterStatusLabel(upload.status)}</div>
-                    <div><span>Found at:</span> {upload.seen_at_name || '—'}</div>
-                    <div><span>Items count:</span> {itemsCount}</div>
-                  </div>
-                  {upload.public_url ? <img src={upload.public_url} alt="Poster thumbnail" className="cbSubmissionThumb" /> : <div className="cbSubmissionThumb cbSubmissionThumbEmpty">No image</div>}
-                </button>
-              )
-            })}
-            {visibleUploads.length === 0 ? <p className="cb-muted-text">No submissions available.</p> : null}
+        <PanelSection>
+          <h3 className="cbSubhead">Upload poster</h3>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+            className="cbUploadInput"
+          />
+          <div className="cbRow">
+            <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
+              {uploadFile ? 'Change photo' : 'Choose file'}
+            </button>
+            <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
+              {uploadingPoster ? 'Uploading...' : 'Upload and select'}
+            </button>
           </div>
+          <div className="cbRow">
+            <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
+            <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
+          </div>
+        </PanelSection>
+
+        <div className="cbSubmissionList">
+          {visibleUploads.map((upload) => {
+            const isSelected = selectedPoster?.id === upload.id
+            const itemsCount = upload.linked_count ?? upload.event_count ?? 0
+            return (
+              <button key={upload.id} type="button" className={isSelected ? 'cbSubmissionCard cbSubmissionCardActive' : 'cbSubmissionCard'} onClick={() => selectPosterById(upload.id)}>
+                <div className="cbSubmissionMeta">
+                  <div><span>Captured:</span> {formatCaptureHour(upload.created_at)}</div>
+                  <div><span>Status:</span> {posterStatusLabel(upload.status)}</div>
+                  <div><span>Found at:</span> {upload.seen_at_name || '—'}</div>
+                  <div><span>Items count:</span> {itemsCount}</div>
+                </div>
+                {upload.public_url ? <img src={upload.public_url} alt="Poster thumbnail" className="cbSubmissionThumb" /> : <div className="cbSubmissionThumb cbSubmissionThumbEmpty">No image</div>}
+              </button>
+            )
+          })}
+          {visibleUploads.length === 0 ? <p className="cb-muted-text">No submissions available.</p> : null}
         </div>
-      </section>
+      </Panel>
     )
   }
 
   function WorkspacePanel() {
     return (
-      <section data-testid="builder-panel-workspace" className="cbPanel">
-        <header className="cbPanelHeader">
-          <h2 className="cb-section-header">Workspace</h2>
-          <p className="cb-muted-text">Place pins on the poster, then edit details in Poster details.</p>
-        </header>
-
-        <div className="cbPanelScroll cbWorkspaceBody">
-          {!selectedPoster ? (
-            <div className="cbCenteredState">Select a poster from Submissions.</div>
-          ) : (
-            <>
+      <Panel title="Workspace" subtitle="Place pins on the poster, then edit details in Poster details." testId="builder-panel-workspace">
+        {!selectedPoster ? (
+          <div className="cbCenteredState">Select a poster from Submissions.</div>
+        ) : (
+          <>
               <div className="cbMetaStrip">
                 <div><span>Captured</span><strong>{formatCaptureHour(selectedPoster.created_at)}</strong></div>
                 <div>
@@ -911,22 +908,20 @@ export default function CreateClient({
                 <button onClick={markDone}>Mark Done</button>
                 <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster</button>
               </div>
-            </>
-          )}
-        </div>
-      </section>
+          </>
+        )}
+      </Panel>
     )
   }
 
   function PosterDetailsPanel() {
     return (
-      <section data-testid="builder-panel-inspector" className="cbPanel">
-        <header className="cbPanelHeader">
-          <h2 className="cb-section-header">Poster details</h2>
-          <p className="cb-muted-text">Create or edit items linked to pinned coordinates on this poster.</p>
-        </header>
-
-        <div className="cbPanelScroll cbDetailsFlow">
+      <PosterDetailsRail
+        title="Poster details"
+        subtitle="Create or edit items linked to pinned coordinates on this poster."
+        testId="builder-panel-inspector"
+      >
+        <PosterDetailsList>
           {!selectedPoster ? (
             <div className="cbCenteredState">Select a submission to begin.</div>
           ) : (
@@ -1042,18 +1037,20 @@ export default function CreateClient({
               </section>
             </>
           )}
-        </div>
-      </section>
+        </PosterDetailsList>
+      </PosterDetailsRail>
     )
   }
 
   return (
     <>
-      <div className="cbCreateGrid" data-testid="builder-create-panels">
-        <SubmissionsPanel />
-        <WorkspacePanel />
-        <PosterDetailsPanel />
-      </div>
+      <BoardLayout
+        testId="builder-create-panels"
+        header={<BoardHeader title="Create posters" subtitle="Use one board skeleton to review submissions, place pins, and edit poster details." />}
+        left={<SubmissionsPanel />}
+        center={<WorkspacePanel />}
+        right={<PosterDetailsPanel />}
+      />
 
       {deleteModalOpen && selectedPoster ? (
         <div className="cbModalBackdrop" onClick={() => !deletingPoster && setDeleteModalOpen(false)}>

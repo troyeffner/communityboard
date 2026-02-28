@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import SubmitClient from './SubmitClient'
 
 export const metadata: Metadata = {
-  title: 'Submit – Community Board',
+  title: 'Submit',
 }
 
 export default function SubmitPage() {

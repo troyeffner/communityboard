@@ -49,41 +49,6 @@ type EventTagBundle = {
   suggested: Array<TagRow & { votes: number }>
 }
 
-function PosterPageHeader({
-  browseHref,
-  title,
-  kind,
-  showIdentifyBoard,
-}: {
-  browseHref: string
-  title: string
-  kind: string
-  showIdentifyBoard?: boolean
-}) {
-  return (
-    <header className="cb-panel cbPosterPageHeader">
-      <div className="cbPosterPageNav">
-        <Link href="/" className="cbPosterPageNavLink cbPosterPageNavLinkStrong">
-          ← Return to Community Board
-        </Link>
-        <a href={browseHref} className="cbPosterPageNavLink">
-          Browse posters
-        </a>
-      </div>
-      <h1 className="cbPosterPageTitle">{title}</h1>
-      <p className="cbPosterPageKind">{kind}</p>
-      {showIdentifyBoard ? (
-        <div className="cbPosterPageIdentify">
-          <p className="cbPosterPageKind">Location not yet identified</p>
-          <a href="#help-identify-board" className="cbPosterPageIdentifyLink">
-            Help identify this board
-          </a>
-        </div>
-      ) : null}
-    </header>
-  )
-}
-
 function renderLoadError(scope: string, detail: string) {
   console.error(`[poster/page] ${scope} failed:`, detail)
   return (
@@ -151,7 +116,7 @@ function getE2eFixturePoster(id: string) {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Poster – Community Board',
+    title: 'Found at: Poster',
   }
 }
 
@@ -174,13 +139,11 @@ export default async function PosterPage({
       if (key === 'event_id') return
       browseParams.set(key, String(value))
     })
-    const browseHref = `/browse${browseParams.toString() ? `?${browseParams.toString()}` : ''}`
     const seenAtParams = new URLSearchParams(browseParams.toString())
     seenAtParams.set('seenAt', fixture.poster.seen_at_name || '')
     const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
     return (
       <main className="cb-page-container cbPosterPage" style={{ scrollBehavior: 'smooth' }}>
-        <PosterPageHeader browseHref={browseHref} title={fixture.poster.seen_at_name || 'Community Board'} kind="Community Board" />
         <PosterViewer
           key={`${id}:${event_id || 'none'}`}
           imageUrls={[fixture.poster.file_path]}
@@ -386,22 +349,12 @@ export default async function PosterPage({
     if (key === 'event_id') return
     browseParams.set(key, String(value))
   })
-  const browseHref = `/browse${browseParams.toString() ? `?${browseParams.toString()}` : ''}`
   const seenAtParams = new URLSearchParams(browseParams.toString())
   const seenAtValue = getPosterSeenAt(poster)
-  const hasSeenAt = Boolean(seenAtValue)
-  const pageTitle = hasSeenAt ? seenAtValue! : 'Community Board'
-  const boardKindLabel = pins.length > 1 ? 'Community Board' : 'Poster'
   if (seenAtValue) seenAtParams.set('seenAt', seenAtValue)
   const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
   return (
     <main className="cb-page-container cbPosterPage" style={{ scrollBehavior: 'smooth' }}>
-      <PosterPageHeader
-        browseHref={browseHref}
-        title={pageTitle}
-        kind={boardKindLabel}
-        showIdentifyBoard={!hasSeenAt}
-      />
       <PosterViewer
         key={`${id}:${event_id || 'none'}`}
         imageUrls={imageUrls}

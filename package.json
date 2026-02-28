@@ -11,7 +11,11 @@
     "test:e2e": "npx playwright test",
     "snap:browse": "node scripts/manual-snap-browse.mjs",
     "test:regression": "npm run test && npm run lint && npm run build && npm run test:e2e",
-    "verify:guardrails": "npm run test && npm run lint && npm run build && npm run test:e2e"
+    "verify:guardrails": "npm run test && npm run lint && npm run build && npm run test:e2e",
+    "eval:snap": "node scripts/ui-eval-snap.mjs",
+    "eval:diff": "node scripts/ui-eval-diff.mjs",
+    "eval:report": "node scripts/ui-eval-report.mjs",
+    "eval:ui": "node scripts/ui-eval-snap.mjs && node scripts/ui-eval-diff.mjs && node scripts/ui-eval-report.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",
@@ -29,6 +33,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

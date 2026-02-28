@@ -35,7 +35,7 @@ export function normalizeEventStatus(raw: unknown, fallback: EventStatus = EVENT
 
 export function eventStatusLabel(raw: unknown) {
   const normalized = normalizeEventStatus(raw, EVENT_STATUSES.DRAFT)
-  return normalized === EVENT_STATUSES.PUBLISHED ? 'Pinned' : 'Draft'
+  return normalized === EVENT_STATUSES.PUBLISHED ? 'Placed on poster' : 'Draft'
 }
 
 export function posterStatusLabel(raw: unknown) {

@@ -28,26 +28,28 @@ test.describe('CommunityBoard Verification Guardrails', () => {
     await assertNoHorizontalOverflow(page)
   })
 
-  test('poster view at 390x844 has stage, navigation, no overflow, and snapshot', async ({ page }) => {
+  test('poster view at 390x844 has shared board layout, stage, and stable snapshots', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/poster/e2e-fixture')
 
     await expect(page.locator('a[href="/"]')).toBeVisible()
-    await expect(page.locator('a[href^="/browse"]')).toBeVisible()
+    await expect(page.locator('a[href="/browse"]')).toBeVisible()
 
+    const board = page.getByTestId('poster-view-grid')
     const stage = page.getByTestId('poster-stage')
+    const rightRail = page.getByTestId('poster-panel-right')
+
+    await expect(board).toBeVisible()
     await expect(stage).toBeVisible()
-    const stageBox = await stage.boundingBox()
-    expect(stageBox?.width || 0).toBeGreaterThan(0)
-    expect(stageBox?.height || 0).toBeGreaterThan(0)
+    await expect(rightRail).toBeVisible()
+
     await assertNoHorizontalOverflow(page)
 
-    await expect(stage).toHaveScreenshot('poster-stage-mobile.png', {
-      animations: 'disabled',
-    })
+    await expect(board).toHaveScreenshot('poster-board-mobile.png', { animations: 'disabled' })
+    await expect(rightRail).toHaveScreenshot('poster-details-rail-mobile.png', { animations: 'disabled' })
   })
 
-  test('builder create at 1024x768 has visible navigation and no overflow', async ({ page }) => {
+  test('builder create at 1024x768 has shared board layout and no overflow', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 })
     await page.goto('/builder/create')
 
@@ -56,25 +58,27 @@ test.describe('CommunityBoard Verification Guardrails', () => {
     await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/create"]')).toBeVisible()
     await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/tend"]')).toBeVisible()
     await expect(page.getByTestId('builder-panel-workspace')).toBeVisible()
+    await expect(page.getByTestId('builder-panel-inspector')).toBeVisible()
 
     await assertNoHorizontalOverflow(page)
   })
 
-  test('builder create at 1440x900 has visible navigation, no overflow, and snapshot', async ({ page }) => {
+  test('builder create at 1440x900 has stable layout snapshots', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/builder/create')
 
     const shell = page.getByTestId('builder-create-panels')
     const workspace = page.getByTestId('builder-panel-workspace')
+    const details = page.getByTestId('builder-panel-inspector')
+
     await expect(shell).toBeVisible()
-    await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/create"]')).toBeVisible()
-    await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/tend"]')).toBeVisible()
     await expect(workspace).toBeVisible()
+    await expect(details).toBeVisible()
 
     await assertNoHorizontalOverflow(page)
 
-    await expect(workspace).toHaveScreenshot('builder-create-workspace-desktop.png', {
-      animations: 'disabled',
-    })
+    await expect(shell).toHaveScreenshot('builder-board-layout-desktop.png', { animations: 'disabled' })
+    await expect(workspace).toHaveScreenshot('builder-workspace-desktop.png', { animations: 'disabled' })
+    await expect(details).toHaveScreenshot('builder-details-rail-desktop.png', { animations: 'disabled' })
   })
 })

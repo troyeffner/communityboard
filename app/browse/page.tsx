@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import BrowseClient from './BrowseClient'
 
 export const metadata: Metadata = {
-  title: 'Browse – Community Board',
+  title: 'Browse posters',
 }
 
 type SearchParams = {

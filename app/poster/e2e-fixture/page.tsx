@@ -1,61 +1,50 @@
-import Link from 'next/link'
+import type { Metadata } from 'next'
+import PosterViewer from '@/app/poster/[id]/PosterViewer'
+
 export const dynamic = 'force-static'
 
-function svgDataUrl() {
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200">
-    <rect width="100%" height="100%" fill="#f6f7f9"/>
-    <rect x="40" y="40" width="820" height="1120" rx="16" fill="#ffffff" stroke="#d7dbe3"/>
-    <rect x="90" y="120" width="720" height="220" rx="12" fill="#eef2ff" stroke="#c7d2fe"/>
-    <rect x="90" y="380" width="340" height="260" rx="12" fill="#ecfeff" stroke="#a5f3fc"/>
-    <rect x="470" y="380" width="340" height="260" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
-    <rect x="90" y="680" width="720" height="390" rx="12" fill="#fef2f2" stroke="#fecaca"/>
-    <circle cx="450" cy="260" r="18" fill="#22c55e" stroke="#ffffff" stroke-width="4"/>
-    <circle cx="260" cy="520" r="18" fill="#ef4444" stroke="#ffffff" stroke-width="4"/>
-    <circle cx="640" cy="520" r="18" fill="#22c55e" stroke="#ffffff" stroke-width="4"/>
-  </svg>`
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+export const metadata: Metadata = {
+  title: 'Found at: E2E Community Board',
 }
 
 export default function Page() {
-  const img = svgDataUrl()
-
   return (
-    <main style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
-      <nav style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-        <Link href="/">← Return to Community Board</Link>
-        <Link href="/browse">← Browse posters</Link>
-      </nav>
-
-      <section
-        data-testid="poster-stage"
-        style={{
-          border: '1px solid #d7dbe3',
-          borderRadius: 12,
-          padding: 12,
-          background: '#fff',
-        }}
-      >
-        <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 8 }}>
-          E2E Fixture Poster (stable for Playwright)
-        </div>
-        <div
-          style={{
-            width: '100%',
-            overflow: 'hidden',
-            borderRadius: 12,
-            border: '1px solid #e5e7eb',
-            background: '#f9fafb',
-          }}
-        >
-          {/* Use an SVG data URL so we don't depend on files or network */}
-          <img
-            alt="E2E Poster Fixture"
-            src={img}
-            style={{ display: 'block', width: '100%', height: 'auto' }}
-          />
-        </div>
-      </section>
+    <main className="cb-page-container cbPosterPage" style={{ scrollBehavior: 'smooth' }}>
+      <PosterViewer
+        imageUrls={[
+          'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><rect width="100%" height="100%" fill="%23eef2ff"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="56" fill="%23334155">E2E Poster Fixture</text></svg>',
+        ]}
+        pins={[
+          {
+            link_id: 'e2e-link-1',
+            event_id: 'e2e-event-1',
+            title: 'Neighborhood Cleanup',
+            start_at: '2026-03-07T14:00:00',
+            location: 'Main Street Plaza',
+            status: 'published',
+            item_type: 'event',
+            upvote_count: 3,
+            did_upvote: false,
+            bbox: { x: 0.24, y: 0.31 },
+          },
+          {
+            link_id: 'e2e-link-2',
+            event_id: 'e2e-event-2',
+            title: 'Open Studio Night',
+            start_at: '2026-03-08T18:30:00',
+            location: 'Cedar Arts',
+            status: 'published',
+            item_type: 'event',
+            upvote_count: 6,
+            did_upvote: false,
+            bbox: { x: 0.71, y: 0.58 },
+          },
+        ]}
+        activeEventId={null}
+        photoTakenAt="2026-02-27T14:00:00.000Z"
+        seenAt="E2E Community Board"
+        seenAtHref="/browse?seenAt=E2E%20Community%20Board"
+      />
     </main>
   )
 }

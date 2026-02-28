@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ensureCbVid } from '@/lib/viewer-id'
-import { eventStatusLabel } from '@/lib/statuses'
 import PosterControls from '@/app/components/poster/PosterControls'
 import PosterStage from '@/app/components/poster/PosterStage'
 import ItemCard from '@/app/components/poster/ItemCard'
 import { uiTokens } from '@/lib/uiTokens'
+import { BoardHeader, BoardLayout } from '@/app/components/layout/BoardLayout'
+import { Panel, PanelSection } from '@/app/components/layout/Panel'
+import { PosterDetailsList, PosterDetailsRail } from '@/app/components/layout/RightRail'
 
 type Pin = {
   link_id: string
@@ -29,10 +31,6 @@ function clamp(v: number, min: number, max: number) {
 function isCalendarType(type?: string | null) {
   const value = (type || 'event').toLowerCase()
   return value === 'event' || value === 'recurring_event' || value === 'class_program'
-}
-
-function pinStatusLabel(value?: string | null) {
-  return eventStatusLabel(value || 'draft')
 }
 
 function formatPhotoTakenHour(value?: string | null) {
@@ -105,8 +103,14 @@ export default function PosterViewer({
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [pinVotes, setPinVotes] = useState<Record<string, { upvote_count: number; did_upvote: boolean }>>({})
-  const [isMobile, setIsMobile] = useState(false)
   const [schemaStatus, setSchemaStatus] = useState('')
+
+  const foundAtLabel = seenAt || 'Unknown'
+  const heading = `Found at: ${foundAtLabel}`
+
+  useEffect(() => {
+    document.title = heading
+  }, [heading])
 
   useEffect(() => {
     if (!stageRef.current) return
@@ -120,13 +124,6 @@ export default function PosterViewer({
     })
     observer.observe(stageRef.current)
     return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const update = () => setIsMobile(window.innerWidth < 980)
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
   }, [])
 
   useEffect(() => {
@@ -292,184 +289,175 @@ export default function PosterViewer({
     }))
   }
 
-  return (
-    <div
-      data-testid="poster-view-grid"
-      className="cbCreateGrid"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : '320px minmax(0, 1fr) 400px',
-        gap: 16,
-        minHeight: 'calc(100vh - 80px)',
-      }}
-    >
-      <section className="cbPanel">
-        <header className="cbPanelHeader">
-          <h2 className="cb-section-header">Poster</h2>
-          <p className="cb-muted-text">Poster context and quick actions.</p>
-        </header>
-        <div className="cbPanelScroll" style={{ display: 'grid', gap: 10, alignContent: 'start' }}>
-          {process.env.NODE_ENV !== 'production' && schemaStatus ? (
-            <p className="cb-muted-text" style={{ margin: 0 }}>{schemaStatus}</p>
-          ) : null}
-          <div className="cbFormCard" style={{ gap: 6 }}>
-            <div><strong>Captured:</strong> {formatPhotoTakenHour(photoTakenAt)}</div>
-            <div>
-              <strong>Found at:</strong>{' '}
-              {seenAt
-                ? (seenAtHref ? <a href={seenAtHref} style={{ textDecoration: 'none', color: '#1d4ed8' }}>{seenAt}</a> : seenAt)
-                : '—'}
-            </div>
-            <div><strong>Status:</strong> {selectedPin ? pinStatusLabel(selectedPin.status) : '—'}</div>
-          </div>
-          <div className="cbFormCard" style={{ gap: 6 }}>
-            <div style={{ fontSize: uiTokens.typography.body, fontWeight: 600 }}>Help tend this listing</div>
-            <a
-              id="help-identify-board"
-              href="#help-identify-board"
-              onClick={(event) => {
-                event.preventDefault()
-                window.dispatchEvent(new CustomEvent('cb-open-tag-picker', { detail: { eventId: selectedEventId || undefined } }))
-              }}
-              style={{ color: '#1d4ed8', textDecoration: 'none' }}
+  const leftPanel = (
+    <Panel title="Poster" subtitle="Found at context and quick actions." testId="poster-panel-left">
+      {process.env.NODE_ENV !== 'production' && schemaStatus ? (
+        <p className="cb-muted-text" style={{ margin: 0 }}>{schemaStatus}</p>
+      ) : null}
+      <PanelSection>
+        <div><strong>Captured:</strong> {formatPhotoTakenHour(photoTakenAt)}</div>
+        <div>
+          <strong>Found at:</strong>{' '}
+          {seenAt
+            ? (seenAtHref ? <a href={seenAtHref} style={{ textDecoration: 'none', color: '#1d4ed8' }}>{seenAt}</a> : seenAt)
+            : '—'}
+        </div>
+      </PanelSection>
+      <PanelSection>
+        <div style={{ fontSize: uiTokens.typography.body, fontWeight: 600 }}>Help tend this listing</div>
+        <a
+          id="help-identify-board"
+          href="#help-identify-board"
+          onClick={(event) => {
+            event.preventDefault()
+            window.dispatchEvent(new CustomEvent('cb-open-tag-picker', { detail: { eventId: selectedEventId || undefined } }))
+          }}
+          style={{ color: '#1d4ed8', textDecoration: 'none' }}
+        >
+          Suggest tags
+        </a>
+      </PanelSection>
+    </Panel>
+  )
+
+  const centerPanel = (
+    <Panel title="Workspace" subtitle="Select an item card to center and inspect its pin." testId="poster-panel-center">
+      <PosterControls style={{ gap: uiTokens.spacing[1] }}>
+        <button data-variant="secondary" onClick={() => {
+          const nextZoom = clamp(Number((zoom - 0.2).toFixed(2)), 1, 5)
+          if (selectedPin) centerOnPin(selectedPin, nextZoom)
+          else setZoom(nextZoom)
+        }}>Zoom -</button>
+        <button data-variant="secondary" onClick={() => {
+          const nextZoom = clamp(Number((zoom + 0.2).toFixed(2)), 1, 5)
+          if (selectedPin) centerOnPin(selectedPin, nextZoom)
+          else setZoom(nextZoom)
+        }}>Zoom +</button>
+        <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
+        <button data-variant="secondary" onClick={fitToItems} disabled={validPins.length === 0}>Fit to items</button>
+        <button data-variant="secondary" onClick={() => selectedPin && centerOnPin(selectedPin)} disabled={!selectedPin}>Center selected</button>
+      </PosterControls>
+
+      <PosterStage
+        stageRef={stageRef}
+        imageUrl={imageUrl}
+        loadError={loadError}
+        pan={pan}
+        zoom={zoom}
+        stageMetrics={stageMetrics}
+        pins={validPins}
+        selectedEventId={effectiveSelectedEventId}
+        onStageMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY } }}
+        onStageMouseMove={(e) => {
+          if (!dragRef.current) return
+          const dx = e.clientX - dragRef.current.x
+          const dy = e.clientY - dragRef.current.y
+          setPan((prev) => clampPan({ x: prev.x + dx, y: prev.y + dy }))
+          dragRef.current = { x: e.clientX, y: e.clientY }
+        }}
+        onStageMouseUp={() => { dragRef.current = null }}
+        onStageMouseLeave={() => { dragRef.current = null }}
+        onImageLoad={(e) => {
+          setImageNatural({
+            width: Math.max(1, e.currentTarget.naturalWidth || 1),
+            height: Math.max(1, e.currentTarget.naturalHeight || 1),
+          })
+          setLoadError('')
+          if (!hasAutoCenteredRef.current && selectedPin?.bbox) {
+            hasAutoCenteredRef.current = true
+            centerOnPin(selectedPin, Math.max(1.4, zoom))
+          }
+        }}
+        onImageError={() => {
+          if (imageIndex < imageUrls.length - 1) {
+            setImageIndex((prev) => prev + 1)
+            return
+          }
+          setAllFailed(true)
+          setLoadError('Failed to load poster image.')
+        }}
+        onPinClick={(pin) => {
+          const selected = validPins.find((candidate) => candidate.link_id === pin.link_id)
+          if (selected) selectPin(selected)
+        }}
+      />
+    </Panel>
+  )
+
+  const rightPanel = (
+    <PosterDetailsRail subtitle="Selected item appears first." testId="poster-panel-right">
+      <PosterDetailsList>
+        {orderedPins.map((pin) => {
+          const eventAtLabel = pin.location || '—'
+          const showBothLocations = foundAtLabel !== '—' && eventAtLabel !== '—' && foundAtLabel !== eventAtLabel
+          return (
+            <ItemCard
+              key={pin.link_id}
+              onClick={() => selectPin(pin)}
+              selected={effectiveSelectedEventId === pin.event_id}
+              testId={`poster-item-${pin.event_id}`}
+              title={pin.title?.trim() || '(Untitled item)'}
+              subtitle={pin.start_at ? `Date/time: ${new Date(pin.start_at).toLocaleString()}` : 'Date/time: —'}
+              typeLabel={(pin.item_type || 'event').replace(/_/g, ' ')}
+              location={`Found at: ${foundAtLabel}`}
             >
-              Suggest tags
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section className="cbPanel">
-        <header className="cbPanelHeader">
-          <h2 className="cb-section-header">Workspace</h2>
-          <p className="cb-muted-text">Select an item card to center and inspect its pin.</p>
-        </header>
-        <div className="cbPanelScroll cbWorkspaceBody">
-          <PosterControls style={{ gap: uiTokens.spacing[1] }}>
-            <button data-variant="secondary" onClick={() => {
-              const nextZoom = clamp(Number((zoom - 0.2).toFixed(2)), 1, 5)
-              if (selectedPin) centerOnPin(selectedPin, nextZoom)
-              else setZoom(nextZoom)
-            }}>Zoom -</button>
-            <button data-variant="secondary" onClick={() => {
-              const nextZoom = clamp(Number((zoom + 0.2).toFixed(2)), 1, 5)
-              if (selectedPin) centerOnPin(selectedPin, nextZoom)
-              else setZoom(nextZoom)
-            }}>Zoom +</button>
-            <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-            <button data-variant="secondary" onClick={fitToItems} disabled={validPins.length === 0}>Fit to items</button>
-            <button data-variant="secondary" onClick={() => selectedPin && centerOnPin(selectedPin)} disabled={!selectedPin}>Center selected</button>
-          </PosterControls>
-
-          <PosterStage
-            stageRef={stageRef}
-            imageUrl={imageUrl}
-            loadError={loadError}
-            pan={pan}
-            zoom={zoom}
-            stageMetrics={stageMetrics}
-            pins={validPins}
-            selectedEventId={effectiveSelectedEventId}
-            onStageMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY } }}
-            onStageMouseMove={(e) => {
-              if (!dragRef.current) return
-              const dx = e.clientX - dragRef.current.x
-              const dy = e.clientY - dragRef.current.y
-              setPan((prev) => clampPan({ x: prev.x + dx, y: prev.y + dy }))
-              dragRef.current = { x: e.clientX, y: e.clientY }
-            }}
-            onStageMouseUp={() => { dragRef.current = null }}
-            onStageMouseLeave={() => { dragRef.current = null }}
-            onImageLoad={(e) => {
-              setImageNatural({
-                width: Math.max(1, e.currentTarget.naturalWidth || 1),
-                height: Math.max(1, e.currentTarget.naturalHeight || 1),
-              })
-              setLoadError('')
-              if (!hasAutoCenteredRef.current && selectedPin?.bbox) {
-                hasAutoCenteredRef.current = true
-                centerOnPin(selectedPin, Math.max(1.4, zoom))
-              }
-            }}
-            onImageError={() => {
-              if (imageIndex < imageUrls.length - 1) {
-                setImageIndex((prev) => prev + 1)
-                return
-              }
-              setAllFailed(true)
-              setLoadError('Failed to load poster image.')
-            }}
-            onPinClick={(pin) => {
-              const selected = validPins.find((candidate) => candidate.link_id === pin.link_id)
-              if (selected) selectPin(selected)
-            }}
-          />
-        </div>
-      </section>
-
-      <section className="cbPanel">
-        <header className="cbPanelHeader">
-          <h2 className="cb-section-header">Poster details</h2>
-          <p className="cb-muted-text">All items on this poster.</p>
-        </header>
-        <div className="cbPanelScroll" style={{ display: 'grid', gap: 8 }}>
-          {orderedPins.map((pin) => {
-            const foundAtLabel = seenAt || '—'
-            const eventAtLabel = pin.location || '—'
-            const showBothLocations = foundAtLabel !== '—' && eventAtLabel !== '—' && foundAtLabel !== eventAtLabel
-            return (
-              <ItemCard
-                key={pin.link_id}
-                onClick={() => selectPin(pin)}
-                selected={effectiveSelectedEventId === pin.event_id}
-                testId={`poster-item-${pin.event_id}`}
-                title={pin.title?.trim() || '(Untitled item)'}
-                subtitle={pin.start_at ? `Date/time: ${new Date(pin.start_at).toLocaleString()}` : 'Date/time: —'}
-                status={pinStatusLabel(pin.status)}
-                typeLabel={(pin.item_type || 'event').replace(/_/g, ' ')}
-                location={`Found at: ${foundAtLabel}`}
-              >
-                {showBothLocations ? (
-                  <div style={{ fontSize: uiTokens.typography.label, marginBottom: 6, color: uiTokens.colors.muted }}>
-                    Event at: {eventAtLabel}
-                  </div>
-                ) : null}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleUpvote(pin)
-                    }}
-                  >
-                    Upvote · {pinVotes[pin.event_id]?.upvote_count ?? pin.upvote_count ?? 0}
-                  </button>
+              {showBothLocations ? (
+                <div style={{ fontSize: uiTokens.typography.label, marginBottom: 6, color: uiTokens.colors.muted }}>
+                  Event at: {eventAtLabel}
                 </div>
-                {isCalendarType(pin.item_type) && pin.start_at ? (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <a
-                      href={toGoogleCalendarUrl({ title: pin.title, start_at: pin.start_at, location: pin.location })}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
-                    >
-                      Add to Google Calendar
-                    </a>
-                    <a
-                      href={`/api/items/${encodeURIComponent(pin.event_id)}/ics`}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
-                    >
-                      Download .ics
-                    </a>
-                  </div>
-                ) : null}
-              </ItemCard>
-            )
-          })}
-          {orderedPins.length === 0 ? <p className="cb-muted-text" style={{ margin: 0 }}>No items yet.</p> : null}
-        </div>
-      </section>
-    </div>
+              ) : null}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleUpvote(pin)
+                  }}
+                >
+                  Upvote · {pinVotes[pin.event_id]?.upvote_count ?? pin.upvote_count ?? 0}
+                </button>
+              </div>
+              {isCalendarType(pin.item_type) && pin.start_at ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <a
+                    href={toGoogleCalendarUrl({ title: pin.title, start_at: pin.start_at, location: pin.location })}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
+                  >
+                    Add to Google Calendar
+                  </a>
+                  <a
+                    href={`/api/items/${encodeURIComponent(pin.event_id)}/ics`}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
+                  >
+                    Download .ics
+                  </a>
+                </div>
+              ) : null}
+            </ItemCard>
+          )
+        })}
+        {orderedPins.length === 0 ? <p className="cb-muted-text" style={{ margin: 0 }}>No items yet.</p> : null}
+      </PosterDetailsList>
+    </PosterDetailsRail>
+  )
+
+  return (
+    <BoardLayout
+      testId="poster-view-grid"
+      header={
+        <BoardHeader
+          title={heading}
+          subtitle="Public poster view with shared board skeleton."
+          leftLink={{ href: '/', label: 'Return to Community Board' }}
+          rightLink={{ href: '/browse', label: 'Browse posters' }}
+        />
+      }
+      left={leftPanel}
+      center={centerPanel}
+      right={rightPanel}
+    />
   )
 }
