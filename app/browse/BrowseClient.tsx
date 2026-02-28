@@ -345,16 +345,14 @@ export default function BrowseClient({
   }
 
   const leftPanel = (
-    <Panel title="Browse" subtitle="Filter posters, choose a board, then review details." testId="browse-panel-left">
+    <Panel title="Browse" subtitle="Search, filter, and choose a poster board." testId="browse-panel-left">
       <PanelSection>
-        <Link href="/" style={{ color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
-          Return to Community Board
-        </Link>
+        <Link href="/" className="cbPanelLink cbPanelLinkStrong">Return to Community Board</Link>
       </PanelSection>
 
       <PanelSection>
-        <div className="cb-muted-text" style={{ margin: 0, fontWeight: 600 }}>Found at</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <p className="cbPanelMicroLabel">Found at</p>
+        <div className="cbTokenWrap">
           <button
             data-variant="secondary"
             onClick={() => {
@@ -365,12 +363,13 @@ export default function BrowseClient({
               updateUrl({ seenAt: '', poster: '', item: '' })
             }}
           >
-            All
+            Clear
           </button>
           {facets.map((facet) => (
             <button
               key={facet}
               data-variant="secondary"
+              className={seenAt === facet ? 'cbFilterToken cbFilterTokenActive' : 'cbFilterToken'}
               onClick={() => {
                 setSeenAt(facet)
                 setPosterParam('')
@@ -379,7 +378,6 @@ export default function BrowseClient({
                 setSelectedEventId(null)
                 updateUrl({ seenAt: facet, poster: '', item: '' })
               }}
-              style={seenAt === facet ? { borderColor: '#1d4ed8', color: '#1d4ed8' } : undefined}
             >
               {facet}
             </button>
@@ -387,11 +385,12 @@ export default function BrowseClient({
         </div>
       </PanelSection>
 
-      <div style={{ display: 'grid', gap: 8 }}>
+      <div className="cbBrowsePosterList">
         {posters.map((poster) => (
           <button
             key={poster.id}
             type="button"
+            className={activePosterId === poster.id ? 'cbBrowsePosterCard cbBrowsePosterCardActive' : 'cbBrowsePosterCard'}
             onClick={() => {
               setPosterParam(poster.id)
               setActivePosterId(poster.id)
@@ -400,45 +399,27 @@ export default function BrowseClient({
               hasAutoCenteredRef.current = false
               updateUrl({ poster: poster.id, item: '' })
             }}
-            style={{
-              border: activePosterId === poster.id ? '2px solid #1d4ed8' : '1px solid #dbe2ea',
-              borderRadius: 12,
-              padding: 10,
-              background: '#fff',
-              display: 'grid',
-              gridTemplateColumns: '96px minmax(0, 1fr)',
-              gap: 10,
-              alignItems: 'start',
-              textAlign: 'left',
-              cursor: 'pointer',
-            }}
           >
             {poster.public_url ? (
-              <img
-                src={poster.public_url}
-                alt="Poster thumbnail"
-                style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid #e5e7eb', objectFit: 'cover' }}
-              />
+              <img src={poster.public_url} alt="Poster thumbnail" className="cbBrowsePosterThumb" />
             ) : (
-              <div style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid #e5e7eb', background: '#f8fafc' }} />
+              <div className="cbBrowsePosterThumb cbBrowsePosterThumbEmpty" />
             )}
-            <div style={{ minWidth: 0, display: 'grid', gap: 4 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {poster.seen_at_name || 'Unknown'}
-              </div>
-              <div className="cb-muted-text" style={{ margin: 0, fontSize: 12 }}>Captured: {formatCaptureHour(poster.created_at)}</div>
-              <div className="cb-muted-text" style={{ margin: 0, fontSize: 12 }}>Items: {poster.item_count}</div>
+            <div className="cbBrowsePosterMeta">
+              <div className="cbBrowsePosterName">{poster.seen_at_name || 'Unknown'}</div>
+              <div className="cb-muted-text">Captured: {formatCaptureHour(poster.created_at)}</div>
+              <div className="cb-muted-text">Items: {poster.item_count}</div>
             </div>
           </button>
         ))}
-        {posters.length === 0 ? <p className="cb-muted-text" style={{ margin: 0 }}>No posters found.</p> : null}
+        {posters.length === 0 ? <p className="cb-muted-text">No posters found.</p> : null}
       </div>
     </Panel>
   )
 
   const centerPanel = (
-    <Panel title="Workspace" subtitle="Zoom and inspect placement on the selected poster." testId="browse-panel-center">
-      {error ? <p style={{ color: 'crimson', margin: 0 }}>{error}</p> : null}
+    <Panel title="Workspace" subtitle="Zoom and inspect item placement on the selected poster." testId="browse-panel-center">
+      {error ? <p className="cbErrorMsg">{error}</p> : null}
       <PosterControls>
         <button data-variant="secondary" onClick={() => {
           const nextZoom = clamp(Number((zoom - 0.2).toFixed(2)), 1, 5)
@@ -451,8 +432,8 @@ export default function BrowseClient({
           else setZoom(nextZoom)
         }}>Zoom +</button>
         <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-        <button data-variant="secondary" onClick={fitToItems} disabled={validPins.length === 0}>Fit to items</button>
-        <button data-variant="secondary" onClick={() => selectedPin && centerOnPin(selectedPin)} disabled={!selectedPin}>Center selected</button>
+        <button data-variant="secondary" onClick={fitToItems} disabled={validPins.length === 0}>Fit</button>
+        <button data-variant="secondary" onClick={() => selectedPin && centerOnPin(selectedPin)} disabled={!selectedPin}>Center</button>
       </PosterControls>
 
       <PosterStage
@@ -519,13 +500,9 @@ export default function BrowseClient({
               typeLabel={(pin.item_type || 'event').replace(/_/g, ' ')}
               location={`Found at: ${foundAtLabel}`}
             >
-              {showBothLocations ? (
-                <div style={{ fontSize: 12, marginBottom: 6, color: '#64748b' }}>
-                  Event at: {eventAtLabel}
-                </div>
-              ) : null}
+              {showBothLocations ? <div className="cbItemMetaSecondary">Event at: {eventAtLabel}</div> : null}
 
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="cbItemActionRow">
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -537,20 +514,20 @@ export default function BrowseClient({
               </div>
 
               {isCalendarType(pin.item_type) && pin.start_at ? (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div className="cbItemActionRow">
                   <a
                     href={toGoogleCalendarUrl({ title: pin.title, start_at: pin.start_at, location: pin.location })}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
+                    className="cbActionLink"
                   >
                     Add to Google Calendar
                   </a>
                   <a
                     href={`/api/items/${encodeURIComponent(pin.event_id)}/ics`}
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
+                    className="cbActionLink"
                   >
                     Download .ics
                   </a>
@@ -559,7 +536,7 @@ export default function BrowseClient({
             </ItemCard>
           )
         })}
-        {orderedPins.length === 0 ? <p className="cb-muted-text" style={{ margin: 0 }}>No items yet.</p> : null}
+        {orderedPins.length === 0 ? <p className="cbPanelEmptyState">No items yet.</p> : null}
       </PosterDetailsList>
     </PosterDetailsRail>
   )
@@ -567,7 +544,13 @@ export default function BrowseClient({
   return (
     <BoardLayout
       testId="browse-board-layout"
-      header={<BoardHeader title="Browse posters" subtitle="Browse community boards, then review placed items." />}
+      header={
+        <BoardHeader
+          title="Browse posters"
+          subtitle="Search and inspect boards with a shared three-panel shell."
+          leftLink={{ href: '/', label: 'Return to Community Board' }}
+        />
+      }
       left={leftPanel}
       center={centerPanel}
       right={rightPanel}

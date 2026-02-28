@@ -46,12 +46,11 @@ export default function ItemCard({
       style={{
         ...uiStyles.itemCard,
         ...(selected ? uiStyles.itemCardSelected : {}),
-        ...(selected ? { border: uiTokens.border.strong, background: uiTokens.colors.bgSubtle, boxShadow: 'inset 3px 0 0 #94a3b8' } : {}),
+        ...(selected ? { border: uiTokens.border.selected, background: uiTokens.colors.selectedBg, boxShadow: 'inset 3px 0 0 #3b82f6' } : {}),
         padding: uiTokens.spacing[2],
         cursor: onClick ? 'pointer' : 'default',
       }}
     >
-      {selected ? <div style={{ fontSize: uiTokens.typography.selectedPill, fontWeight: 700, color: uiTokens.colors.muted, marginBottom: 1 }}>Selected</div> : null}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <strong>{title}</strong>
         {typeLabel ? (

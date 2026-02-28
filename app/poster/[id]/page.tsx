@@ -62,9 +62,6 @@ function renderLoadError(scope: string, detail: string) {
 
       <p className="cbPosterPageErrorTitle">We could not load this poster right now.</p>
       <p className="cbPosterPageErrorDetail">{scope}: {detail}</p>
-      <Link href="/api/health/schema" className="cbPosterPageNavLink cbPosterPageNavLinkStrong">
-        Check schema health
-      </Link>
     </main>
   )
 }
@@ -116,7 +113,7 @@ function getE2eFixturePoster(id: string) {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Found at: Poster',
+    title: 'Found at: Community Board',
   }
 }
 
@@ -125,12 +122,11 @@ export default async function PosterPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ event_id?: string; seenAt?: string; tags?: string; poster?: string; debug?: string }>
+  searchParams: Promise<{ event_id?: string; seenAt?: string; tags?: string; poster?: string }>
 }) {
   const { id } = await params
   const currentParams = await searchParams
   const { event_id } = currentParams
-  const debug = currentParams.debug === '1'
   const fixture = getE2eFixturePoster(id)
   if (fixture) {
     const browseParams = new URLSearchParams()
@@ -152,7 +148,6 @@ export default async function PosterPage({
           photoTakenAt={fixture.poster.created_at || null}
           seenAt={fixture.poster.seen_at_name || null}
           seenAtHref={seenAtHref}
-          debug={debug}
         />
         <PosterTagVoting
           events={fixture.pins.map((pin) => ({ event_id: pin.event_id, title: pin.title }))}
@@ -363,7 +358,6 @@ export default async function PosterPage({
         photoTakenAt={poster.created_at || null}
         seenAt={seenAtValue}
         seenAtHref={seenAtHref}
-        debug={debug}
       />
       <PosterTagVoting
         events={pins.map((pin) => ({ event_id: pin.event_id, title: pin.title }))}

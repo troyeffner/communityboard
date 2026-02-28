@@ -17,7 +17,7 @@ export const uiTokens = {
   border: {
     soft: '1px solid #e5e7eb',
     strong: '1px solid #cbd5e1',
-    selected: '2px solid #ef4444',
+    selected: '1px solid #93c5fd',
   },
   typography: {
     label: 12,
@@ -31,7 +31,7 @@ export const uiTokens = {
     muted: '#6b7280',
     bgPanel: '#ffffff',
     bgSubtle: '#f8fafc',
-    selectedBg: '#fef2f2',
+    selectedBg: '#eff6ff',
   },
   panel: {
     padding: 12,

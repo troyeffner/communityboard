@@ -13,12 +13,16 @@ export function PosterDetailsRail({
   testId?: string
 }) {
   return (
-    <Panel title={title} subtitle={subtitle} testId={testId}>
+    <Panel title={title} subtitle={subtitle} className="cbPosterDetailsRail" testId={testId}>
       {children}
     </Panel>
   )
 }
 
 export function PosterDetailsList({ children }: { children: ReactNode }) {
-  return <div className="cbPosterDetailsList" data-testid="poster-details-list">{children}</div>
+  return (
+    <div className="cbPosterDetailsList" data-testid="poster-details-list">
+      {children}
+    </div>
+  )
 }

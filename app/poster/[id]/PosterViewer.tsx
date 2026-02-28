@@ -6,7 +6,6 @@ import { ensureCbVid } from '@/lib/viewer-id'
 import PosterControls from '@/app/components/poster/PosterControls'
 import PosterStage from '@/app/components/poster/PosterStage'
 import ItemCard from '@/app/components/poster/ItemCard'
-import { uiTokens } from '@/lib/uiTokens'
 import { BoardHeader, BoardLayout } from '@/app/components/layout/BoardLayout'
 import { Panel, PanelSection } from '@/app/components/layout/Panel'
 import { PosterDetailsList, PosterDetailsRail } from '@/app/components/layout/RightRail'
@@ -75,7 +74,6 @@ export default function PosterViewer({
   photoTakenAt,
   seenAt,
   seenAtHref = '',
-  debug = false,
   selectionParam = 'event_id',
   onSelectEventId,
 }: {
@@ -85,7 +83,6 @@ export default function PosterViewer({
   photoTakenAt?: string | null
   seenAt?: string | null
   seenAtHref?: string
-  debug?: boolean
   selectionParam?: string
   onSelectEventId?: (eventId: string) => void
 }) {
@@ -103,7 +100,6 @@ export default function PosterViewer({
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [pinVotes, setPinVotes] = useState<Record<string, { upvote_count: number; did_upvote: boolean }>>({})
-  const [schemaStatus, setSchemaStatus] = useState('')
 
   const foundAtLabel = seenAt || 'Unknown'
   const heading = `Found at: ${foundAtLabel}`
@@ -125,29 +121,6 @@ export default function PosterViewer({
     observer.observe(stageRef.current)
     return () => observer.disconnect()
   }, [])
-
-  useEffect(() => {
-    if (!debug) return
-    let cancelled = false
-    const run = async () => {
-      try {
-        const res = await fetch('/api/health/schema')
-        const data = await res.json().catch(() => ({}))
-        if (cancelled) return
-        if (res.ok) setSchemaStatus('Schema OK')
-        else {
-          const missing = Array.isArray(data?.missing) ? data.missing.join(', ') : 'poster_uploads.seen_at_name'
-          setSchemaStatus(`Schema missing: ${missing} (run migration)`)
-        }
-      } catch {
-        if (!cancelled) setSchemaStatus('Schema check unavailable')
-      }
-    }
-    run()
-    return () => {
-      cancelled = true
-    }
-  }, [debug])
 
   const validPins = useMemo(
     () => pins.filter((p): p is Pin & { bbox: { x: number; y: number } } => Boolean(p.bbox)),
@@ -291,38 +264,22 @@ export default function PosterViewer({
 
   const leftPanel = (
     <Panel title="Poster" subtitle="Found at context and quick actions." testId="poster-panel-left">
-      {process.env.NODE_ENV !== 'production' && schemaStatus ? (
-        <p className="cb-muted-text" style={{ margin: 0 }}>{schemaStatus}</p>
-      ) : null}
       <PanelSection>
-        <div><strong>Captured:</strong> {formatPhotoTakenHour(photoTakenAt)}</div>
-        <div>
-          <strong>Found at:</strong>{' '}
-          {seenAt
-            ? (seenAtHref ? <a href={seenAtHref} style={{ textDecoration: 'none', color: '#1d4ed8' }}>{seenAt}</a> : seenAt)
-            : '—'}
+        <div className="cbPanelMetaGrid">
+          <div><strong>Captured:</strong> {formatPhotoTakenHour(photoTakenAt)}</div>
+          <div>
+            <strong>Found at:</strong>{' '}
+            {seenAt ? (seenAtHref ? <a href={seenAtHref}>{seenAt}</a> : seenAt) : '—'}
+          </div>
         </div>
       </PanelSection>
-      <PanelSection>
-        <div style={{ fontSize: uiTokens.typography.body, fontWeight: 600 }}>Help tend this listing</div>
-        <a
-          id="help-identify-board"
-          href="#help-identify-board"
-          onClick={(event) => {
-            event.preventDefault()
-            window.dispatchEvent(new CustomEvent('cb-open-tag-picker', { detail: { eventId: selectedEventId || undefined } }))
-          }}
-          style={{ color: '#1d4ed8', textDecoration: 'none' }}
-        >
-          Suggest tags
-        </a>
-      </PanelSection>
+
     </Panel>
   )
 
   const centerPanel = (
-    <Panel title="Workspace" subtitle="Select an item card to center and inspect its pin." testId="poster-panel-center">
-      <PosterControls style={{ gap: uiTokens.spacing[1] }}>
+    <Panel title="Workspace" subtitle="Poster stage for zooming and pin review." testId="poster-panel-center">
+      <PosterControls>
         <button data-variant="secondary" onClick={() => {
           const nextZoom = clamp(Number((zoom - 0.2).toFixed(2)), 1, 5)
           if (selectedPin) centerOnPin(selectedPin, nextZoom)
@@ -334,8 +291,8 @@ export default function PosterViewer({
           else setZoom(nextZoom)
         }}>Zoom +</button>
         <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-        <button data-variant="secondary" onClick={fitToItems} disabled={validPins.length === 0}>Fit to items</button>
-        <button data-variant="secondary" onClick={() => selectedPin && centerOnPin(selectedPin)} disabled={!selectedPin}>Center selected</button>
+        <button data-variant="secondary" onClick={fitToItems} disabled={validPins.length === 0}>Fit</button>
+        <button data-variant="secondary" onClick={() => selectedPin && centerOnPin(selectedPin)} disabled={!selectedPin}>Center</button>
       </PosterControls>
 
       <PosterStage
@@ -401,12 +358,8 @@ export default function PosterViewer({
               typeLabel={(pin.item_type || 'event').replace(/_/g, ' ')}
               location={`Found at: ${foundAtLabel}`}
             >
-              {showBothLocations ? (
-                <div style={{ fontSize: uiTokens.typography.label, marginBottom: 6, color: uiTokens.colors.muted }}>
-                  Event at: {eventAtLabel}
-                </div>
-              ) : null}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {showBothLocations ? <div className="cbItemMetaSecondary">Event at: {eventAtLabel}</div> : null}
+              <div className="cbItemActionRow">
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -417,20 +370,20 @@ export default function PosterViewer({
                 </button>
               </div>
               {isCalendarType(pin.item_type) && pin.start_at ? (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div className="cbItemActionRow">
                   <a
                     href={toGoogleCalendarUrl({ title: pin.title, start_at: pin.start_at, location: pin.location })}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
+                    className="cbActionLink"
                   >
                     Add to Google Calendar
                   </a>
                   <a
                     href={`/api/items/${encodeURIComponent(pin.event_id)}/ics`}
                     onClick={(e) => e.stopPropagation()}
-                    style={{ display: 'inline-block', padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1', textDecoration: 'none', color: '#111827', fontWeight: 600 }}
+                    className="cbActionLink"
                   >
                     Download .ics
                   </a>
@@ -439,7 +392,7 @@ export default function PosterViewer({
             </ItemCard>
           )
         })}
-        {orderedPins.length === 0 ? <p className="cb-muted-text" style={{ margin: 0 }}>No items yet.</p> : null}
+        {orderedPins.length === 0 ? <p className="cbPanelEmptyState">No items yet.</p> : null}
       </PosterDetailsList>
     </PosterDetailsRail>
   )
@@ -450,7 +403,7 @@ export default function PosterViewer({
       header={
         <BoardHeader
           title={heading}
-          subtitle="Public poster view with shared board skeleton."
+          subtitle="Public poster view"
           leftLink={{ href: '/', label: 'Return to Community Board' }}
           rightLink={{ href: '/browse', label: 'Browse posters' }}
         />

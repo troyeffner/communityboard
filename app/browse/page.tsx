@@ -18,6 +18,7 @@ export default async function BrowsePage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
+
   return (
     <BrowseClient
       initialPoster={typeof params.poster === 'string' ? params.poster : ''}
