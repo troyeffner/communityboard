@@ -5,7 +5,7 @@ test('poster view visual snapshot', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('a[href="/submit"]')).toBeVisible()
   await expect(page.locator('a[href="/businesses"]')).toBeVisible()
-  await expect(page).toHaveScreenshot('home-mobile.png', { fullPage: true })
+  await expect(page.getByTestId('home-shell')).toHaveScreenshot('home-mobile.png')
 })
 
 test('builder create visual snapshot', async ({ page }) => {

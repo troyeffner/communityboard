@@ -115,7 +115,7 @@ function EventList({
             )}
             {e.seen_at_name && (
               <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6 }}>
-                Seen at: {e.seen_at_name}
+                Found at: {e.seen_at_name}
               </div>
             )}
             <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -145,11 +145,11 @@ function EventList({
                 data-variant="secondary"
                 onClick={() => onVote(e.id)}
                 disabled={Boolean(votes[e.id]?.votedByMe) || Boolean(pendingVoteIds[e.id])}
-                title={votes[e.id]?.votedByMe ? 'This item is pinned' : 'Pin this item to the board'}
+                title={votes[e.id]?.votedByMe ? 'You already upvoted this item' : 'Upvote this item'}
               >
-                {votes[e.id]?.votedByMe ? 'Pinned' : 'Pin to board'} · {votes[e.id]?.upvotes || 0}
+                Upvote · {votes[e.id]?.upvotes || 0}
               </button>
-              <span style={{ fontSize: 12, opacity: 0.75 }}>Pinning helps the community surface useful items.</span>
+              <span style={{ fontSize: 12, opacity: 0.75 }}>Upvotes help the community surface useful items.</span>
             </div>
             {e.poster_public_url && (
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -178,7 +178,7 @@ function EventList({
                     title: e.title,
                     start_at: e.start_at,
                     location: e.location,
-                    description: [e.description || '', e.seen_at_name ? `Seen at: ${e.seen_at_name}` : ''].filter(Boolean).join('\n'),
+                    description: [e.description || '', e.seen_at_name ? `Found at: ${e.seen_at_name}` : ''].filter(Boolean).join('\n'),
                   })}
                   target="_blank"
                   rel="noreferrer"

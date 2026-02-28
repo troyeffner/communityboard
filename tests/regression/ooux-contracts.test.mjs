@@ -24,12 +24,11 @@ test('seen-at update route aliases canonical update-poster handler', () => {
   assert.equal(src.includes("export { POST } from '../update-poster/route'"), true)
 })
 
-test('status vocabulary in UI uses Draft/Pinned wording', () => {
+test('status vocabulary in UI avoids pin language and uses publish/upvote copy', () => {
   const tend = read('app/builder/tend/page.tsx')
   const create = read('app/builder/create/CreateClient.tsx')
 
-  assert.equal(tend.includes('Pin to board'), true)
+  assert.equal(tend.includes('Pin to board'), false)
   assert.equal(create.includes('Create drafts'), true)
-  assert.equal(tend.includes('Publish'), false)
+  assert.equal(tend.includes('Publish'), true)
 })
-

@@ -769,7 +769,7 @@ export default function BuilderCreatePage({
             className="cb-tab-button"
             style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            Pin to board
+            Tend board
           </a>
         </div>
         {process.env.NODE_ENV !== 'production' && schemaStatus ? (
@@ -811,7 +811,7 @@ export default function BuilderCreatePage({
               selected={selectedPosterId === u.id}
               title={formatCaptureHour(u.created_at)}
               subtitle={`Status: ${posterStatusLabel(u.status)}`}
-              location={`Seen at: ${u.seen_at_name || '—'}`}
+              location={`Found at: ${u.seen_at_name || '—'}`}
               status={`Items: ${u.linked_count ?? u.event_count ?? 0}`}
             >
               {u.public_url ? (
@@ -841,7 +841,7 @@ export default function BuilderCreatePage({
         }}
       >
         <h2 className="cb-section-header" style={{ marginBottom: 4 }}>2. Poster workspace</h2>
-        <p className="cb-muted-text" style={{ margin: '0 0 8px 0' }}>Click the image to place or edit a pin, then use Inspector to save.</p>
+        <p className="cb-muted-text" style={{ margin: '0 0 8px 0' }}>Click the image to place or edit an item, then use Poster details to save.</p>
         {!selectedUpload?.public_url && <p className="cb-muted-text" style={{ margin: 0 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
         {selectedUpload?.public_url && (
           <>
@@ -880,7 +880,7 @@ export default function BuilderCreatePage({
                   <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom -</button>
                   <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom +</button>
                   <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-                  <button data-variant="secondary" style={posterControlButtonStyle} onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit to pinned items</button>
+                  <button data-variant="secondary" style={posterControlButtonStyle} onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit to items</button>
                   <button data-variant="secondary" style={posterControlButtonStyle} onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center selected</button>
                 </>
               )}
@@ -1006,7 +1006,7 @@ export default function BuilderCreatePage({
       </section>
 
       <section data-testid="builder-panel-inspector" className="cb-panel" style={{ minWidth: 0, overflow: 'auto', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
-        <h2 className="cb-section-header" style={{ marginTop: 0, marginBottom: 4 }}>3. Inspector</h2>
+        <h2 className="cb-section-header" style={{ marginTop: 0, marginBottom: 4 }}>3. Poster details</h2>
         <p className="cb-muted-text" style={{ margin: '0 0 10px 0' }}>Draft item details and review items on the selected poster.</p>
         <div style={{ display: 'grid', gap: 10 }}>
           {!selectedPosterId && <p className="cb-muted-text" style={{ margin: 0 }}>Select a submission to begin.</p>}
@@ -1169,7 +1169,7 @@ export default function BuilderCreatePage({
             <h3 style={{ margin: '0 0 10px 0' }}>Delete poster</h3>
             <div style={{ marginBottom: 8 }}>
               <div>Created: {new Date(selectedUpload.created_at).toLocaleString()}</div>
-              {selectedUpload.seen_at_name ? <div>Seen at: {selectedUpload.seen_at_name}</div> : null}
+              {selectedUpload.seen_at_name ? <div>Found at: {selectedUpload.seen_at_name}</div> : null}
               <div>Linked events: {selectedUpload.linked_count ?? selectedUpload.event_count ?? 0}</div>
             </div>
             <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>

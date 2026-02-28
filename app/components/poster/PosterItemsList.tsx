@@ -2,11 +2,11 @@ import type { ReactNode } from 'react'
 import { uiTokens } from '@/lib/uiTokens'
 
 export default function PosterItemsList({
-  title,
+  title = 'Poster details',
   children,
   maxHeight,
 }: {
-  title: string
+  title?: string
   children: ReactNode
   maxHeight?: number
 }) {

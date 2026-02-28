@@ -84,7 +84,7 @@ export default function BuilderTendPage() {
       body: JSON.stringify({ event_id: eventId }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Pin to board failed')
+    if (!res.ok) return setError(data?.error || 'Publish failed')
     await load()
   }
 
@@ -159,7 +159,7 @@ export default function BuilderTendPage() {
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">All status</option>
           <option value="draft">Draft</option>
-          <option value="published">Pinned</option>
+          <option value="published">Published</option>
         </select>
         <select value={linked} onChange={(e) => setLinked(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">Linked + unlinked</option>
@@ -192,7 +192,7 @@ export default function BuilderTendPage() {
                 <td style={{ borderTop: '1px solid #eee', padding: 8 }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {normalizeEventStatus(row.status, EVENT_STATUSES.DRAFT) !== EVENT_STATUSES.PUBLISHED && (
-                      <button onClick={() => publish(row.id)}>Pin to board</button>
+                      <button onClick={() => publish(row.id)}>Publish</button>
                     )}
                     <button data-variant="secondary" onClick={() => beginEdit(row)}>Edit</button>
                     <button data-variant="danger" onClick={() => removeEvent(row.id)}>Remove</button>
@@ -214,7 +214,7 @@ export default function BuilderTendPage() {
             <input type="datetime-local" value={editStartAt} onChange={(e) => setEditStartAt(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
             <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
               <option value="draft">Draft</option>
-              <option value="published">Pinned</option>
+              <option value="published">Published</option>
             </select>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={saveEdit}>Save changes</button>

@@ -236,6 +236,7 @@ export default async function Home() {
 
   return (
     <main
+      data-testid="home-shell"
       style={{
         padding: '16px clamp(16px, 4vw, 28px) 32px',
         fontFamily: 'sans-serif',

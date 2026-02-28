@@ -288,7 +288,7 @@ export default function PosterViewer({
           items={[
             { label: 'Captured', value: formatPhotoTakenHour(photoTakenAt) },
             {
-              label: 'Seen at',
+              label: 'Found at',
               value: seenAt
                 ? seenAtHref
                   ? <a href={seenAtHref} style={{ color: '#1d4ed8', textDecoration: 'none' }}>{seenAt}</a>
@@ -311,7 +311,7 @@ export default function PosterViewer({
             else setZoom(nextZoom)
           }} style={compactControlButtonStyle}>Zoom +</button>
           <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }} style={compactControlButtonStyle}>Reset</button>
-          <button data-variant="secondary" onClick={fitToPins} disabled={validPins.length === 0} style={compactControlButtonStyle}>Fit to pinned items</button>
+          <button data-variant="secondary" onClick={fitToPins} disabled={validPins.length === 0} style={compactControlButtonStyle}>Fit to items</button>
             <button data-variant="secondary" onClick={() => selectedPin && centerOnPin(selectedPin)} disabled={!selectedPin} style={compactControlButtonStyle}>Center selected</button>
           </PosterControls>
           <PosterStage
@@ -396,11 +396,7 @@ export default function PosterViewer({
           gridTemplateRows: 'auto 1fr',
         }}
       >
-        <div style={{ display: 'grid', gap: 2 }}>
-          <h2 className="cb-section-header cb-railScroll cbPosterRailCard">Other items on this poster</h2>
-          <p style={{ margin: 0, fontSize: uiTokens.typography.helper, color: uiTokens.colors.muted }}>Tap an item to center its pin.</p>
-        </div>
-        <PosterItemsList title="" maxHeight={10000}>
+        <PosterItemsList title="Poster details" maxHeight={10000}>
           {orderedPins.map((pin) => (
             <ItemCard
               key={pin.link_id}
@@ -420,7 +416,7 @@ export default function PosterViewer({
                     toggleUpvote(pin)
                   }}
                 >
-                  {(pinVotes[pin.event_id]?.did_upvote ? 'Pinned' : 'Pin to board')} · {pinVotes[pin.event_id]?.upvote_count ?? pin.upvote_count ?? 0}
+                  Upvote · {pinVotes[pin.event_id]?.upvote_count ?? pin.upvote_count ?? 0}
                 </button>
               </div>
 
@@ -446,7 +442,7 @@ export default function PosterViewer({
               ) : null}
             </ItemCard>
           ))}
-          {orderedPins.length === 0 ? <p style={{ margin: 0, color: uiTokens.colors.muted }}>No items pinned yet.</p> : null}
+          {orderedPins.length === 0 ? <p style={{ margin: 0, color: uiTokens.colors.muted }}>No items yet.</p> : null}
         </PosterItemsList>
       </aside>
       <div id="report-issue-placeholder" style={{ display: 'none' }} />
