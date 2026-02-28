@@ -1,3 +1,4 @@
+import Link from 'next/link'
 export const dynamic = 'force-static'
 
 function svgDataUrl() {
@@ -22,8 +23,8 @@ export default function Page() {
   return (
     <main style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
       <nav style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-        <a href="/">← Return to Community Board</a>
-        <a href="/browse">← Browse posters</a>
+        <Link href="/">← Return to Community Board</Link>
+        <Link href="/browse">← Browse posters</Link>
       </nav>
 
       <section

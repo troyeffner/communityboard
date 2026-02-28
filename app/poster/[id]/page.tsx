@@ -55,15 +55,15 @@ function renderLoadError(scope: string, detail: string) {
 
       {/* E2E nav guardrails (keep labels stable) */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '8px 0 12px' }}>
-        <a href="/">← Return to Community Board</a>
-        <a href="/browse">← Browse posters</a>
+        <Link href="/">← Return to Community Board</Link>
+        <Link href="/browse">← Browse posters</Link>
       </div>
 
       <p style={{ marginTop: 0 }}>We could not load this poster right now.</p>
       <p style={{ marginBottom: 8, opacity: 0.8 }}>{scope}: {detail}</p>
-      <a href="/api/health/schema" style={{ color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
+      <Link href="/api/health/schema">
         Check schema health
-      </a>
+      </Link>
     </main>
   )
 }

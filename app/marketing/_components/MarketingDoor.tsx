@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-async function postEvent(payload: any) {
+async function postEvent(payload: unknown) {
   try {
     await fetch('/api/marketing/event', {
       method: 'POST',

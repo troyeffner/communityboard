@@ -1,4 +1,5 @@
 import MarketingInterest from './_components/MarketingInterest'
+import Link from 'next/link'
 
 export const metadata = {
   title: 'CommunityBoard — A local community events board',
@@ -19,12 +20,12 @@ export default function MarketingPage() {
           </p>
 
           <div className="mk-ctaRow">
-            <a className="mk-btn mk-btnPrimary" href="/poster/e2e-fixture">
+            <Link href="/poster/e2e-fixture">
               See a live example
-            </a>
-            <a className="mk-btn mk-btnGhost" href="/browse">
+            </Link>
+            <Link href="/browse">
               Browse (if available)
-            </a>
+            </Link>
           </div>
 
           <div className="mk-note">
@@ -133,8 +134,8 @@ export default function MarketingPage() {
             If people click through and leave a note, that’s signal.
           </p>
           <div className="mk-ctaRow" style={{ marginTop: 14 }}>
-            <a className="mk-btn mk-btnPrimary" href="/marketing/stewards">Stewardship</a>
-            <a className="mk-btn mk-btnPrimary" href="/marketing/owners">Ownership</a>
+            <Link href="/marketing/stewards">Stewardship</Link>
+            <Link href="/marketing/owners">Ownership</Link>
           </div>
         </div>
       </section>

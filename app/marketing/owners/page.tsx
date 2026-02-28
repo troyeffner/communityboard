@@ -20,7 +20,7 @@ export default function OwnersPage() {
 
           <div className="mk-ctaRow">
             <Link className="mk-btn mk-btnGhost" href="/marketing">Back</Link>
-            <a className="mk-btn mk-btnPrimary" href="/poster/e2e-fixture">See example</a>
+            <Link href="/poster/e2e-fixture">See example</Link>
           </div>
         </div>
       </header>

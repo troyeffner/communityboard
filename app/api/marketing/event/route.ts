@@ -9,10 +9,10 @@ type MarketingEvent = {
   name: string
   path?: string
   ts?: string
-  meta?: any
+  meta?: unknown
 }
 
-function safeJson(obj: any) {
+function safeJson(obj: unknown) {
   try {
     return JSON.stringify(obj)
   } catch {

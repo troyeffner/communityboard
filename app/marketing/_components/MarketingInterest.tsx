@@ -17,7 +17,7 @@ const choices: Choice[] = [
   { id: 'want_notify', label: 'Notify me when it’s usable', detail: 'I’d want a link when it’s ready for real use.' },
 ]
 
-async function postEvent(payload: any) {
+async function postEvent(payload: unknown) {
   try {
     await fetch('/api/marketing/event', {
       method: 'POST',
