@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import CreateClient from './CreateClient'
+
+export const metadata: Metadata = {
+  title: 'Create – Community Board',
+}
 
 type SearchParams = {
   poster?: string

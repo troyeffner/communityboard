@@ -1,8 +1,13 @@
 export const dynamic = 'force-dynamic'
 
+import type { Metadata } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import { headers } from 'next/headers'
 import PublicEventsList from './components/PublicEventsList'
+
+export const metadata: Metadata = {
+  title: 'Community Board',
+}
 
 type EventStatus = 'draft' | 'published'
 

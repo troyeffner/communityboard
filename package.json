@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "node --test tests/regression/*.test.mjs",
     "test:e2e": "npx playwright test",
+    "snap:browse": "node scripts/manual-snap-browse.mjs",
     "test:regression": "npm run test && npm run lint && npm run build && npm run test:e2e",
     "verify:guardrails": "npm run test && npm run lint && npm run build && npm run test:e2e"
   },

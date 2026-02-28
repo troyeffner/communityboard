@@ -1,8 +1,9 @@
+import type { Metadata } from 'next'
 import MarketingInterest from './_components/MarketingInterest'
 import Link from 'next/link'
 
-export const metadata = {
-  title: 'CommunityBoard — A local community events board',
+export const metadata: Metadata = {
+  title: 'Marketing – Community Board',
   description:
     'A simple community board that turns real-world posters into a shared, chronological listing. Built for thousands, not millions.',
 }

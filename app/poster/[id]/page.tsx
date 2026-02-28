@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import PosterViewer from './PosterViewer'
 import PosterTagVoting from './PosterTagVoting'
 import { getPosterSeenAt } from '@/lib/seenAt'
@@ -145,6 +146,12 @@ function getE2eFixturePoster(id: string) {
       'e2e-event-1': { official: [{ id: 't1', label: 'volunteer', kind: 'topic', slug: 'volunteer' }], suggested: [] },
       'e2e-event-2': { official: [{ id: 't2', label: 'arts', kind: 'topic', slug: 'arts' }], suggested: [] },
     } as Record<string, EventTagBundle>,
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: 'Poster – Community Board',
   }
 }
 
