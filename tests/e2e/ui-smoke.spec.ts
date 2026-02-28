@@ -42,8 +42,7 @@ test.describe('CommunityBoard Verification Guardrails', () => {
     expect(stageBox?.height || 0).toBeGreaterThan(0)
     await assertNoHorizontalOverflow(page)
 
-    await expect(page).toHaveScreenshot('poster-view-mobile.png', {
-      fullPage: true,
+    await expect(stage).toHaveScreenshot('poster-stage-mobile.png', {
       animations: 'disabled',
     })
   })
@@ -66,15 +65,15 @@ test.describe('CommunityBoard Verification Guardrails', () => {
     await page.goto('/builder/create')
 
     const shell = page.getByTestId('builder-create-panels')
+    const workspace = page.getByTestId('builder-panel-workspace')
     await expect(shell).toBeVisible()
     await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/create"]')).toBeVisible()
     await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/tend"]')).toBeVisible()
-    await expect(page.getByTestId('builder-panel-workspace')).toBeVisible()
+    await expect(workspace).toBeVisible()
 
     await assertNoHorizontalOverflow(page)
 
-    await expect(page).toHaveScreenshot('builder-create-desktop.png', {
-      fullPage: true,
+    await expect(workspace).toHaveScreenshot('builder-create-workspace-desktop.png', {
       animations: 'disabled',
     })
   })

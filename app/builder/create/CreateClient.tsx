@@ -186,22 +186,9 @@ export default function BuilderCreatePage({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [inspectorTab, setInspectorTab] = useState<'event' | 'business' | 'posterMeta'>('event')
-  const [isMobile, setIsMobile] = useState(false)
-  const panelsRef = useRef<HTMLDivElement | null>(null)
   const [stageSize, setStageSize] = useState({ width: 1, height: 1 })
   const [schemaStatus, setSchemaStatus] = useState('')
   const [formBaseline, setFormBaseline] = useState(() => getFormFingerprint(getNewItemFormState()))
-  const posterControlButtonStyle = {
-    height: 40,
-    minHeight: 40,
-    padding: '0 12px',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    whiteSpace: 'nowrap' as const,
-    flex: '0 0 auto',
-  }
 
   function getCurrentFormState(): ItemFormState {
     return {
@@ -301,13 +288,6 @@ export default function BuilderCreatePage({
   }, [])
 
   useEffect(() => {
-    const update = () => setIsMobile(window.innerWidth < 980)
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [])
-
-  useEffect(() => {
     if (!stageRef.current) return
     const stage = stageRef.current
     const observer = new ResizeObserver((entries) => {
@@ -363,14 +343,10 @@ export default function BuilderCreatePage({
     setZoom(1)
     setPan({ x: 0, y: 0 })
     await loadRows(posterId)
-    if (isMobile && panelsRef.current) {
-      panelsRef.current.scrollTo({ left: panelsRef.current.clientWidth, behavior: 'smooth' })
-    }
   }
 
   function startEdit(row: PosterEventRow) {
     if (editingEventId === row.event.id && activeLinkId === row.link_id) {
-      setInspectorTab('event')
       return
     }
     if (!shouldDiscardUnsavedChanges('Switch items')) return
@@ -381,10 +357,6 @@ export default function BuilderCreatePage({
     applyFormState(nextForm)
     setFormBaselineTo(nextForm)
     setSeenAtName(selectedUpload?.seen_at_name || '')
-    setInspectorTab('event')
-    if (isMobile && panelsRef.current) {
-      panelsRef.current.scrollTo({ left: panelsRef.current.clientWidth * 2, behavior: 'smooth' })
-    }
   }
 
   function resetFormToNew() {
@@ -737,336 +709,220 @@ export default function BuilderCreatePage({
 
   const needsPinForNew = Boolean(selectedPosterId && !editingEventId)
   const canSubmitItem = !saving && (!needsPinForNew || Boolean(point))
+  const rowsForDetails = useMemo(() => {
+    if (!activeLinkId) return rows
+    const selectedRow = rows.find((row) => row.link_id === activeLinkId)
+    if (!selectedRow) return rows
+    return [selectedRow, ...rows.filter((row) => row.link_id !== activeLinkId)]
+  }, [rows, activeLinkId])
 
-  return (
-    <main
-      ref={panelsRef}
-      className="cb-page-container"
-      data-testid="builder-create-panels"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(3, calc(100vw - 32px))' : 'minmax(260px, 280px) minmax(0, 1fr) minmax(320px, 360px)',
-        gap: 16,
-        alignItems: 'start',
-        minHeight: 'calc(100vh - 64px)',
-        overflowX: isMobile ? 'auto' : 'hidden',
-        scrollSnapType: isMobile ? 'x mandatory' : 'none',
-      }}
-    >
-      <section data-testid="builder-panel-submissions" className="cb-panel" style={{ minWidth: 0, overflow: 'auto', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
-        <h1 className="cb-section-header" style={{ marginTop: 0, marginBottom: 4 }}>1. Submissions</h1>
-        <p className="cb-muted-text" style={{ margin: '0 0 10px 0' }}>Choose a poster, then place pins and draft items.</p>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-          <a
-            href="/builder/create"
-            className="cb-tab-button cb-tab-button-active"
-            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            Create drafts
-          </a>
-          <a
-            href="/builder/tend"
-            className="cb-tab-button"
-            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            Tend board
-          </a>
-        </div>
-        {process.env.NODE_ENV !== 'production' && schemaStatus ? (
-          <p className="cb-muted-text" style={{ margin: '0 0 8px 0' }}>{schemaStatus}</p>
-        ) : null}
-        <div className="cb-surface" style={{ padding: 10, marginBottom: 10 }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-              style={{ display: 'none' }}
-            />
-            <button
-              type="button"
-              data-variant="secondary"
-              onClick={() => uploadInputRef.current?.click()}
-              disabled={uploadingPoster}
-            >
-              {uploadFile ? 'Change photo' : 'Choose file'}
-            </button>
-            {uploadFile ? <div className="cb-muted-text">Photo selected</div> : null}
-            <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
-              {uploadingPoster ? 'Uploading...' : 'Upload and select'}
-            </button>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
-              <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
-            </div>
+  const SubmissionsPanel = () => (
+    <section data-testid="builder-panel-submissions" className="cb-panel cbCreatePanel cbCreatePanelSubmissions">
+      <div className="cbCreatePanelHead">
+        <h1 className="cb-section-header">Submissions</h1>
+        <p className="cb-muted-text cbCreatePanelHint">Choose a poster, then place pins and draft items.</p>
+      </div>
+      <div className="cbCreatePanelTabs">
+        <a href="/builder/create" className="cb-tab-button cb-tab-button-active cbCreateTabLink">Create drafts</a>
+        <a href="/builder/tend" className="cb-tab-button cbCreateTabLink">Tend board</a>
+      </div>
+      {process.env.NODE_ENV !== 'production' && schemaStatus ? <p className="cb-muted-text cbCreateStatusNote">{schemaStatus}</p> : null}
+      <div className="cb-surface cbCreateCard">
+        <div className="cbCreateStack">
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+            className="cbCreateHiddenInput"
+          />
+          <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
+            {uploadFile ? 'Change photo' : 'Choose file'}
+          </button>
+          {uploadFile ? <div className="cb-muted-text">Photo selected</div> : null}
+          <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
+            {uploadingPoster ? 'Uploading...' : 'Upload and select'}
+          </button>
+          <div className="cbCreateInlineActions">
+            <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
+            <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
           </div>
         </div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {uploads.filter((u) => !Boolean(u.is_done) && normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE).map((u) => (
-            <ItemCard
-              key={u.id}
-              onClick={() => selectPoster(u.id)}
-              selected={selectedPosterId === u.id}
-              title={formatCaptureHour(u.created_at)}
-              subtitle={`Status: ${posterStatusLabel(u.status)}`}
-              location={`Found at: ${u.seen_at_name || '—'}`}
-              status={`Items: ${u.linked_count ?? u.event_count ?? 0}`}
-            >
-              {u.public_url ? (
-                <img
-                  src={u.public_url}
-                  alt="Poster thumb"
-                  style={{ width: '100%', height: 112, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
-                />
-              ) : null}
-            </ItemCard>
-          ))}
-          {uploads.length === 0 && <p className="cb-muted-text" style={{ margin: 0 }}>No incomplete posters.</p>}
-        </div>
-      </section>
+      </div>
+      <div className="cbCreateScrollableList">
+        {uploads.filter((u) => !Boolean(u.is_done) && normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE).map((u) => (
+          <ItemCard
+            key={u.id}
+            onClick={() => selectPoster(u.id)}
+            selected={selectedPosterId === u.id}
+            title={formatCaptureHour(u.created_at)}
+            subtitle={`Status: ${posterStatusLabel(u.status)}`}
+            location={`Found at: ${u.seen_at_name || '—'}`}
+            status={`Items: ${u.linked_count ?? u.event_count ?? 0}`}
+          >
+            {u.public_url ? <img src={u.public_url} alt="Poster thumb" className="cbCreateThumb" /> : null}
+          </ItemCard>
+        ))}
+        {uploads.length === 0 ? <p className="cb-muted-text">No incomplete posters.</p> : null}
+      </div>
+    </section>
+  )
 
-      <section
-        data-testid="builder-panel-workspace"
-        className="cb-panel"
-        style={{
-          minWidth: 0,
-          overflow: 'hidden',
-          minHeight: 'clamp(560px, 78vh, 920px)',
-          display: 'grid',
-          gridTemplateRows: 'auto auto 1fr',
-          gap: 8,
-          scrollSnapAlign: isMobile ? 'start' : 'none',
-        }}
-      >
-        <h2 className="cb-section-header" style={{ marginBottom: 4 }}>2. Poster workspace</h2>
-        <p className="cb-muted-text" style={{ margin: '0 0 8px 0' }}>Click the image to place or edit an item, then use Poster details to save.</p>
-        {!selectedUpload?.public_url && <p className="cb-muted-text" style={{ margin: 0 }}>{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from the left list.'}</p>}
-        {selectedUpload?.public_url && (
-          <>
-            <PosterMetaStrip
-              items={[
-                { label: 'Captured', value: formatCaptureHour(selectedUpload.created_at) },
-                {
-                  label: 'Seen at',
-                  value: (
-                    <div style={{ minWidth: 0 }}>
-                      <input
-                        value={seenAtName}
-                        onChange={(e) => setSeenAtName(e.target.value)}
-                        placeholder="Seen at"
-                        style={{ width: '100%', marginTop: 4, padding: '6px 8px' }}
-                      />
-                      <button
-                        data-variant="secondary"
-                        type="button"
-                        onClick={saveSeenAt}
-                        disabled={!selectedPosterId || savingSeenAt}
-                        style={{ marginTop: 6, height: 32, minHeight: 32, padding: '0 10px' }}
-                      >
-                        {savingSeenAt ? 'Saving...' : 'Save'}
-                      </button>
-                    </div>
-                  ),
-                },
-                { label: 'Status', value: posterStatusLabel(selectedUpload.status) },
-                { label: 'Items', value: rows.length },
-              ]}
-            />
-            <PosterImageViewer
-              controls={(
-                <>
-                  <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom -</button>
-                  <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom +</button>
-                  <button data-variant="secondary" style={posterControlButtonStyle} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-                  <button data-variant="secondary" style={posterControlButtonStyle} onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit to items</button>
-                  <button data-variant="secondary" style={posterControlButtonStyle} onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center selected</button>
-                </>
-              )}
-              footer={(
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={markDone}>Mark Done</button>
-                  <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
-                </div>
-              )}
+  const WorkspacePanel = () => (
+    <section data-testid="builder-panel-workspace" className="cb-panel cbCreatePanel cbCreatePanelWorkspace">
+      <div className="cbCreatePanelHead">
+        <h2 className="cb-section-header">Workspace</h2>
+        <p className="cb-muted-text cbCreatePanelHint">Place pins on the poster, then edit details in Poster details.</p>
+      </div>
+      {!selectedUpload?.public_url ? (
+        <p className="cb-muted-text">{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from Submissions.'}</p>
+      ) : (
+        <>
+          <PosterMetaStrip
+            items={[
+              { label: 'Captured', value: formatCaptureHour(selectedUpload.created_at) },
+              {
+                label: 'Found at',
+                value: (
+                  <div className="cbCreateFoundAtEditor">
+                    <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Found at" className="cbCreateFoundAtInput" />
+                    <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
+                      {savingSeenAt ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                ),
+              },
+              { label: 'Status', value: posterStatusLabel(selectedUpload.status) },
+              { label: 'Items', value: rows.length },
+            ]}
+          />
+          <PosterImageViewer
+            controls={(
+              <>
+                <button data-variant="secondary" className="cbCreateControlButton" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom -</button>
+                <button data-variant="secondary" className="cbCreateControlButton" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom +</button>
+                <button data-variant="secondary" className="cbCreateControlButton" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
+                <button data-variant="secondary" className="cbCreateControlButton" onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit to items</button>
+                <button data-variant="secondary" className="cbCreateControlButton" onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center selected</button>
+              </>
+            )}
+            footer={(
+              <div className="cbCreateInlineActions">
+                <button onClick={markDone}>Mark done</button>
+                <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
+              </div>
+            )}
+          >
+            <div
+              ref={stageRef}
+              onMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY }; didDragRef.current = false }}
+              onMouseMove={(e) => {
+                if (!dragRef.current) return
+                const dx = e.clientX - dragRef.current.x
+                const dy = e.clientY - dragRef.current.y
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDragRef.current = true
+                setPan((prev) => clampPan({ x: prev.x + dx, y: prev.y + dy }))
+                dragRef.current = { x: e.clientX, y: e.clientY }
+              }}
+              onMouseUp={() => { dragRef.current = null }}
+              onMouseLeave={() => { dragRef.current = null }}
+              className="cbCreateStage"
             >
-              <div
-                ref={stageRef}
-                onMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY }; didDragRef.current = false }}
-                onMouseMove={(e) => {
-                  if (!dragRef.current) return
-                  const dx = e.clientX - dragRef.current.x
-                  const dy = e.clientY - dragRef.current.y
-                  if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDragRef.current = true
-                  setPan((prev) => clampPan({ x: prev.x + dx, y: prev.y + dy }))
-                  dragRef.current = { x: e.clientX, y: e.clientY }
-                }}
-                onMouseUp={() => { dragRef.current = null }}
-                onMouseLeave={() => { dragRef.current = null }}
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  maxWidth: '100%',
-                  minWidth: 0,
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                  minHeight: 320,
-                  height: '100%',
-                  background: '#f8fafc',
-                }}
-              >
-                <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'top left' }}>
-                  <img
-                    ref={imageRef}
-                    src={selectedUpload.public_url}
-                    alt="Poster"
-                    onLoad={(e) => {
-                      setImageNatural({
-                        width: Math.max(1, e.currentTarget.naturalWidth || 1),
-                        height: Math.max(1, e.currentTarget.naturalHeight || 1),
-                      })
-                    }}
-                    onClick={(e) => {
-                      if (didDragRef.current) {
-                        didDragRef.current = false
-                        return
-                      }
-                      if (editingEventId && !shouldDiscardUnsavedChanges('Start a new item')) return
-                      const m = getStageMetrics()
-                      if (!m) return
-                      const rect = e.currentTarget.getBoundingClientRect()
-                      const x = (e.clientX - rect.left) / rect.width
-                      const y = (e.clientY - rect.top) / rect.height
-                      setPoint({ x: Number(Math.max(0, Math.min(1, x)).toFixed(4)), y: Number(Math.max(0, Math.min(1, y)).toFixed(4)) })
-                      setActiveLinkId(null)
-                      setEditingEventId(null)
-                      if (editingEventId) setFormBaselineToCurrent()
-                      setInspectorTab('event')
-                    }}
-                    style={{
-                      position: 'absolute',
-                      left: `${getStageMetrics()?.offsetX || 0}px`,
-                      top: `${getStageMetrics()?.offsetY || 0}px`,
-                      width: `${getStageMetrics()?.baseW || 0}px`,
-                      height: `${getStageMetrics()?.baseH || 0}px`,
-                      objectFit: 'contain',
-                      display: 'block',
-                    }}
-                  />
-                  {rows.filter((row) => row.bbox).map((row) => {
-                    const active = activeLinkId === row.link_id
-                    return (
-                      <button
-                        key={row.link_id}
-                        type="button"
-                        title={row.event.title}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          startEdit(row)
-                        }}
-                        style={{
-                          position: 'absolute',
-                          left: `${(getStageMetrics()?.offsetX || 0) + row.bbox!.x * (getStageMetrics()?.baseW || 0)}px`,
-                          top: `${(getStageMetrics()?.offsetY || 0) + row.bbox!.y * (getStageMetrics()?.baseH || 0)}px`,
-                          transform: 'translate(-50%, -50%)',
-                          width: active ? 16 : 12,
-                          height: active ? 16 : 12,
-                          borderRadius: 999,
-                          background: active ? '#ef4444' : '#22c55e',
-                          border: '2px solid #fff',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
-                          cursor: 'pointer',
-                        }}
-                      />
-                    )
-                  })}
-                  {!editingEventId && point && (
-                    <div
+              <div className="cbCreateTransformLayer" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
+                <img
+                  ref={imageRef}
+                  src={selectedUpload.public_url}
+                  alt="Poster"
+                  onLoad={(e) => {
+                    setImageNatural({
+                      width: Math.max(1, e.currentTarget.naturalWidth || 1),
+                      height: Math.max(1, e.currentTarget.naturalHeight || 1),
+                    })
+                  }}
+                  onClick={(e) => {
+                    if (didDragRef.current) {
+                      didDragRef.current = false
+                      return
+                    }
+                    if (editingEventId && !shouldDiscardUnsavedChanges('Start a new item')) return
+                    const m = getStageMetrics()
+                    if (!m) return
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const x = (e.clientX - rect.left) / rect.width
+                    const y = (e.clientY - rect.top) / rect.height
+                    setPoint({ x: Number(Math.max(0, Math.min(1, x)).toFixed(4)), y: Number(Math.max(0, Math.min(1, y)).toFixed(4)) })
+                    setActiveLinkId(null)
+                    setEditingEventId(null)
+                    if (editingEventId) setFormBaselineToCurrent()
+                  }}
+                  className="cbCreateStageImage"
+                  style={{
+                    left: `${getStageMetrics()?.offsetX || 0}px`,
+                    top: `${getStageMetrics()?.offsetY || 0}px`,
+                    width: `${getStageMetrics()?.baseW || 0}px`,
+                    height: `${getStageMetrics()?.baseH || 0}px`,
+                  }}
+                />
+                {rows.filter((row) => row.bbox).map((row) => {
+                  const active = activeLinkId === row.link_id
+                  return (
+                    <button
+                      key={row.link_id}
+                      type="button"
+                      title={row.event.title}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startEdit(row)
+                      }}
+                      className={active ? 'cbCreatePin cbCreatePinActive' : 'cbCreatePin'}
                       style={{
-                        position: 'absolute',
-                        left: `${(getStageMetrics()?.offsetX || 0) + point.x * (getStageMetrics()?.baseW || 0)}px`,
-                        top: `${(getStageMetrics()?.offsetY || 0) + point.y * (getStageMetrics()?.baseH || 0)}px`,
-                        transform: 'translate(-50%, -50%)',
-                        width: 14,
-                        height: 14,
-                        borderRadius: 999,
-                        background: '#ef4444',
-                        border: '2px solid #fff',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                        left: `${(getStageMetrics()?.offsetX || 0) + row.bbox!.x * (getStageMetrics()?.baseW || 0)}px`,
+                        top: `${(getStageMetrics()?.offsetY || 0) + row.bbox!.y * (getStageMetrics()?.baseH || 0)}px`,
                       }}
                     />
-                  )}
-                </div>
+                  )
+                })}
+                {!editingEventId && point ? (
+                  <div
+                    className="cbCreateDraftPin"
+                    style={{
+                      left: `${(getStageMetrics()?.offsetX || 0) + point.x * (getStageMetrics()?.baseW || 0)}px`,
+                      top: `${(getStageMetrics()?.offsetY || 0) + point.y * (getStageMetrics()?.baseH || 0)}px`,
+                    }}
+                  />
+                ) : null}
               </div>
-            </PosterImageViewer>
-          </>
-        )}
-      </section>
+            </div>
+          </PosterImageViewer>
+        </>
+      )}
+    </section>
+  )
 
-      <section data-testid="builder-panel-inspector" className="cb-panel" style={{ minWidth: 0, overflow: 'auto', scrollSnapAlign: isMobile ? 'start' : 'none' }}>
-        <h2 className="cb-section-header" style={{ marginTop: 0, marginBottom: 4 }}>3. Poster details</h2>
-        <p className="cb-muted-text" style={{ margin: '0 0 10px 0' }}>Draft item details and review items on the selected poster.</p>
-        <div style={{ display: 'grid', gap: 10 }}>
-          {!selectedPosterId && <p className="cb-muted-text" style={{ margin: 0 }}>Select a submission to begin.</p>}
-          {selectedPosterId && (
-            <>
-              <div className="cb-surface" style={{ padding: 8 }}>
-                <div className="cb-section-tabs">
-                  <button
-                    type="button"
-                    className={inspectorTab === 'event' ? 'cb-tab-button cb-tab-button-active' : 'cb-tab-button'}
-                    onClick={() => setInspectorTab('event')}
-                  >
-                    Item
-                  </button>
-                  <button
-                    type="button"
-                    className={inspectorTab === 'business' ? 'cb-tab-button cb-tab-button-active' : 'cb-tab-button'}
-                    onClick={() => setInspectorTab('business')}
-                  >
-                    Business/Service
-                  </button>
-                  <button
-                    type="button"
-                    className={inspectorTab === 'posterMeta' ? 'cb-tab-button cb-tab-button-active' : 'cb-tab-button'}
-                    onClick={() => setInspectorTab('posterMeta')}
-                  >
-                    Poster meta
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-          {error && (
-            <p style={{ color: '#b91c1c', margin: 0, border: '1px solid #fecaca', borderRadius: 8, background: '#fff1f2', padding: '8px 10px' }}>
-              {error}{' '}
-              <a href="/api/health/schema" target="_blank" rel="noreferrer" style={{ color: '#991b1b', textDecoration: 'underline' }}>
-                Check schema health
-              </a>
-            </p>
-          )}
-          {message && <p style={{ margin: 0, border: '1px solid #bfdbfe', borderRadius: 8, background: '#eff6ff', padding: '8px 10px', color: '#1e3a8a' }}>{message}</p>}
-          {selectedPosterId && inspectorTab === 'posterMeta' && (
-            <div className="cb-surface" style={{ padding: 12 }}>
-              <div style={{ display: 'grid', gap: 8 }}>
-                <div className="cb-meta-label">Captured</div>
-                <div>{formatCaptureHour(selectedUpload?.created_at || null)}</div>
-                <p className="cb-muted-text" style={{ margin: 0 }}>Edit poster metadata in the Poster workspace section above the image.</p>
-              </div>
-            </div>
-          )}
-          {selectedPosterId && inspectorTab === 'business' && (
-            <div className="cb-surface" style={{ padding: 12 }}>
-              <p className="cb-muted-text" style={{ margin: 0 }}>Business/Service editor is coming soon. Use Event tab for now.</p>
-            </div>
-          )}
-          {selectedPosterId && inspectorTab === 'event' && (
-            <div className="cb-surface" style={{ padding: 12 }}>
-              <div style={{ display: 'grid', gap: 8 }}>
-                <h3 style={{ margin: '0 0 2px 0' }}>{editingEventId ? 'Edit item' : 'New item'}</h3>
-                <label style={{ display: 'grid', gap: 4 }}>
+  const PosterDetailsPanel = () => (
+    <section data-testid="builder-panel-inspector" className="cb-panel cbCreatePanel cbCreatePanelDetails">
+      <div className="cbCreatePanelHead">
+        <h2 className="cb-section-header">Poster details</h2>
+        <p className="cb-muted-text cbCreatePanelHint">Create or edit items linked to pinned coordinates on this poster.</p>
+      </div>
+      <div className="cbCreateDetailsScroll">
+        {!selectedPosterId ? <p className="cb-muted-text">Select a submission to begin.</p> : null}
+        {error ? (
+          <p className="cbCreateAlertError">
+            {error}{' '}
+            <a href="/api/health/schema" target="_blank" rel="noreferrer">
+              Check schema health
+            </a>
+          </p>
+        ) : null}
+        {message ? <p className="cbCreateAlertInfo">{message}</p> : null}
+        {selectedPosterId ? (
+          <>
+            <div className="cb-surface cbCreateCard">
+              <h3 className="cbCreateCardTitle">{editingEventId ? 'Edit item' : 'Create item'}</h3>
+              <div className="cbCreateFormGrid">
+                <label className="cbCreateField">
                   <span className="cb-meta-label">Item type</span>
                   <select value={itemType} onChange={(e) => setItemType(normalizeItemType(e.target.value, 'event'))}>
                     {ITEM_TYPES.map((type) => (
@@ -1074,15 +930,12 @@ export default function BuilderCreatePage({
                     ))}
                   </select>
                 </label>
-                <div className="cb-meta-label" style={{ marginTop: 2 }}>Item details</div>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
-                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" />
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" style={{ resize: 'vertical' }} />
-                {isTimeBoundType(itemType) ? (
-                  <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} />
-                ) : null}
+                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Event at" />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" className="cbCreateTextarea" />
+                {isTimeBoundType(itemType) ? <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} /> : null}
                 {itemType === 'recurring_event' ? (
-                  <div style={{ display: 'grid', gap: 8, border: '1px solid #dbe2ea', borderRadius: 8, padding: 10, background: '#f8fafc' }}>
+                  <div className="cbCreateRepeatCard">
                     <div className="cb-meta-label">Recurring cadence</div>
                     <select value={recurrenceMode} onChange={(e) => setRecurrenceMode(e.target.value as typeof recurrenceMode)}>
                       <option value="weekly">Weekly</option>
@@ -1107,17 +960,21 @@ export default function BuilderCreatePage({
                     </select>
                   </div>
                 ) : null}
-                {!editingEventId && !point ? <p className="cb-muted-text" style={{ margin: 0 }}>Click the poster to place a pin.</p> : null}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {!editingEventId && !point ? <p className="cb-muted-text">Click the poster to place a pin before saving.</p> : null}
+                <div className="cbCreateInlineActions">
                   <button onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
-                  {(editingEventId || point || isFormDirty) && <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button>}
+                  {(editingEventId || point || isFormDirty) ? <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button> : null}
                 </div>
               </div>
-              <PosterItemsList title="Items on this poster" maxHeight={260}>
-                {rows.length === 0 ? (
-                  <p className="cb-muted-text" style={{ margin: 0 }}>No items yet. Click image to add a new pin and item.</p>
+            </div>
+
+            <div className="cb-surface cbCreateCard">
+              <h3 className="cbCreateCardTitle">Items</h3>
+              <PosterItemsList title="">
+                {rowsForDetails.length === 0 ? (
+                  <p className="cb-muted-text">No items yet. Click image to add a new pin and item.</p>
                 ) : (
-                  rows.map((row) => {
+                  rowsForDetails.map((row) => {
                     const parsedStart = new Date(row.event.start_at)
                     const startLabel = Number.isNaN(parsedStart.getTime()) ? 'No date/time yet' : parsedStart.toLocaleString()
                     const recurrenceLabel = row.event.item_type === 'recurring_event'
@@ -1131,10 +988,11 @@ export default function BuilderCreatePage({
                         subtitle={`${startLabel} • ${(row.event.item_type || 'event').replaceAll('_', ' ')}`}
                         status={statusLabel(row.event.status)}
                         onClick={() => startEdit(row)}
-                        location={row.event.location ? `Location: ${row.event.location}` : 'Location: —'}
+                        location={row.event.location ? `Event at: ${row.event.location}` : 'Event at: —'}
                       >
-                        {recurrenceLabel ? <div className="cb-muted-text" style={{ marginBottom: 6 }}>Cadence: {recurrenceLabel}</div> : null}
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div className="cb-muted-text cbCreateMetaLine">Found at: {selectedUpload?.seen_at_name || '—'}</div>
+                        {recurrenceLabel ? <div className="cb-muted-text cbCreateMetaLine">Cadence: {recurrenceLabel}</div> : null}
+                        <div className="cbCreateInlineActions">
                           <button data-variant="secondary" onClick={(e) => { e.stopPropagation(); startEdit(row) }}>Edit</button>
                           <button data-variant="danger" onClick={(e) => { e.stopPropagation(); deleteEventRow(row) }}>Delete</button>
                         </div>
@@ -1144,9 +1002,17 @@ export default function BuilderCreatePage({
                 )}
               </PosterItemsList>
             </div>
-          )}
-        </div>
-      </section>
+          </>
+        ) : null}
+      </div>
+    </section>
+  )
+
+  return (
+    <main className="cb-page-container cbCreateBoardLayout" data-testid="builder-create-panels">
+      <SubmissionsPanel />
+      <WorkspacePanel />
+      <PosterDetailsPanel />
 
       {deleteModalOpen && selectedUpload && (
         <div

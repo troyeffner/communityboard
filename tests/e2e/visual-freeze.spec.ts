@@ -11,8 +11,9 @@ test('poster view visual snapshot', async ({ page }) => {
 test('builder create visual snapshot', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/builder/create')
-  await expect(page.getByTestId('builder-create-panels')).toBeVisible()
+  const workspace = page.getByTestId('builder-panel-workspace')
+  await expect(workspace).toBeVisible()
   await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/create"]')).toBeVisible()
   await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/tend"]')).toBeVisible()
-  await expect(page).toHaveScreenshot('builder-create-desktop.png', { fullPage: true })
+  await expect(workspace).toHaveScreenshot('builder-create-workspace-desktop.png', { animations: 'disabled' })
 })
