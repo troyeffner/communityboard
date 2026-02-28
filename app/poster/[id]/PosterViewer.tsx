@@ -116,9 +116,7 @@ export default function PosterViewer({
       })
     })
     observer.observe(stageRef.current)
-    return (
-    <div className="cbPosterDebugBadge">PosterViewer rendered</div>
-) => observer.disconnect()
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {

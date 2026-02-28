@@ -10,8 +10,8 @@ type Evt = {
   name?: string
   path?: string
   ts?: string
-  meta?: any
-  _meta?: any
+  meta?: unknown
+  _meta?: unknown
 }
 
 function readEvents(): Evt[] {
@@ -30,9 +30,14 @@ function readEvents(): Evt[] {
   return out
 }
 
-function safeStr(v: any) {
+function safeStr(v: unknown) {
   if (typeof v === 'string') return v
   return v == null ? '' : String(v)
+}
+
+function eventMeta(e: Evt): Record<string, unknown> {
+  if (e.meta && typeof e.meta === 'object') return e.meta as Record<string, unknown>
+  return {}
 }
 
 export default function MarketingAdminPage() {
@@ -44,7 +49,8 @@ export default function MarketingAdminPage() {
   const byDoor = (xs: Evt[]) => {
     const m = new Map<string, number>()
     for (const e of xs) {
-      const doorId = safeStr(e?.meta?.doorId) || '(unknown)'
+      const meta = eventMeta(e)
+      const doorId = safeStr(meta.doorId) || '(unknown)'
       m.set(doorId, (m.get(doorId) || 0) + 1)
     }
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
@@ -54,13 +60,16 @@ export default function MarketingAdminPage() {
   const submitByDoor = byDoor(submits)
 
   const notes = submits
-    .map(e => ({
-      ts: safeStr(e.ts),
-      doorId: safeStr(e?.meta?.doorId),
-      email: safeStr(e?.meta?.email),
-      note: safeStr(e?.meta?.note),
-      path: safeStr(e.path),
-    }))
+    .map(e => {
+      const meta = eventMeta(e)
+      return {
+        ts: safeStr(e.ts),
+        doorId: safeStr(meta.doorId),
+        email: safeStr(meta.email),
+        note: safeStr(meta.note),
+        path: safeStr(e.path),
+      }
+    })
     .filter(n => n.note || n.email)
     .slice(0, 50)
 
