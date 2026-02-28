@@ -1,13 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { POSTER_STATUSES, eventStatusLabel, posterStatusLabel, normalizePosterStatus } from '@/lib/statuses'
-import { ITEM_TYPES, type ItemType, normalizeItemType } from '@/lib/itemTypes'
 import { createClient } from '@supabase/supabase-js'
-import PosterMetaStrip from '@/app/components/poster/PosterMetaStrip'
-import PosterItemsList from '@/app/components/poster/PosterItemsList'
-import ItemCard from '@/app/components/poster/ItemCard'
-import PosterImageViewer from '@/app/components/poster/PosterImageViewer'
+import { ITEM_TYPES, type ItemType, normalizeItemType } from '@/lib/itemTypes'
+import { POSTER_STATUSES, eventStatusLabel, posterStatusLabel, normalizePosterStatus } from '@/lib/statuses'
 
 type Upload = {
   id: string
@@ -19,6 +15,8 @@ type Upload = {
   event_count: number
   linked_count?: number
 }
+
+type Poster = Upload
 
 type PosterEventRow = {
   link_id: string
@@ -119,7 +117,7 @@ function friendlyError(message: string | undefined, fallback: string) {
   if (raw) console.error('[builder/create] API error:', raw)
   if (msg.includes('enum')) return 'Status value is not supported by this environment yet.'
   if (msg.includes('seen_at_name') || msg.includes('42703') || msg.includes('schema cache') || msg.includes('column')) {
-    return 'Database schema is out of date for this action. Run /api/health/schema to inspect missing columns.'
+    return 'Required database fields are unavailable in this environment. Verify /api/health/schema.'
   }
   return message || fallback
 }
@@ -141,7 +139,7 @@ function getFormFingerprint(form: ItemFormState) {
   return JSON.stringify(form)
 }
 
-export default function BuilderCreatePage({
+export default function CreateClient({
   initialPosterId,
   initialManualMode = false,
 }: {
@@ -149,14 +147,11 @@ export default function BuilderCreatePage({
   initialManualMode?: boolean
 }) {
   const manualMode = initialManualMode
-  const posterUploadFromQuery = initialPosterId
 
   const [uploads, setUploads] = useState<Upload[]>([])
-  const [selectedPosterId, setSelectedPosterId] = useState<string | null>(null)
-  const selectedUpload = useMemo(() => uploads.find((u) => u.id === selectedPosterId) || null, [uploads, selectedPosterId])
+  const [selectedPoster, setSelectedPoster] = useState<Poster | null>(null)
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [rows, setRows] = useState<PosterEventRow[]>([])
-  const [activeLinkId, setActiveLinkId] = useState<string | null>(null)
-  const [editingEventId, setEditingEventId] = useState<string | null>(null)
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
 
   const [title, setTitle] = useState('')
@@ -168,6 +163,7 @@ export default function BuilderCreatePage({
   const [description, setDescription] = useState('')
   const [startAt, setStartAt] = useState(defaultStartAt2pmLocal())
   const [seenAtName, setSeenAtName] = useState('')
+
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadingPoster, setUploadingPoster] = useState(false)
@@ -175,10 +171,11 @@ export default function BuilderCreatePage({
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const stageRef = useRef<HTMLDivElement | null>(null)
-  const imageRef = useRef<HTMLImageElement | null>(null)
-  const [imageNatural, setImageNatural] = useState({ width: 1, height: 1 })
   const dragRef = useRef<{ x: number; y: number } | null>(null)
   const didDragRef = useRef(false)
+  const [imageNatural, setImageNatural] = useState({ width: 1, height: 1 })
+  const [stageSize, setStageSize] = useState({ width: 1, height: 1 })
+
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteMode, setDeleteMode] = useState<'unlink' | 'delete_with_events'>('unlink')
   const [deletingPoster, setDeletingPoster] = useState(false)
@@ -186,9 +183,10 @@ export default function BuilderCreatePage({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [stageSize, setStageSize] = useState({ width: 1, height: 1 })
-  const [schemaStatus, setSchemaStatus] = useState('')
   const [formBaseline, setFormBaseline] = useState(() => getFormFingerprint(getNewItemFormState()))
+
+  const selectedRow = useMemo(() => rows.find((row) => row.link_id === selectedItemId) || null, [rows, selectedItemId])
+  const editingEventId = selectedRow?.event.id || null
 
   function getCurrentFormState(): ItemFormState {
     return {
@@ -245,67 +243,60 @@ export default function BuilderCreatePage({
   async function loadUploads() {
     const res = await fetch('/api/manage/list-uploads-with-counts')
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to load posters'))
-    setUploads((data.uploads || []) as Upload[])
+    if (!res.ok) {
+      setError(friendlyError(data?.error, 'Failed to load posters'))
+      return [] as Upload[]
+    }
+    const nextUploads = (data.uploads || []) as Upload[]
+    setUploads(nextUploads)
+    setSelectedPoster((prev) => {
+      if (!prev) return prev
+      return nextUploads.find((u) => u.id === prev.id) || null
+    })
+    return nextUploads
   }
 
-  async function loadRows(uploadId: string | null) {
-    if (!uploadId) {
+  async function loadRows(posterId: string | null) {
+    if (!posterId) {
       setRows([])
       return
     }
-    const res = await fetch(`/api/manage/poster-events?poster_upload_id=${encodeURIComponent(uploadId)}`)
+    const res = await fetch(`/api/manage/poster-events?poster_upload_id=${encodeURIComponent(posterId)}`)
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to load events on poster'))
+    if (!res.ok) {
+      setError(friendlyError(data?.error, 'Failed to load items on poster'))
+      return
+    }
     setRows((data.rows || []) as PosterEventRow[])
   }
 
-  useEffect(() => {
-    loadUploads()
-  }, [])
+  async function selectPosterById(posterId: string, sourceUploads?: Upload[]) {
+    if (selectedPoster?.id !== posterId && !shouldDiscardUnsavedChanges('Switch posters')) return
+    const from = sourceUploads || uploads
+    const poster = from.find((u) => u.id === posterId) || null
+    const nextForm = getNewItemFormState()
+
+    setSelectedPoster(poster)
+    setSelectedItemId(null)
+    setPoint(null)
+    setError('')
+    setMessage('')
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+    applyFormState(nextForm)
+    setFormBaselineTo(nextForm)
+    setSeenAtName(poster?.seen_at_name || '')
+    await loadRows(posterId)
+  }
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return
-    let cancelled = false
-    const run = async () => {
-      try {
-        const res = await fetch('/api/health/schema')
-        const data = await res.json().catch(() => ({}))
-        if (cancelled) return
-        if (res.ok) setSchemaStatus('Schema OK')
-        else {
-          const missing = Array.isArray(data?.missing) ? data.missing.join(', ') : 'poster_uploads.seen_at_name'
-          setSchemaStatus(`Schema missing: ${missing} (run migration)`)
-        }
-      } catch {
-        if (!cancelled) setSchemaStatus('Schema check unavailable')
-      }
-    }
-    run()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!stageRef.current) return
-    const stage = stageRef.current
-    const observer = new ResizeObserver((entries) => {
-      const box = entries[0]?.contentRect
-      if (!box) return
-      setStageSize({ width: box.width || 1, height: box.height || 1 })
+    loadUploads().then((nextUploads) => {
+      if (!initialPosterId) return
+      const exists = nextUploads.find((u) => u.id === initialPosterId)
+      if (exists) selectPosterById(exists.id, nextUploads)
     })
-    observer.observe(stage)
-    return () => observer.disconnect()
-  }, [selectedPosterId])
-
-  useEffect(() => {
-    if (!posterUploadFromQuery || selectedPosterId) return
-    const exists = uploads.find((u) => u.id === posterUploadFromQuery)
-    if (exists) {
-      selectPoster(posterUploadFromQuery)
-    }
-  }, [posterUploadFromQuery, selectedPosterId, uploads])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!manualMode) return
@@ -317,67 +308,137 @@ export default function BuilderCreatePage({
     }
   }, [manualMode, seenAtName])
 
-  async function goToNextUntendedPoster() {
-    const res = await fetch('/api/builder/next-poster')
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to load next poster'))
-    const nextId = data?.poster?.id as string | undefined
-    if (!nextId) return setMessage('No untended posters in queue.')
-    await loadUploads()
-    await selectPoster(nextId)
+  useEffect(() => {
+    if (!stageRef.current) return
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect
+      if (!box) return
+      setStageSize({ width: box.width || 1, height: box.height || 1 })
+    })
+    observer.observe(stageRef.current)
+    return () => observer.disconnect()
+  }, [selectedPoster?.id])
+
+  const stageMetrics = useMemo(() => {
+    const stageW = stageSize.width || 1
+    const stageH = stageSize.height || 1
+    const naturalRatio = imageNatural.width / Math.max(1, imageNatural.height)
+    const stageRatio = stageW / stageH
+
+    let baseW = stageW
+    let baseH = stageH
+    if (naturalRatio > stageRatio) {
+      baseW = stageW
+      baseH = stageW / naturalRatio
+    } else {
+      baseH = stageH
+      baseW = stageH * naturalRatio
+    }
+    const offsetX = (stageW - baseW) / 2
+    const offsetY = (stageH - baseH) / 2
+    return { stageW, stageH, baseW, baseH, offsetX, offsetY }
+  }, [stageSize.width, stageSize.height, imageNatural.width, imageNatural.height])
+
+  function clampPan(nextPan: { x: number; y: number }, nextZoom = zoom) {
+    const renderedW = stageMetrics.baseW * nextZoom
+    const renderedH = stageMetrics.baseH * nextZoom
+    const offsetScaledX = stageMetrics.offsetX * nextZoom
+    const offsetScaledY = stageMetrics.offsetY * nextZoom
+
+    let clampedX = nextPan.x
+    let clampedY = nextPan.y
+
+    if (renderedW <= stageMetrics.stageW) {
+      clampedX = (stageMetrics.stageW - renderedW) / 2 - offsetScaledX
+    } else {
+      const minX = stageMetrics.stageW - (offsetScaledX + renderedW)
+      const maxX = -offsetScaledX
+      clampedX = Math.max(minX, Math.min(maxX, clampedX))
+    }
+
+    if (renderedH <= stageMetrics.stageH) {
+      clampedY = (stageMetrics.stageH - renderedH) / 2 - offsetScaledY
+    } else {
+      const minY = stageMetrics.stageH - (offsetScaledY + renderedH)
+      const maxY = -offsetScaledY
+      clampedY = Math.max(minY, Math.min(maxY, clampedY))
+    }
+
+    return { x: Number(clampedX.toFixed(1)), y: Number(clampedY.toFixed(1)) }
   }
 
-  async function selectPoster(posterId: string) {
-    if (posterId !== selectedPosterId && !shouldDiscardUnsavedChanges('Switch posters')) return
-    const upload = uploads.find((u) => u.id === posterId) || null
-    const nextForm = getNewItemFormState()
-    setSelectedPosterId(posterId)
-    setError('')
-    setMessage('')
-    setActiveLinkId(null)
-    setEditingEventId(null)
-    setPoint(null)
-    applyFormState(nextForm)
-    setFormBaselineTo(nextForm)
-    setSeenAtName(upload?.seen_at_name || '')
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-    await loadRows(posterId)
+  useEffect(() => {
+    if (!selectedPoster?.public_url) return
+    setPan((prev) => clampPan(prev, zoom))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPoster?.public_url, zoom, stageSize.width, stageSize.height, imageNatural.width, imageNatural.height])
+
+  function centerOnPoint(pointToCenter: { x: number; y: number }, targetZoom = zoom) {
+    const panX = stageMetrics.stageW / 2 - (stageMetrics.offsetX + pointToCenter.x * stageMetrics.baseW) * targetZoom
+    const panY = stageMetrics.stageH / 2 - (stageMetrics.offsetY + pointToCenter.y * stageMetrics.baseH) * targetZoom
+    setZoom(Number(targetZoom.toFixed(2)))
+    setPan({ x: Number(panX.toFixed(1)), y: Number(panY.toFixed(1)) })
+  }
+
+  function fitToItems() {
+    const pins = rows.filter((row) => row.bbox).map((row) => row.bbox!)
+    if (pins.length === 0) return
+    if (pins.length === 1) {
+      centerOnPoint(pins[0], Math.max(1.6, zoom))
+      return
+    }
+
+    const minX = Math.min(...pins.map((p) => p.x))
+    const minY = Math.min(...pins.map((p) => p.y))
+    const maxX = Math.max(...pins.map((p) => p.x))
+    const maxY = Math.max(...pins.map((p) => p.y))
+
+    const paddingX = 0.08
+    const paddingY = 0.08
+    const startX = Math.max(0, minX - paddingX)
+    const startY = Math.max(0, minY - paddingY)
+    const boxWidth = Math.max(0.04, Math.min(1, maxX - minX + paddingX * 2))
+    const boxHeight = Math.max(0.04, Math.min(1, maxY - minY + paddingY * 2))
+
+    const boxWpx = boxWidth * stageMetrics.baseW
+    const boxHpx = boxHeight * stageMetrics.baseH
+    const targetZoom = Math.max(1, Math.min(5, Math.min(stageMetrics.stageW / boxWpx, stageMetrics.stageH / boxHpx)))
+    centerOnPoint({ x: Math.min(1, startX + boxWidth / 2), y: Math.min(1, startY + boxHeight / 2) }, targetZoom)
+  }
+
+  function centerSelected() {
+    const active = rows.find((row) => row.link_id === selectedItemId && row.bbox)?.bbox || point
+    if (!active) return
+    centerOnPoint(active, Math.max(1.8, zoom))
   }
 
   function startEdit(row: PosterEventRow) {
-    if (editingEventId === row.event.id && activeLinkId === row.link_id) {
-      return
-    }
+    if (selectedItemId === row.link_id) return
     if (!shouldDiscardUnsavedChanges('Switch items')) return
     const nextForm = rowToFormState(row)
-    setEditingEventId(row.event.id)
-    setActiveLinkId(row.link_id)
+    setSelectedItemId(row.link_id)
     setPoint(null)
     applyFormState(nextForm)
     setFormBaselineTo(nextForm)
-    setSeenAtName(selectedUpload?.seen_at_name || '')
+    setSeenAtName(selectedPoster?.seen_at_name || '')
   }
 
   function resetFormToNew() {
     const nextForm = getNewItemFormState()
-    setEditingEventId(null)
-    setActiveLinkId(null)
+    setSelectedItemId(null)
+    setPoint(null)
     applyFormState(nextForm)
     setFormBaselineTo(nextForm)
   }
 
   async function saveSeenAt() {
-    if (!selectedPosterId || !seenAtName.trim()) return true
+    if (!selectedPoster?.id || !seenAtName.trim()) return true
     setSavingSeenAt(true)
     try {
       const res = await fetch('/api/manage/update-poster', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          poster_upload_id: selectedPosterId,
-          seen_at_name: seenAtName,
-        }),
+        body: JSON.stringify({ poster_upload_id: selectedPoster.id, seen_at_name: seenAtName }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -389,7 +450,11 @@ export default function BuilderCreatePage({
       } catch {
         // ignore localStorage failures
       }
-      await loadUploads()
+      const nextUploads = await loadUploads()
+      if (selectedPoster) {
+        const refreshed = nextUploads.find((u) => u.id === selectedPoster.id) || null
+        setSelectedPoster(refreshed)
+      }
       return true
     } finally {
       setSavingSeenAt(false)
@@ -399,8 +464,17 @@ export default function BuilderCreatePage({
   async function saveEvent() {
     setError('')
     setMessage('')
-    if (isTimeBoundType(itemType) && !startAt.trim()) return setError('Start time is required for this item type.')
-    if (!selectedPosterId && !manualMode) return setError('Select a poster first.')
+
+    if (isTimeBoundType(itemType) && !startAt.trim()) {
+      setError('Start time is required for this item type.')
+      return
+    }
+
+    if (!selectedPoster && !manualMode) {
+      setError('Select a poster first.')
+      return
+    }
+
     const effectiveTitle = title.trim() || 'Untitled draft'
 
     setSaving(true)
@@ -422,15 +496,18 @@ export default function BuilderCreatePage({
           }),
         })
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) return setError(friendlyError(data?.error, 'Failed to update event'))
+        if (!res.ok) {
+          setError(friendlyError(data?.error, 'Failed to update item'))
+          return
+        }
         setMessage('Updated.')
-        await loadRows(selectedPosterId)
+        await loadRows(selectedPoster?.id || null)
         await loadUploads()
         setFormBaselineToCurrent()
         return
       }
 
-      if (!selectedPosterId) {
+      if (!selectedPoster) {
         const manualRes = await fetch('/api/submit/manual-event', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -445,18 +522,25 @@ export default function BuilderCreatePage({
           }),
         })
         const manualData = await manualRes.json().catch(() => ({}))
-        if (!manualRes.ok) return setError(friendlyError(manualData?.error, 'Failed to create draft event'))
+        if (!manualRes.ok) {
+          setError(friendlyError(manualData?.error, 'Failed to create draft item'))
+          return
+        }
         setMessage('Saved as draft.')
         resetFormToNew()
         return
       }
 
-      if (!point) return setError('Click image to place a pin for new event.')
+      if (!point) {
+        setError('Click image to place a pin for new item.')
+        return
+      }
+
       const res = await fetch('/api/builder/create-event-from-poster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          poster_upload_id: selectedPosterId,
+          poster_upload_id: selectedPoster.id,
           bbox: point,
           type: itemType,
           title: effectiveTitle,
@@ -466,11 +550,15 @@ export default function BuilderCreatePage({
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) return setError(friendlyError(data?.error, 'Failed to create event'))
+      if (!res.ok) {
+        setError(friendlyError(data?.error, 'Failed to create item'))
+        return
+      }
+
       setMessage('Saved. Place another pin to add another item.')
       setPoint(null)
       setFormBaselineToCurrent()
-      await loadRows(selectedPosterId)
+      await loadRows(selectedPoster.id)
       await loadUploads()
     } finally {
       setSaving(false)
@@ -482,28 +570,35 @@ export default function BuilderCreatePage({
     setUploadingPoster(true)
     setError('')
     setMessage('')
+
     try {
       const resized = await resizeImageForUpload(uploadFile)
-      const before = Math.round(uploadFile.size / 1024)
-      const after = Math.round(resized.size / 1024)
-      console.info(`Upload compression: ${before}KB -> ${after}KB`)
-
       const signed = await fetch('/api/submit/signed-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content_type: 'image/jpeg' }),
       })
       const signedData = await signed.json().catch(() => ({}))
-      if (!signed.ok) return setError(friendlyError(signedData?.error, 'Upload failed'))
+      if (!signed.ok) {
+        setError(friendlyError(signedData?.error, 'Upload failed'))
+        return
+      }
 
       const pubUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (!pubUrl || !anon) return setError('Missing public Supabase upload config')
+      if (!pubUrl || !anon) {
+        setError('Missing public Supabase upload config')
+        return
+      }
+
       const browserSupabase = createClient(pubUrl, anon)
       const uploadRes = await browserSupabase.storage
         .from('posters')
         .uploadToSignedUrl(String(signedData.path), String(signedData.token), resized)
-      if (uploadRes.error) return setError(friendlyError(uploadRes.error.message, 'Upload failed'))
+      if (uploadRes.error) {
+        setError(friendlyError(uploadRes.error.message, 'Upload failed'))
+        return
+      }
 
       const finalize = await fetch('/api/submit/finalize-upload', {
         method: 'POST',
@@ -511,19 +606,28 @@ export default function BuilderCreatePage({
         body: JSON.stringify({ file_path: signedData.path, seen_at_name: seenAtName.trim() || null }),
       })
       const data = await finalize.json().catch(() => ({}))
-      if (!finalize.ok) return setError(friendlyError(data?.error, 'Upload failed'))
+      if (!finalize.ok) {
+        setError(friendlyError(data?.error, 'Upload failed'))
+        return
+      }
+
       fetch('/api/submit/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ poster_upload_id: data?.poster_upload_id || data?.id || null }),
       }).catch(() => {})
+
       const newPosterId = String(data?.poster_upload_id || data?.id || '').trim()
-      if (!newPosterId) return setError('Upload succeeded but missing poster ID')
+      if (!newPosterId) {
+        setError('Upload succeeded but missing poster ID')
+        return
+      }
+
       setMessage('Poster uploaded.')
       setUploadFile(null)
       if (uploadInputRef.current) uploadInputRef.current.value = ''
-      await loadUploads()
-      await selectPoster(newPosterId)
+      const nextUploads = await loadUploads()
+      await selectPosterById(newPosterId, nextUploads)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
@@ -531,164 +635,94 @@ export default function BuilderCreatePage({
     }
   }
 
-  async function deleteEventRow(row: PosterEventRow) {
-    const choice = prompt('Type "unlink" to remove only this pin link, or "cascade" to delete link + event.', 'unlink')
+  async function goToNextUntendedPoster() {
+    const res = await fetch('/api/builder/next-poster')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setError(friendlyError(data?.error, 'Failed to load next poster'))
+      return
+    }
+
+    const nextId = data?.poster?.id as string | undefined
+    if (!nextId) {
+      setMessage('No untended posters in queue.')
+      return
+    }
+
+    const nextUploads = await loadUploads()
+    await selectPosterById(nextId, nextUploads)
+  }
+
+  async function deleteItemRow(row: PosterEventRow) {
+    const choice = prompt('Type "unlink" to remove only this pin link, or "cascade" to delete link + item.', 'unlink')
     if (!choice) return
     const mode = choice.trim().toLowerCase()
-    if (mode !== 'unlink' && mode !== 'cascade') return setError('Delete cancelled. Use unlink or cascade.')
-    if (!confirm(mode === 'cascade' ? 'Delete link and event?' : 'Remove link only?')) return
+    if (mode !== 'unlink' && mode !== 'cascade') {
+      setError('Delete cancelled. Use unlink or cascade.')
+      return
+    }
+    if (!confirm(mode === 'cascade' ? 'Delete link and item?' : 'Remove link only?')) return
 
-    setError('')
     const res = await fetch('/api/builder/delete-poster-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ link_id: row.link_id, mode }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(friendlyError(data?.error, 'Delete failed'))
-    if (editingEventId === row.event.id) resetFormToNew()
-    setPoint(null)
-    await loadRows(selectedPosterId)
+    if (!res.ok) {
+      setError(friendlyError(data?.error, 'Delete failed'))
+      return
+    }
+
+    if (selectedItemId === row.link_id) resetFormToNew()
+    await loadRows(selectedPoster?.id || null)
     await loadUploads()
   }
 
   async function markDone() {
-    if (!selectedPosterId) return
+    if (!selectedPoster?.id) return
     const res = await fetch('/api/builder/mark-upload-done', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ poster_upload_id: selectedPosterId, is_done: true }),
+      body: JSON.stringify({ poster_upload_id: selectedPoster.id, is_done: true }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(friendlyError(data?.error, 'Failed to mark done'))
-    setSelectedPosterId(null)
-    setRows([])
-    await loadUploads()
-  }
-
-  function getStageMetrics() {
-    const stageW = stageSize.width || 1
-    const stageH = stageSize.height || 1
-    const naturalRatio = imageNatural.width / Math.max(1, imageNatural.height)
-    const stageRatio = stageW / stageH
-    let baseW = stageW
-    let baseH = stageH
-    if (naturalRatio > stageRatio) {
-      baseW = stageW
-      baseH = stageW / naturalRatio
-    } else {
-      baseH = stageH
-      baseW = stageH * naturalRatio
-    }
-    const offsetX = (stageW - baseW) / 2
-    const offsetY = (stageH - baseH) / 2
-    return { stageW, stageH, baseW, baseH, offsetX, offsetY }
-  }
-
-  function clampPan(nextPan: { x: number; y: number }, nextZoom = zoom) {
-    const m = getStageMetrics()
-    if (!m) return nextPan
-
-    const renderedW = m.baseW * nextZoom
-    const renderedH = m.baseH * nextZoom
-    const offsetScaledX = m.offsetX * nextZoom
-    const offsetScaledY = m.offsetY * nextZoom
-
-    let clampedX = nextPan.x
-    let clampedY = nextPan.y
-
-    if (renderedW <= m.stageW) {
-      clampedX = (m.stageW - renderedW) / 2 - offsetScaledX
-    } else {
-      const minX = m.stageW - (offsetScaledX + renderedW)
-      const maxX = -offsetScaledX
-      clampedX = Math.max(minX, Math.min(maxX, clampedX))
-    }
-
-    if (renderedH <= m.stageH) {
-      clampedY = (m.stageH - renderedH) / 2 - offsetScaledY
-    } else {
-      const minY = m.stageH - (offsetScaledY + renderedH)
-      const maxY = -offsetScaledY
-      clampedY = Math.max(minY, Math.min(maxY, clampedY))
-    }
-
-    return { x: Number(clampedX.toFixed(1)), y: Number(clampedY.toFixed(1)) }
-  }
-
-  useEffect(() => {
-    if (!selectedUpload?.public_url) return
-    setPan((prev) => clampPan(prev, zoom))
-  }, [selectedUpload?.public_url, zoom, stageSize.width, stageSize.height, imageNatural.width, imageNatural.height])
-
-  function centerOnPoint(pointToCenter: { x: number; y: number }, targetZoom = zoom) {
-    const m = getStageMetrics()
-    if (!m) return
-    const panX = m.stageW / 2 - (m.offsetX + pointToCenter.x * m.baseW) * targetZoom
-    const panY = m.stageH / 2 - (m.offsetY + pointToCenter.y * m.baseH) * targetZoom
-    setZoom(Number(targetZoom.toFixed(2)))
-    setPan({ x: Number(panX.toFixed(1)), y: Number(panY.toFixed(1)) })
-  }
-
-  function fitToPins() {
-    const pins = rows.filter((row) => row.bbox).map((row) => row.bbox!)
-    if (pins.length === 0) return
-    if (pins.length === 1) {
-      centerOnPoint(pins[0], Math.max(1.6, zoom))
+    if (!res.ok) {
+      setError(friendlyError(data?.error, 'Failed to mark done'))
       return
     }
 
-    const m = getStageMetrics()
-    if (!m) return
-    const minX = Math.min(...pins.map((p) => p.x))
-    const minY = Math.min(...pins.map((p) => p.y))
-    const maxX = Math.max(...pins.map((p) => p.x))
-    const maxY = Math.max(...pins.map((p) => p.y))
-
-    const paddingX = 0.08
-    const paddingY = 0.08
-    const startX = Math.max(0, minX - paddingX)
-    const startY = Math.max(0, minY - paddingY)
-    const boxWidth = Math.max(0.04, Math.min(1, maxX - minX + paddingX * 2))
-    const boxHeight = Math.max(0.04, Math.min(1, maxY - minY + paddingY * 2))
-
-    const boxWpx = boxWidth * m.baseW
-    const boxHpx = boxHeight * m.baseH
-    const targetZoom = Math.max(1, Math.min(5, Math.min(m.stageW / boxWpx, m.stageH / boxHpx)))
-    const centerPoint = {
-      x: Math.min(1, startX + boxWidth / 2),
-      y: Math.min(1, startY + boxHeight / 2),
-    }
-    centerOnPoint(centerPoint, targetZoom)
-  }
-
-  function centerOnActivePin() {
-    const active = rows.find((row) => row.link_id === activeLinkId && row.bbox)?.bbox || point
-    if (!active) return
-    centerOnPoint(active, Math.max(1.8, zoom))
+    setSelectedPoster(null)
+    setSelectedItemId(null)
+    setRows([])
+    setPoint(null)
+    await loadUploads()
   }
 
   async function deletePoster(mode: 'unlink' | 'delete_with_events') {
-    if (!selectedPosterId) return
+    if (!selectedPoster?.id) return
     setDeletingPoster(true)
     setError('')
     setMessage('')
+
     try {
       const res = await fetch('/api/manage/delete-poster', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ poster_upload_id: selectedPosterId, mode }),
+        body: JSON.stringify({ poster_upload_id: selectedPoster.id, mode }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) return setError(friendlyError(data?.error, 'Failed to delete poster'))
+      if (!res.ok) {
+        setError(friendlyError(data?.error, 'Failed to delete poster'))
+        return
+      }
 
       setDeleteModalOpen(false)
-      setSelectedPosterId(null)
+      setSelectedPoster(null)
+      setSelectedItemId(null)
       setRows([])
-      setActiveLinkId(null)
-      setEditingEventId(null)
       setPoint(null)
-      setMessage(mode === 'delete_with_events' ? 'Poster and linked events deleted.' : 'Poster deleted. Linked events were unlinked.')
+      setMessage(mode === 'delete_with_events' ? 'Poster and linked items deleted.' : 'Poster deleted. Linked items were unlinked.')
       await loadUploads()
     } finally {
       setDeletingPoster(false)
@@ -696,8 +730,8 @@ export default function BuilderCreatePage({
   }
 
   async function handleDeletePosterClick() {
-    if (!selectedUpload) return
-    const linkedCount = selectedUpload.linked_count ?? selectedUpload.event_count ?? 0
+    if (!selectedPoster) return
+    const linkedCount = selectedPoster.linked_count ?? selectedPoster.event_count ?? 0
     if (linkedCount === 0) {
       if (!confirm('Delete this poster?')) return
       await deletePoster('unlink')
@@ -707,367 +741,364 @@ export default function BuilderCreatePage({
     setDeleteModalOpen(true)
   }
 
-  const needsPinForNew = Boolean(selectedPosterId && !editingEventId)
+  const needsPinForNew = Boolean(selectedPoster && !editingEventId)
   const canSubmitItem = !saving && (!needsPinForNew || Boolean(point))
-  const rowsForDetails = useMemo(() => {
-    if (!activeLinkId) return rows
-    const selectedRow = rows.find((row) => row.link_id === activeLinkId)
-    if (!selectedRow) return rows
-    return [selectedRow, ...rows.filter((row) => row.link_id !== activeLinkId)]
-  }, [rows, activeLinkId])
+  const activeRows = useMemo(() => {
+    if (!selectedItemId) return rows
+    const lead = rows.find((row) => row.link_id === selectedItemId)
+    if (!lead) return rows
+    return [lead, ...rows.filter((row) => row.link_id !== selectedItemId)]
+  }, [rows, selectedItemId])
 
-  const SubmissionsPanel = () => (
-    <section data-testid="builder-panel-submissions" className="cb-panel cbCreatePanel cbCreatePanelSubmissions">
-      <div className="cbCreatePanelHead">
-        <h1 className="cb-section-header">Submissions</h1>
-        <p className="cb-muted-text cbCreatePanelHint">Choose a poster, then place pins and draft items.</p>
-      </div>
-      <div className="cbCreatePanelTabs">
-        <a href="/builder/create" className="cb-tab-button cb-tab-button-active cbCreateTabLink">Create drafts</a>
-        <a href="/builder/tend" className="cb-tab-button cbCreateTabLink">Tend board</a>
-      </div>
-      {process.env.NODE_ENV !== 'production' && schemaStatus ? <p className="cb-muted-text cbCreateStatusNote">{schemaStatus}</p> : null}
-      <div className="cb-surface cbCreateCard">
-        <div className="cbCreateStack">
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-            className="cbCreateHiddenInput"
-          />
-          <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
-            {uploadFile ? 'Change photo' : 'Choose file'}
-          </button>
-          {uploadFile ? <div className="cb-muted-text">Photo selected</div> : null}
-          <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
-            {uploadingPoster ? 'Uploading...' : 'Upload and select'}
-          </button>
-          <div className="cbCreateInlineActions">
-            <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
-            <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
+  const visibleUploads = uploads.filter((u) => !Boolean(u.is_done) && normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE)
+
+  function SubmissionsPanel() {
+    return (
+      <section data-testid="builder-panel-submissions" className="cbPanel">
+        <header className="cbPanelHeader">
+          <h1 className="cb-section-header">Submissions</h1>
+          <p className="cb-muted-text">Choose a poster, then place pins and draft items.</p>
+        </header>
+        <div className="cbPanelScroll cbSubmissionsBody">
+          <div className="cbSubmissionsNav">
+            <a href="/builder/create" className="cb-tab-button cb-tab-button-active">Create drafts</a>
+            <a href="/builder/tend" className="cb-tab-button">Tend board</a>
+          </div>
+
+          <section className="cbSubmissionsUpload">
+            <h3 className="cbSubhead">Upload poster</h3>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+              className="cbUploadInput"
+            />
+            <div className="cbRow">
+              <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
+                {uploadFile ? 'Change photo' : 'Choose file'}
+              </button>
+              <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
+                {uploadingPoster ? 'Uploading...' : 'Upload and select'}
+              </button>
+            </div>
+            <div className="cbRow">
+              <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
+              <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
+            </div>
+          </section>
+
+          <div className="cbSubmissionList">
+            {visibleUploads.map((upload) => {
+              const isSelected = selectedPoster?.id === upload.id
+              const itemsCount = upload.linked_count ?? upload.event_count ?? 0
+              return (
+                <button key={upload.id} type="button" className={isSelected ? 'cbSubmissionCard cbSubmissionCardActive' : 'cbSubmissionCard'} onClick={() => selectPosterById(upload.id)}>
+                  <div className="cbSubmissionMeta">
+                    <div><span>Captured:</span> {formatCaptureHour(upload.created_at)}</div>
+                    <div><span>Status:</span> {posterStatusLabel(upload.status)}</div>
+                    <div><span>Found at:</span> {upload.seen_at_name || '—'}</div>
+                    <div><span>Items count:</span> {itemsCount}</div>
+                  </div>
+                  {upload.public_url ? <img src={upload.public_url} alt="Poster thumbnail" className="cbSubmissionThumb" /> : <div className="cbSubmissionThumb cbSubmissionThumbEmpty">No image</div>}
+                </button>
+              )
+            })}
+            {visibleUploads.length === 0 ? <p className="cb-muted-text">No submissions available.</p> : null}
           </div>
         </div>
-      </div>
-      <div className="cbCreateScrollableList">
-        {uploads.filter((u) => !Boolean(u.is_done) && normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE).map((u) => (
-          <ItemCard
-            key={u.id}
-            onClick={() => selectPoster(u.id)}
-            selected={selectedPosterId === u.id}
-            title={formatCaptureHour(u.created_at)}
-            subtitle={`Status: ${posterStatusLabel(u.status)}`}
-            location={`Found at: ${u.seen_at_name || '—'}`}
-            status={`Items: ${u.linked_count ?? u.event_count ?? 0}`}
-          >
-            {u.public_url ? <img src={u.public_url} alt="Poster thumb" className="cbCreateThumb" /> : null}
-          </ItemCard>
-        ))}
-        {uploads.length === 0 ? <p className="cb-muted-text">No incomplete posters.</p> : null}
-      </div>
-    </section>
-  )
+      </section>
+    )
+  }
 
-  const WorkspacePanel = () => (
-    <section data-testid="builder-panel-workspace" className="cb-panel cbCreatePanel cbCreatePanelWorkspace">
-      <div className="cbCreatePanelHead">
-        <h2 className="cb-section-header">Workspace</h2>
-        <p className="cb-muted-text cbCreatePanelHint">Place pins on the poster, then edit details in Poster details.</p>
-      </div>
-      {!selectedUpload?.public_url ? (
-        <p className="cb-muted-text">{manualMode ? 'Manual mode: no poster selected.' : 'Select a poster from Submissions.'}</p>
-      ) : (
-        <>
-          <PosterMetaStrip
-            items={[
-              { label: 'Captured', value: formatCaptureHour(selectedUpload.created_at) },
-              {
-                label: 'Found at',
-                value: (
-                  <div className="cbCreateFoundAtEditor">
-                    <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Found at" className="cbCreateFoundAtInput" />
-                    <button data-variant="secondary" type="button" onClick={saveSeenAt} disabled={!selectedPosterId || savingSeenAt}>
+  function WorkspacePanel() {
+    return (
+      <section data-testid="builder-panel-workspace" className="cbPanel">
+        <header className="cbPanelHeader">
+          <h2 className="cb-section-header">Workspace</h2>
+          <p className="cb-muted-text">Place pins on the poster, then edit details in Poster details.</p>
+        </header>
+
+        <div className="cbPanelScroll cbWorkspaceBody">
+          {!selectedPoster ? (
+            <div className="cbCenteredState">Select a poster from Submissions.</div>
+          ) : (
+            <>
+              <div className="cbMetaStrip">
+                <div><span>Captured</span><strong>{formatCaptureHour(selectedPoster.created_at)}</strong></div>
+                <div>
+                  <span>Found at</span>
+                  <div className="cbFoundAtEditor">
+                    <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Found at" />
+                    <button type="button" data-variant="secondary" onClick={saveSeenAt} disabled={savingSeenAt}>
                       {savingSeenAt ? 'Saving...' : 'Save'}
                     </button>
                   </div>
-                ),
-              },
-              { label: 'Status', value: posterStatusLabel(selectedUpload.status) },
-              { label: 'Items', value: rows.length },
-            ]}
-          />
-          <PosterImageViewer
-            controls={(
-              <>
-                <button data-variant="secondary" className="cbCreateControlButton" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom -</button>
-                <button data-variant="secondary" className="cbCreateControlButton" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom +</button>
-                <button data-variant="secondary" className="cbCreateControlButton" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-                <button data-variant="secondary" className="cbCreateControlButton" onClick={fitToPins} disabled={rows.filter((r) => r.bbox).length === 0}>Fit to items</button>
-                <button data-variant="secondary" className="cbCreateControlButton" onClick={centerOnActivePin} disabled={!activeLinkId && !point}>Center selected</button>
-              </>
-            )}
-            footer={(
-              <div className="cbCreateInlineActions">
-                <button onClick={markDone}>Mark done</button>
-                <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster...</button>
+                </div>
+                <div><span>Status</span><strong>{posterStatusLabel(selectedPoster.status)}</strong></div>
+                <div><span>Items count</span><strong>{rows.length}</strong></div>
               </div>
-            )}
-          >
-            <div
-              ref={stageRef}
-              onMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY }; didDragRef.current = false }}
-              onMouseMove={(e) => {
-                if (!dragRef.current) return
-                const dx = e.clientX - dragRef.current.x
-                const dy = e.clientY - dragRef.current.y
-                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDragRef.current = true
-                setPan((prev) => clampPan({ x: prev.x + dx, y: prev.y + dy }))
-                dragRef.current = { x: e.clientX, y: e.clientY }
-              }}
-              onMouseUp={() => { dragRef.current = null }}
-              onMouseLeave={() => { dragRef.current = null }}
-              className="cbCreateStage"
-            >
-              <div className="cbCreateTransformLayer" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-                <img
-                  ref={imageRef}
-                  src={selectedUpload.public_url}
-                  alt="Poster"
-                  onLoad={(e) => {
-                    setImageNatural({
-                      width: Math.max(1, e.currentTarget.naturalWidth || 1),
-                      height: Math.max(1, e.currentTarget.naturalHeight || 1),
-                    })
-                  }}
-                  onClick={(e) => {
-                    if (didDragRef.current) {
-                      didDragRef.current = false
-                      return
-                    }
-                    if (editingEventId && !shouldDiscardUnsavedChanges('Start a new item')) return
-                    const m = getStageMetrics()
-                    if (!m) return
-                    const rect = e.currentTarget.getBoundingClientRect()
-                    const x = (e.clientX - rect.left) / rect.width
-                    const y = (e.clientY - rect.top) / rect.height
-                    setPoint({ x: Number(Math.max(0, Math.min(1, x)).toFixed(4)), y: Number(Math.max(0, Math.min(1, y)).toFixed(4)) })
-                    setActiveLinkId(null)
-                    setEditingEventId(null)
-                    if (editingEventId) setFormBaselineToCurrent()
-                  }}
-                  className="cbCreateStageImage"
-                  style={{
-                    left: `${getStageMetrics()?.offsetX || 0}px`,
-                    top: `${getStageMetrics()?.offsetY || 0}px`,
-                    width: `${getStageMetrics()?.baseW || 0}px`,
-                    height: `${getStageMetrics()?.baseH || 0}px`,
-                  }}
-                />
-                {rows.filter((row) => row.bbox).map((row) => {
-                  const active = activeLinkId === row.link_id
-                  return (
-                    <button
-                      key={row.link_id}
-                      type="button"
-                      title={row.event.title}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        startEdit(row)
+
+              <div className="cbControlRow">
+                <button data-variant="secondary" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom -</button>
+                <button data-variant="secondary" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom +</button>
+                <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
+                <button data-variant="secondary" onClick={fitToItems} disabled={rows.filter((r) => r.bbox).length === 0}>Fit to items</button>
+                <button data-variant="secondary" onClick={centerSelected} disabled={!selectedItemId && !point}>Center selected</button>
+              </div>
+
+              <div
+                ref={stageRef}
+                className="cbPosterStage"
+                onMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY }; didDragRef.current = false }}
+                onMouseMove={(e) => {
+                  if (!dragRef.current) return
+                  const dx = e.clientX - dragRef.current.x
+                  const dy = e.clientY - dragRef.current.y
+                  if (Math.abs(dx) > 2 || Math.abs(dy) > 2) didDragRef.current = true
+                  setPan((prev) => clampPan({ x: prev.x + dx, y: prev.y + dy }))
+                  dragRef.current = { x: e.clientX, y: e.clientY }
+                }}
+                onMouseUp={() => { dragRef.current = null }}
+                onMouseLeave={() => { dragRef.current = null }}
+              >
+                <div className="cbPosterTransform" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
+                  {selectedPoster.public_url ? (
+                    <img
+                      src={selectedPoster.public_url}
+                      alt="Poster"
+                      className="cbPosterImage"
+                      onLoad={(e) => {
+                        setImageNatural({
+                          width: Math.max(1, e.currentTarget.naturalWidth || 1),
+                          height: Math.max(1, e.currentTarget.naturalHeight || 1),
+                        })
                       }}
-                      className={active ? 'cbCreatePin cbCreatePinActive' : 'cbCreatePin'}
+                      onClick={(e) => {
+                        if (didDragRef.current) {
+                          didDragRef.current = false
+                          return
+                        }
+                        if (editingEventId && !shouldDiscardUnsavedChanges('Start a new item')) return
+
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        const x = (e.clientX - rect.left) / rect.width
+                        const y = (e.clientY - rect.top) / rect.height
+
+                        setPoint({ x: Number(Math.max(0, Math.min(1, x)).toFixed(4)), y: Number(Math.max(0, Math.min(1, y)).toFixed(4)) })
+                        setSelectedItemId(null)
+                        if (editingEventId) setFormBaselineToCurrent()
+                      }}
                       style={{
-                        left: `${(getStageMetrics()?.offsetX || 0) + row.bbox!.x * (getStageMetrics()?.baseW || 0)}px`,
-                        top: `${(getStageMetrics()?.offsetY || 0) + row.bbox!.y * (getStageMetrics()?.baseH || 0)}px`,
+                        left: `${stageMetrics.offsetX}px`,
+                        top: `${stageMetrics.offsetY}px`,
+                        width: `${stageMetrics.baseW}px`,
+                        height: `${stageMetrics.baseH}px`,
                       }}
                     />
-                  )
-                })}
-                {!editingEventId && point ? (
-                  <div
-                    className="cbCreateDraftPin"
-                    style={{
-                      left: `${(getStageMetrics()?.offsetX || 0) + point.x * (getStageMetrics()?.baseW || 0)}px`,
-                      top: `${(getStageMetrics()?.offsetY || 0) + point.y * (getStageMetrics()?.baseH || 0)}px`,
-                    }}
-                  />
-                ) : null}
-              </div>
-            </div>
-          </PosterImageViewer>
-        </>
-      )}
-    </section>
-  )
+                  ) : null}
 
-  const PosterDetailsPanel = () => (
-    <section data-testid="builder-panel-inspector" className="cb-panel cbCreatePanel cbCreatePanelDetails">
-      <div className="cbCreatePanelHead">
-        <h2 className="cb-section-header">Poster details</h2>
-        <p className="cb-muted-text cbCreatePanelHint">Create or edit items linked to pinned coordinates on this poster.</p>
-      </div>
-      <div className="cbCreateDetailsScroll">
-        {!selectedPosterId ? <p className="cb-muted-text">Select a submission to begin.</p> : null}
-        {error ? (
-          <p className="cbCreateAlertError">
-            {error}{' '}
-            <a href="/api/health/schema" target="_blank" rel="noreferrer">
-              Check schema health
-            </a>
-          </p>
-        ) : null}
-        {message ? <p className="cbCreateAlertInfo">{message}</p> : null}
-        {selectedPosterId ? (
-          <>
-            <div className="cb-surface cbCreateCard">
-              <h3 className="cbCreateCardTitle">{editingEventId ? 'Edit item' : 'Create item'}</h3>
-              <div className="cbCreateFormGrid">
-                <label className="cbCreateField">
-                  <span className="cb-meta-label">Item type</span>
-                  <select value={itemType} onChange={(e) => setItemType(normalizeItemType(e.target.value, 'event'))}>
-                    {ITEM_TYPES.map((type) => (
-                      <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>
-                    ))}
-                  </select>
-                </label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
-                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Event at" />
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" className="cbCreateTextarea" />
-                {isTimeBoundType(itemType) ? <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} /> : null}
-                {itemType === 'recurring_event' ? (
-                  <div className="cbCreateRepeatCard">
-                    <div className="cb-meta-label">Recurring cadence</div>
-                    <select value={recurrenceMode} onChange={(e) => setRecurrenceMode(e.target.value as typeof recurrenceMode)}>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                    {recurrenceMode === 'monthly' ? (
-                      <select value={recurrenceMonthOrdinal} onChange={(e) => setRecurrenceMonthOrdinal(e.target.value as typeof recurrenceMonthOrdinal)}>
-                        <option value="first">First</option>
-                        <option value="second">Second</option>
-                        <option value="third">Third</option>
-                        <option value="fourth">Fourth</option>
-                      </select>
-                    ) : null}
-                    <select value={recurrenceWeekday} onChange={(e) => setRecurrenceWeekday(e.target.value as typeof recurrenceWeekday)}>
-                      <option value="monday">Monday</option>
-                      <option value="tuesday">Tuesday</option>
-                      <option value="wednesday">Wednesday</option>
-                      <option value="thursday">Thursday</option>
-                      <option value="friday">Friday</option>
-                      <option value="saturday">Saturday</option>
-                      <option value="sunday">Sunday</option>
-                    </select>
-                  </div>
-                ) : null}
-                {!editingEventId && !point ? <p className="cb-muted-text">Click the poster to place a pin before saving.</p> : null}
-                <div className="cbCreateInlineActions">
-                  <button onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
-                  {(editingEventId || point || isFormDirty) ? <button data-variant="secondary" onClick={() => { resetFormToNew(); setPoint(null) }}>Cancel</button> : null}
+                  {rows.filter((row) => row.bbox).map((row) => {
+                    const active = selectedItemId === row.link_id
+                    return (
+                      <button
+                        key={row.link_id}
+                        type="button"
+                        title={row.event.title}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          startEdit(row)
+                        }}
+                        className={active ? 'cbPin cbPinActive' : 'cbPin'}
+                        style={{
+                          left: `${stageMetrics.offsetX + row.bbox!.x * stageMetrics.baseW}px`,
+                          top: `${stageMetrics.offsetY + row.bbox!.y * stageMetrics.baseH}px`,
+                        }}
+                      />
+                    )
+                  })}
+
+                  {!editingEventId && point ? (
+                    <div
+                      className="cbPinDraft"
+                      style={{
+                        left: `${stageMetrics.offsetX + point.x * stageMetrics.baseW}px`,
+                        top: `${stageMetrics.offsetY + point.y * stageMetrics.baseH}px`,
+                      }}
+                    />
+                  ) : null}
                 </div>
               </div>
-            </div>
 
-            <div className="cb-surface cbCreateCard">
-              <h3 className="cbCreateCardTitle">Items</h3>
-              <PosterItemsList title="">
-                {rowsForDetails.length === 0 ? (
-                  <p className="cb-muted-text">No items yet. Click image to add a new pin and item.</p>
-                ) : (
-                  rowsForDetails.map((row) => {
-                    const parsedStart = new Date(row.event.start_at)
-                    const startLabel = Number.isNaN(parsedStart.getTime()) ? 'No date/time yet' : parsedStart.toLocaleString()
-                    const recurrenceLabel = row.event.item_type === 'recurring_event'
-                      ? `${row.event.recurrence_mode === 'monthly' ? (row.event.recurrence_month_ordinal || 'first') : 'weekly'} ${row.event.recurrence_weekday || 'monday'}`
-                      : null
-                    return (
-                      <ItemCard
-                        key={row.link_id}
-                        selected={activeLinkId === row.link_id}
-                        title={row.event.title || '(Draft item)'}
-                        dateTime={`Date/time: ${startLabel}`}
-                        description={row.event.description ? `Description: ${row.event.description}` : 'Description: —'}
-                        status={`${statusLabel(row.event.status)} • ${(row.event.item_type || 'event').replaceAll('_', ' ')}`}
-                        onClick={() => startEdit(row)}
-                        location={row.event.location ? `Event at: ${row.event.location}` : 'Event at: —'}
-                      >
-                        <div className="cb-muted-text cbCreateMetaLine">Found at: {selectedUpload?.seen_at_name || '—'}</div>
-                        {recurrenceLabel ? <div className="cb-muted-text cbCreateMetaLine">Cadence: {recurrenceLabel}</div> : null}
-                        <div className="cbCreateInlineActions">
-                          <button data-variant="secondary" onClick={(e) => { e.stopPropagation(); startEdit(row) }}>Edit</button>
-                          <button data-variant="danger" onClick={(e) => { e.stopPropagation(); deleteEventRow(row) }}>Delete</button>
-                        </div>
-                      </ItemCard>
-                    )
-                  })
-                )}
-              </PosterItemsList>
-            </div>
-          </>
-        ) : null}
-      </div>
-    </section>
-  )
+              <div className="cbActionRow">
+                <button onClick={markDone}>Mark Done</button>
+                <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster</button>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  function PosterDetailsPanel() {
+    return (
+      <section data-testid="builder-panel-inspector" className="cbPanel">
+        <header className="cbPanelHeader">
+          <h2 className="cb-section-header">Poster details</h2>
+          <p className="cb-muted-text">Create or edit items linked to pinned coordinates on this poster.</p>
+        </header>
+
+        <div className="cbPanelScroll cbDetailsFlow">
+          {!selectedPoster ? (
+            <div className="cbCenteredState">Select a submission to begin.</div>
+          ) : (
+            <>
+              {error ? <p className="cbErrorMsg">{error}</p> : null}
+              {message ? <p className="cbInfoMsg">{message}</p> : null}
+
+              <section className="cbFormCard">
+                <h3 className="cbSubhead">{editingEventId ? 'Edit item' : 'Create item'}</h3>
+                <div className="cbFormGrid">
+                  <label>
+                    Item type
+                    <select value={itemType} onChange={(e) => setItemType(normalizeItemType(e.target.value, 'event'))}>
+                      {ITEM_TYPES.map((type) => (
+                        <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Title
+                    <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
+                  </label>
+
+                  <label>
+                    Event at
+                    <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Event at" />
+                  </label>
+
+                  <label>
+                    Description
+                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" />
+                  </label>
+
+                  {isTimeBoundType(itemType) ? (
+                    <label>
+                      Start time
+                      <input type="datetime-local" step={1800} value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+                    </label>
+                  ) : null}
+
+                  {itemType === 'recurring_event' ? (
+                    <fieldset className="cbRecurrenceFieldset">
+                      <legend>Recurring cadence</legend>
+                      <select value={recurrenceMode} onChange={(e) => setRecurrenceMode(e.target.value as typeof recurrenceMode)}>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                      {recurrenceMode === 'monthly' ? (
+                        <select value={recurrenceMonthOrdinal} onChange={(e) => setRecurrenceMonthOrdinal(e.target.value as typeof recurrenceMonthOrdinal)}>
+                          <option value="first">First</option>
+                          <option value="second">Second</option>
+                          <option value="third">Third</option>
+                          <option value="fourth">Fourth</option>
+                        </select>
+                      ) : null}
+                      <select value={recurrenceWeekday} onChange={(e) => setRecurrenceWeekday(e.target.value as typeof recurrenceWeekday)}>
+                        <option value="monday">Monday</option>
+                        <option value="tuesday">Tuesday</option>
+                        <option value="wednesday">Wednesday</option>
+                        <option value="thursday">Thursday</option>
+                        <option value="friday">Friday</option>
+                        <option value="saturday">Saturday</option>
+                        <option value="sunday">Sunday</option>
+                      </select>
+                    </fieldset>
+                  ) : null}
+
+                  {!editingEventId && !point ? <p className="cb-muted-text">Click the poster to place a pin before saving.</p> : null}
+
+                  <div className="cbRow">
+                    <button onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
+                    {(editingEventId || point || isFormDirty) ? (
+                      <button data-variant="secondary" onClick={() => resetFormToNew()}>Cancel</button>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+
+              <hr className="cbDivider" />
+
+              <section>
+                <h3 className="cbSubhead">Items</h3>
+                <div className="cbItemsList">
+                  {activeRows.length === 0 ? (
+                    <p className="cb-muted-text">No items yet. Click image to add a new pin and item.</p>
+                  ) : (
+                    activeRows.map((row) => {
+                      const parsedStart = new Date(row.event.start_at)
+                      const startLabel = Number.isNaN(parsedStart.getTime()) ? 'No date/time yet' : parsedStart.toLocaleString()
+                      const recurrenceLabel = row.event.item_type === 'recurring_event'
+                        ? `${row.event.recurrence_mode === 'monthly' ? (row.event.recurrence_month_ordinal || 'first') : 'weekly'} ${row.event.recurrence_weekday || 'monday'}`
+                        : null
+
+                      return (
+                        <article key={row.link_id} className={selectedItemId === row.link_id ? 'cbItemCard cbItemCardActive' : 'cbItemCard'} onClick={() => startEdit(row)}>
+                          <h4>{row.event.title || '(Draft item)'}</h4>
+                          <p><strong>Status:</strong> {statusLabel(row.event.status)} • {(row.event.item_type || 'event').replaceAll('_', ' ')}</p>
+                          <p><strong>Date/time:</strong> {startLabel}</p>
+                          <p><strong>Found at:</strong> {selectedPoster.seen_at_name || '—'}</p>
+                          <p><strong>Event at:</strong> {row.event.location || '—'}</p>
+                          <p><strong>Description:</strong> {row.event.description || '—'}</p>
+                          {recurrenceLabel ? <p><strong>Cadence:</strong> {recurrenceLabel}</p> : null}
+                          <div className="cbRow">
+                            <button data-variant="secondary" onClick={(e) => { e.stopPropagation(); startEdit(row) }}>Edit</button>
+                            <button data-variant="danger" onClick={(e) => { e.stopPropagation(); deleteItemRow(row) }}>Delete</button>
+                          </div>
+                        </article>
+                      )
+                    })
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </section>
+    )
+  }
 
   return (
-    <main className="cb-page-container cbCreateBoardLayout" data-testid="builder-create-panels">
-      <SubmissionsPanel />
-      <WorkspacePanel />
-      <PosterDetailsPanel />
+    <>
+      <div className="cbCreateGrid" data-testid="builder-create-panels">
+        <SubmissionsPanel />
+        <WorkspacePanel />
+        <PosterDetailsPanel />
+      </div>
 
-      {deleteModalOpen && selectedUpload && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,0.45)',
-            display: 'grid',
-            placeItems: 'center',
-            zIndex: 50,
-            padding: 16,
-          }}
-          onClick={() => !deletingPoster && setDeleteModalOpen(false)}
-        >
-          <div
-            className="cb-panel"
-            style={{ width: '100%', maxWidth: 520, padding: 14 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 10px 0' }}>Delete poster</h3>
-            <div style={{ marginBottom: 8 }}>
-              <div>Created: {new Date(selectedUpload.created_at).toLocaleString()}</div>
-              {selectedUpload.seen_at_name ? <div>Found at: {selectedUpload.seen_at_name}</div> : null}
-              <div>Linked events: {selectedUpload.linked_count ?? selectedUpload.event_count ?? 0}</div>
+      {deleteModalOpen && selectedPoster ? (
+        <div className="cbModalBackdrop" onClick={() => !deletingPoster && setDeleteModalOpen(false)}>
+          <div className="cbModalCard" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete poster</h3>
+            <div className="cbModalMeta">
+              <div>Created: {new Date(selectedPoster.created_at).toLocaleString()}</div>
+              <div>Found at: {selectedPoster.seen_at_name || '—'}</div>
+              <div>Linked items: {selectedPoster.linked_count ?? selectedPoster.event_count ?? 0}</div>
             </div>
-            <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <input
-                  type="radio"
-                  name="delete_mode"
-                  checked={deleteMode === 'unlink'}
-                  onChange={() => setDeleteMode('unlink')}
-                />
-                <span>
-                  <strong>Delete poster only</strong>
-                  <br />
-                  Unlink linked events and keep events.
-                </span>
-              </label>
-              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <input
-                  type="radio"
-                  name="delete_mode"
-                  checked={deleteMode === 'delete_with_events'}
-                  onChange={() => setDeleteMode('delete_with_events')}
-                />
-                <span>
-                  <strong>Delete poster + linked events</strong>
-                  <br />
-                  Remove this poster and all events linked from it.
-                </span>
-              </label>
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+
+            <label className="cbModalOption">
+              <input type="radio" name="delete_mode" checked={deleteMode === 'unlink'} onChange={() => setDeleteMode('unlink')} />
+              <span>Delete poster only (keep linked items)</span>
+            </label>
+            <label className="cbModalOption">
+              <input type="radio" name="delete_mode" checked={deleteMode === 'delete_with_events'} onChange={() => setDeleteMode('delete_with_events')} />
+              <span>Delete poster and linked items</span>
+            </label>
+
+            <div className="cbRow cbRowEnd">
               <button data-variant="secondary" onClick={() => setDeleteModalOpen(false)} disabled={deletingPoster}>Cancel</button>
               <button data-variant="danger" onClick={() => deletePoster(deleteMode)} disabled={deletingPoster}>
                 {deletingPoster ? 'Deleting...' : 'Delete'}
@@ -1075,7 +1106,7 @@ export default function BuilderCreatePage({
             </div>
           </div>
         </div>
-      )}
-    </main>
+      ) : null}
+    </>
   )
 }
