@@ -43,15 +43,18 @@ export default function BrowseClient({
   initialPoster,
   initialSeenAt,
   initialTags,
+  initialItem,
 }: {
   initialPoster: string
   initialSeenAt: string
   initialTags: string
+  initialItem: string
 }) {
   const router = useRouter()
   const [posterParam, setPosterParam] = useState(initialPoster)
   const [seenAt, setSeenAt] = useState(initialSeenAt)
   const [tags] = useState(initialTags)
+  const [itemParam, setItemParam] = useState(initialItem)
   const [posters, setPosters] = useState<PosterRow[]>([])
   const [facets, setFacets] = useState<string[]>([])
   const [items, setItems] = useState<ItemRow[]>([])
@@ -60,14 +63,16 @@ export default function BrowseClient({
 
   const activePoster = useMemo(() => posters.find((p) => p.id === activePosterId) || null, [posters, activePosterId])
 
-  function updateUrl(next: { poster?: string; seenAt?: string; tags?: string }) {
+  function updateUrl(next: { poster?: string; seenAt?: string; tags?: string; item?: string }) {
     const params = new URLSearchParams()
     const poster = next.poster ?? posterParam
     const nextSeenAt = next.seenAt ?? seenAt
     const nextTags = next.tags ?? tags
+    const nextItem = next.item ?? itemParam
     if (poster) params.set('poster', poster)
     if (nextSeenAt) params.set('seenAt', nextSeenAt)
     if (nextTags) params.set('tags', nextTags)
+    if (nextItem) params.set('item', nextItem)
     router.replace(`/browse${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
@@ -97,6 +102,15 @@ export default function BrowseClient({
     return () => { cancelled = true }
   }, [posterParam, seenAt, tags])
 
+  useEffect(() => {
+    if (items.length === 0) return
+    if (!itemParam) return
+    if (items.some((item) => item.id === itemParam)) return
+    setItemParam('')
+    updateUrl({ item: '' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, itemParam])
+
   const imageUrls = activePoster?.public_url ? [activePoster.public_url] : []
   const pinRows = items.map((item) => ({
     link_id: `item-${item.id}`,
@@ -109,6 +123,15 @@ export default function BrowseClient({
     did_upvote: item.did_upvote || false,
     bbox: { x: item.x, y: item.y },
   }))
+  const selectedItemId = itemParam || pinRows[0]?.event_id || null
+  const focused = Boolean(itemParam || posterParam || seenAt)
+
+  function clearFocus() {
+    setItemParam('')
+    setPosterParam('')
+    setSeenAt('')
+    updateUrl({ item: '', poster: '', seenAt: '' })
+  }
 
   return (
     <main className="cb-page-container cbBrowsePage">
@@ -118,6 +141,11 @@ export default function BrowseClient({
         </div>
         <h1 className="cbBrowseTitle">Browse Posters</h1>
         <p className="cbBrowseSubtitle">Review captured boards and open items in a consistent board-style layout.</p>
+        {focused ? (
+          <div style={{ marginTop: 8 }}>
+            <button data-variant="secondary" onClick={clearFocus}>Clear focus</button>
+          </div>
+        ) : null}
       </header>
       <div className="cbBrowseLayout">
         <section className="cb-panel cbBrowseRail">
@@ -130,7 +158,8 @@ export default function BrowseClient({
                 className={!seenAt ? 'cbBrowseFacetButton cbBrowseFacetButtonActive' : 'cbBrowseFacetButton'}
                 onClick={() => {
                   setSeenAt('')
-                  updateUrl({ seenAt: '', poster: '' })
+                  setItemParam('')
+                  updateUrl({ seenAt: '', poster: '', item: '' })
                 }}
               >
                 All
@@ -143,7 +172,8 @@ export default function BrowseClient({
                   onClick={() => {
                     setSeenAt(facet)
                     setPosterParam('')
-                    updateUrl({ seenAt: facet, poster: '' })
+                    setItemParam('')
+                    updateUrl({ seenAt: facet, poster: '', item: '' })
                   }}
                 >
                   {facet}
@@ -159,7 +189,8 @@ export default function BrowseClient({
                 onClick={() => {
                   setPosterParam(poster.id)
                   setActivePosterId(poster.id)
-                  updateUrl({ poster: poster.id })
+                  setItemParam('')
+                  updateUrl({ poster: poster.id, item: '' })
                 }}
                 className={`cbBrowsePosterCard ${activePosterId === poster.id ? 'cbBrowsePosterCardSelected' : ''}`}
               >
@@ -184,9 +215,14 @@ export default function BrowseClient({
           <PosterViewer
             imageUrls={imageUrls}
             pins={pinRows}
-            activeEventId={pinRows[0]?.event_id || null}
+            activeEventId={selectedItemId}
             photoTakenAt={activePoster?.created_at || null}
             seenAt={activePoster?.seen_at_name || null}
+            selectionParam="item"
+            onSelectEventId={(eventId) => {
+              setItemParam(eventId)
+              updateUrl({ item: eventId })
+            }}
           />
         </section>
       </div>

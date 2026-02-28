@@ -155,7 +155,7 @@ function EventList({
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {e.poster_upload_id && (
                   <a
-                    href={`/poster/${encodeURIComponent(e.poster_upload_id)}?event_id=${encodeURIComponent(e.id)}`}
+                    href={`/browse?poster=${encodeURIComponent(e.poster_upload_id)}&item=${encodeURIComponent(e.id)}${e.seen_at_name ? `&seenAt=${encodeURIComponent(e.seen_at_name)}` : ''}`}
                     onClick={onOpenPoster}
                     style={{
                       display: 'inline-block',

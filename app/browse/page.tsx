@@ -4,6 +4,7 @@ type SearchParams = {
   poster?: string
   seenAt?: string
   tags?: string
+  item?: string
 }
 
 export default async function BrowsePage({
@@ -17,6 +18,7 @@ export default async function BrowsePage({
       initialPoster={typeof params.poster === 'string' ? params.poster : ''}
       initialSeenAt={typeof params.seenAt === 'string' ? params.seenAt : ''}
       initialTags={typeof params.tags === 'string' ? params.tags : ''}
+      initialItem={typeof params.item === 'string' ? params.item : ''}
     />
   )
 }

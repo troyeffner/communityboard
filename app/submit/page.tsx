@@ -111,6 +111,10 @@ export default function SubmitPage() {
       setErrorText('Take or choose a photo first.')
       return
     }
+    if (!seenAtName.trim()) {
+      setErrorText('Found at is required.')
+      return
+    }
 
     setSubmitting(true)
     setErrorText('')
@@ -118,15 +122,16 @@ export default function SubmitPage() {
     setStatusText('Uploading photo...')
     setProgress(55)
     try {
+      const trimmedSeenAt = seenAtName.trim()
       if (reuseSeenAt) {
-        window.localStorage.setItem('submit_seen_at_name', seenAtName.trim())
+        window.localStorage.setItem('submit_seen_at_name', trimmedSeenAt)
       } else {
         window.localStorage.removeItem('submit_seen_at_name')
       }
 
       const form = new FormData()
       form.append('file', makeUploadFile(compressed))
-      if (seenAtName.trim()) form.append('seen_at_name', seenAtName.trim())
+      form.append('seen_at_name', trimmedSeenAt)
 
       const upload = await fetch('/api/submit/upload', {
         method: 'POST',
@@ -191,7 +196,7 @@ export default function SubmitPage() {
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
           <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Found at</h3>
           <label style={{ display: 'block' }}>
-            Found at (optional)
+            Found at
             <input
               value={seenAtName}
               onChange={(e) => setSeenAtName(e.target.value)}

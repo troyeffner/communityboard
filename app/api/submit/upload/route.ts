@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   if (!file.type.startsWith('image/')) return jsonError('File must be an image')
 
   const seen_at_name = String(form.get('seen_at_name') || '').trim() || null
+  if (!seen_at_name) return jsonError('Found at is required')
 
   // Read file into a Buffer
   const arrayBuffer = await file.arrayBuffer()

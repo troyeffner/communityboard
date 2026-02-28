@@ -470,8 +470,8 @@ export default function CreateClient({
       return
     }
 
-    if (!selectedPoster && !manualMode) {
-      setError('Select a poster first.')
+    if (!selectedPoster) {
+      setError('Select a poster and place a pin before saving.')
       return
     }
 
@@ -507,32 +507,8 @@ export default function CreateClient({
         return
       }
 
-      if (!selectedPoster) {
-        const manualRes = await fetch('/api/submit/manual-event', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: effectiveTitle,
-            recurrence_mode: itemType === 'recurring_event' ? recurrenceMode : null,
-            recurrence_weekday: itemType === 'recurring_event' ? recurrenceWeekday : null,
-            recurrence_month_ordinal: itemType === 'recurring_event' && recurrenceMode === 'monthly' ? recurrenceMonthOrdinal : null,
-            location,
-            description,
-            start_at: startAt,
-          }),
-        })
-        const manualData = await manualRes.json().catch(() => ({}))
-        if (!manualRes.ok) {
-          setError(friendlyError(manualData?.error, 'Failed to create draft item'))
-          return
-        }
-        setMessage('Saved as draft.')
-        resetFormToNew()
-        return
-      }
-
       if (!point) {
-        setError('Click image to place a pin for new item.')
+        setError('Click the poster to place a pin before saving.')
         return
       }
 
