@@ -5,7 +5,9 @@ export default function ItemCard({
   selected = false,
   title,
   subtitle,
+  dateTime,
   location,
+  description,
   status,
   typeLabel,
   onClick,
@@ -15,7 +17,9 @@ export default function ItemCard({
   selected?: boolean
   title: string
   subtitle?: string
+  dateTime?: string
   location?: string
+  description?: string
   status?: string
   typeLabel?: string
   onClick?: () => void
@@ -54,8 +58,9 @@ export default function ItemCard({
           <span style={{ fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 999, padding: '2px 8px' }}>{typeLabel}</span>
         ) : null}
       </div>
-      {subtitle ? <div style={{ fontSize: uiTokens.typography.label, marginTop: 3, ...uiStyles.mutedText }}>{subtitle}</div> : null}
-      <div style={{ fontSize: uiTokens.typography.label, marginTop: 2, ...uiStyles.mutedText }}>{location || 'Location: —'}</div>
+      {dateTime ? <div style={{ fontSize: uiTokens.typography.label, marginTop: 3, ...uiStyles.mutedText }}>{dateTime}</div> : (subtitle ? <div style={{ fontSize: uiTokens.typography.label, marginTop: 3, ...uiStyles.mutedText }}>{subtitle}</div> : null)}
+      <div style={{ fontSize: uiTokens.typography.label, marginTop: 2, ...uiStyles.mutedText }}>{location || 'Event at: —'}</div>
+      {description ? <div style={{ fontSize: uiTokens.typography.label, marginTop: 2, ...uiStyles.mutedText }}>{description}</div> : null}
       {status ? <div style={{ fontSize: uiTokens.typography.label, marginTop: 2, ...uiStyles.mutedText }}>{status}</div> : null}
       {children ? <div style={{ marginTop: 8 }}>{children}</div> : null}
     </div>

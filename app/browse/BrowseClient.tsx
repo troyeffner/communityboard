@@ -123,7 +123,7 @@ export default function BrowseClient({
         <section className="cb-panel cbBrowseRail">
           <h2 className="cb-section-header cbBrowsePanelTitle">Browse</h2>
           <div>
-            <div className="cbBrowseMicroLabel">Seen at</div>
+            <div className="cbBrowseMicroLabel">Found at</div>
             <div className="cbBrowseFacetRow">
               <button
                 data-variant="secondary"

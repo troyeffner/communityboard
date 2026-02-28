@@ -381,7 +381,7 @@ export default function BuilderCreatePage({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(friendlyError(data?.error, 'Failed to save Seen at'))
+        setError(friendlyError(data?.error, 'Failed to save Found at'))
         return false
       }
       try {
@@ -985,8 +985,9 @@ export default function BuilderCreatePage({
                         key={row.link_id}
                         selected={activeLinkId === row.link_id}
                         title={row.event.title || '(Draft item)'}
-                        subtitle={`${startLabel} • ${(row.event.item_type || 'event').replaceAll('_', ' ')}`}
-                        status={statusLabel(row.event.status)}
+                        dateTime={`Date/time: ${startLabel}`}
+                        description={row.event.description ? `Description: ${row.event.description}` : 'Description: —'}
+                        status={`${statusLabel(row.event.status)} • ${(row.event.item_type || 'event').replaceAll('_', ' ')}`}
                         onClick={() => startEdit(row)}
                         location={row.event.location ? `Event at: ${row.event.location}` : 'Event at: —'}
                       >

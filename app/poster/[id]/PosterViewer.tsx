@@ -405,10 +405,14 @@ export default function PosterViewer({
               testId={`poster-item-${pin.event_id}`}
               title={pin.title?.trim() || '(Untitled item)'}
               typeLabel={(pin.item_type || 'event').replace(/_/g, ' ')}
-              subtitle={pin.start_at ? new Date(pin.start_at).toLocaleString() : 'No date/time'}
-              location={pin.location ? `Location: ${pin.location}` : 'Location: —'}
+              dateTime={`Date/time: ${pin.start_at ? new Date(pin.start_at).toLocaleString() : 'No date/time'}`}
+              location={pin.location ? `Event at: ${pin.location}` : 'Event at: —'}
+              description="Description: —"
               status={pinStatusLabel(pin.status)}
             >
+              <div style={{ fontSize: uiTokens.typography.label, marginBottom: 6, color: uiTokens.colors.muted }}>
+                Found at: {seenAt || '—'}
+              </div>
               <div>
                 <button
                   onClick={(e) => {

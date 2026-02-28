@@ -189,9 +189,9 @@ export default function SubmitPage() {
 
       <section style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 16, display: 'grid', gap: 12, marginTop: 14 }}>
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Seen at</h3>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Found at</h3>
           <label style={{ display: 'block' }}>
-            Seen at (optional)
+            Found at (optional)
             <input
               value={seenAtName}
               onChange={(e) => setSeenAtName(e.target.value)}

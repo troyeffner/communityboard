@@ -563,11 +563,11 @@ export default function ManagePage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setFormError(schemaAwareError(data?.error, 'Failed to save Seen at'))
+        setFormError(schemaAwareError(data?.error, 'Failed to save Found at'))
         return
       }
       await loadUploads()
-      setMessage('Seen at saved.')
+      setMessage('Found at saved.')
     } finally {
       setSavingSeenAt(false)
     }
@@ -853,7 +853,7 @@ export default function ManagePage() {
           <p style={{ fontSize: 12, opacity: 0.7, margin: '6px 0 0 0' }}>Venue/location: Where the event happens.</p>
 
           <div style={{ marginTop: 10, border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Seen at</h3>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Found at</h3>
             <p style={{ fontSize: 12, opacity: 0.7, margin: '0 0 8px 0' }}>Found at: where you found this poster/business card.</p>
             <label style={{ display: 'block', marginTop: 8 }}>Location name
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
