@@ -905,7 +905,7 @@ export default function CreateClient({
               </div>
 
               <div className="cbActionRow">
-                <button onClick={markDone}>Mark Done</button>
+                <button onClick={markDone}>Mark done</button>
                 <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster</button>
               </div>
           </>
@@ -918,7 +918,7 @@ export default function CreateClient({
     return (
       <PosterDetailsRail
         title="Poster details"
-        subtitle="Create or edit items linked to pinned coordinates on this poster."
+        subtitle="Create or edit items linked to required poster coordinates."
         testId="builder-panel-inspector"
       >
         <PosterDetailsList>
