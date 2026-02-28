@@ -48,20 +48,55 @@ type EventTagBundle = {
   suggested: Array<TagRow & { votes: number }>
 }
 
+function PosterPageHeader({
+  browseHref,
+  title,
+  kind,
+  showIdentifyBoard,
+}: {
+  browseHref: string
+  title: string
+  kind: string
+  showIdentifyBoard?: boolean
+}) {
+  return (
+    <header className="cb-panel cbPosterPageHeader">
+      <div className="cbPosterPageNav">
+        <Link href="/" className="cbPosterPageNavLink cbPosterPageNavLinkStrong">
+          ← Return to Community Board
+        </Link>
+        <a href={browseHref} className="cbPosterPageNavLink">
+          Browse posters
+        </a>
+      </div>
+      <h1 className="cbPosterPageTitle">{title}</h1>
+      <p className="cbPosterPageKind">{kind}</p>
+      {showIdentifyBoard ? (
+        <div className="cbPosterPageIdentify">
+          <p className="cbPosterPageKind">Location not yet identified</p>
+          <a href="#help-identify-board" className="cbPosterPageIdentifyLink">
+            Help identify this board
+          </a>
+        </div>
+      ) : null}
+    </header>
+  )
+}
+
 function renderLoadError(scope: string, detail: string) {
   console.error(`[poster/page] ${scope} failed:`, detail)
   return (
-    <main style={{ padding: 24, fontFamily: 'sans-serif' }} className="cbPosterPageFullBleed">
+    <main className="cbPosterPageFullBleed">
 
       {/* E2E nav guardrails (keep labels stable) */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '8px 0 12px' }}>
-        <Link href="/">← Return to Community Board</Link>
-        <Link href="/browse">← Browse posters</Link>
+      <div className="cbPosterPageNav cbPosterPageErrorNav">
+        <Link href="/" className="cbPosterPageNavLink cbPosterPageNavLinkStrong">← Return to Community Board</Link>
+        <Link href="/browse" className="cbPosterPageNavLink">← Browse posters</Link>
       </div>
 
-      <p style={{ marginTop: 0 }}>We could not load this poster right now.</p>
-      <p style={{ marginBottom: 8, opacity: 0.8 }}>{scope}: {detail}</p>
-      <Link href="/api/health/schema">
+      <p className="cbPosterPageErrorTitle">We could not load this poster right now.</p>
+      <p className="cbPosterPageErrorDetail">{scope}: {detail}</p>
+      <Link href="/api/health/schema" className="cbPosterPageNavLink cbPosterPageNavLinkStrong">
         Check schema health
       </Link>
     </main>
@@ -137,19 +172,8 @@ export default async function PosterPage({
     seenAtParams.set('seenAt', fixture.poster.seen_at_name || '')
     const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
     return (
-      <main className="cb-page-container" style={{ scrollBehavior: 'smooth' }}>
-        <header className="cb-panel" style={{ marginBottom: 10, padding: 10 }}>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
-            <Link href="/" style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
-              ← Return to Community Board
-            </Link>
-            <a href={browseHref} style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 500 }}>
-              Browse posters
-            </a>
-          </div>
-          <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 26, lineHeight: 1.15 }}>{fixture.poster.seen_at_name}</h1>
-          <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>Community Board</p>
-        </header>
+      <main className="cb-page-container cbPosterPage" style={{ scrollBehavior: 'smooth' }}>
+        <PosterPageHeader browseHref={browseHref} title={fixture.poster.seen_at_name || 'Community Board'} kind="Community Board" />
         <PosterViewer
           key={`${id}:${event_id || 'none'}`}
           imageUrls={[fixture.poster.file_path]}
@@ -364,29 +388,13 @@ export default async function PosterPage({
   if (seenAtValue) seenAtParams.set('seenAt', seenAtValue)
   const seenAtHref = `/browse${seenAtParams.toString() ? `?${seenAtParams.toString()}` : ''}`
   return (
-    <main className="cb-page-container" style={{ scrollBehavior: 'smooth' }}>
-      <header className="cb-panel" style={{ marginBottom: 10, padding: 10 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
-          <Link href="/" style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 600 }}>
-            ← Return to Community Board
-          </Link>
-          <a href={browseHref} style={{ fontSize: 14, color: '#1d4ed8', textDecoration: 'none', fontWeight: 500 }}>
-            Browse posters
-          </a>
-        </div>
-        <h1 style={{ marginTop: 0, marginBottom: 4, fontSize: 26, lineHeight: 1.15 }}>{pageTitle}</h1>
-        <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>{boardKindLabel}</p>
-        {hasSeenAt ? (
-          null
-        ) : (
-          <div style={{ display: 'grid', gap: 2, marginTop: 2 }}>
-            <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>Location not yet identified</p>
-            <a href="#help-identify-board" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none' }}>
-              Help identify this board
-            </a>
-          </div>
-        )}
-      </header>
+    <main className="cb-page-container cbPosterPage" style={{ scrollBehavior: 'smooth' }}>
+      <PosterPageHeader
+        browseHref={browseHref}
+        title={pageTitle}
+        kind={boardKindLabel}
+        showIdentifyBoard={!hasSeenAt}
+      />
       <PosterViewer
         key={`${id}:${event_id || 'none'}`}
         imageUrls={imageUrls}

@@ -1,0 +1,160 @@
+/* UI alignment pass: browse/poster/create */
+.cbCreateRail {
+  border-color: #d4dbe5;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.cbCreateWorkspace {
+  border-color: #d4dbe5;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.cbCreateSurfacePad {
+  border-radius: 10px;
+}
+
+.cbCreateDoorLink {
+  min-height: 38px;
+}
+
+.cbCreateActionRow > button,
+.cbCreateActionRow > a {
+  min-height: 34px;
+}
+
+.cbCreateWorkspace .cb-toolbar {
+  padding: 6px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: var(--color-bg-soft);
+}
+
+.cbBrowseHeader {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-color: #d4dbe5;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.cbBrowseHeaderNav {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.cbBrowseBackLink {
+  font-size: 14px;
+  color: #1d4ed8;
+}
+
+.cbBrowseTitle {
+  margin: 0 0 4px 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.cbBrowseSubtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.cbBrowseRail {
+  border-color: #d4dbe5;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.cbBrowseFacetButton {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.cbBrowseFacetButtonActive {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-strong);
+  background: var(--color-bg-soft);
+}
+
+.cbBrowsePosterCard {
+  box-shadow: var(--shadow-soft);
+}
+
+.cbBrowseWorkspace {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.cbPosterPage {
+  padding-top: 12px;
+  padding-bottom: 16px;
+}
+
+.cbPosterPageHeader {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-color: #d4dbe5;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+.cbPosterPageNav {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.cbPosterPageNavLink {
+  font-size: 14px;
+  color: #1d4ed8;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.cbPosterPageNavLinkStrong {
+  font-weight: 600;
+}
+
+.cbPosterPageTitle {
+  margin: 0 0 4px 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.cbPosterPageKind {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.cbPosterPageIdentify {
+  display: grid;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.cbPosterPageIdentifyLink {
+  font-size: 13px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.cbPosterPageFullBleed {
+  padding: 24px;
+  font-family: sans-serif;
+}
+
+.cbPosterPageErrorNav {
+  margin: 8px 0 12px;
+}
+
+.cbPosterPageErrorTitle {
+  margin-top: 0;
+}
+
+.cbPosterPageErrorDetail {
+  margin-bottom: 8px;
+  opacity: 0.8;
+}

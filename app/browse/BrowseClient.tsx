@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PosterViewer from '../poster/[id]/PosterViewer'
-import { uiStyles, uiTokens } from '@/lib/uiTokens'
 
 type PosterRow = {
   id: string
@@ -112,19 +111,23 @@ export default function BrowseClient({
   }))
 
   return (
-    <main style={{ width: '100%', maxWidth: '100%', padding: '12px clamp(12px, 3vw, 18px) 20px', fontFamily: 'sans-serif', overflowX: 'clip' }}>
-      <p style={{ margin: '0 0 6px 0' }}>
-        <Link href="/" style={{ textDecoration: 'none', fontWeight: 600 }}>← Community Board</Link>
-      </p>
-      <h1 style={{ marginTop: 0, marginBottom: 12 }}>Browse Posters</h1>
-      <div className="browse-layout" style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 12, alignItems: 'start' }}>
-        <section style={{ ...uiStyles.panel, padding: 10, display: 'grid', gap: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 20 }}>Browse</h2>
+    <main className="cb-page-container cbBrowsePage">
+      <header className="cb-panel cbBrowseHeader">
+        <div className="cbBrowseHeaderNav">
+          <Link href="/" className="cbBrowseBackLink">← Return to Community Board</Link>
+        </div>
+        <h1 className="cbBrowseTitle">Browse Posters</h1>
+        <p className="cbBrowseSubtitle">Review captured boards and open items in a consistent board-style layout.</p>
+      </header>
+      <div className="cbBrowseLayout">
+        <section className="cb-panel cbBrowseRail">
+          <h2 className="cb-section-header cbBrowsePanelTitle">Browse</h2>
           <div>
-            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Seen at</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div className="cbBrowseMicroLabel">Seen at</div>
+            <div className="cbBrowseFacetRow">
               <button
                 data-variant="secondary"
+                className={!seenAt ? 'cbBrowseFacetButton cbBrowseFacetButtonActive' : 'cbBrowseFacetButton'}
                 onClick={() => {
                   setSeenAt('')
                   updateUrl({ seenAt: '', poster: '' })
@@ -136,19 +139,19 @@ export default function BrowseClient({
                 <button
                   key={facet}
                   data-variant="secondary"
+                  className={seenAt === facet ? 'cbBrowseFacetButton cbBrowseFacetButtonActive' : 'cbBrowseFacetButton'}
                   onClick={() => {
                     setSeenAt(facet)
                     setPosterParam('')
                     updateUrl({ seenAt: facet, poster: '' })
                   }}
-                  style={seenAt === facet ? { borderColor: '#1d4ed8', color: '#1d4ed8' } : undefined}
                 >
                   {facet}
                 </button>
               ))}
             </div>
           </div>
-          <div style={{ display: 'grid', gap: 8, maxHeight: 'min(55vh, 520px)', overflow: 'auto' }}>
+          <div className="cbBrowsePosterList">
             {posters.map((poster) => (
               <button
                 key={poster.id}
@@ -158,34 +161,26 @@ export default function BrowseClient({
                   setActivePosterId(poster.id)
                   updateUrl({ poster: poster.id })
                 }}
-                style={{
-                  ...uiStyles.itemCard,
-                  ...(activePosterId === poster.id ? uiStyles.itemCardSelected : {}),
-                  padding: uiTokens.spacing[2],
-                  textAlign: 'left' as const,
-                  display: 'grid',
-                  gridTemplateColumns: '64px 1fr',
-                  gap: 8,
-                }}
+                className={`cbBrowsePosterCard ${activePosterId === poster.id ? 'cbBrowsePosterCardSelected' : ''}`}
               >
                 {poster.public_url ? (
-                  <img src={poster.public_url} alt="Poster thumbnail" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6 }} />
+                  <img src={poster.public_url} alt="Poster thumbnail" className="cbBrowsePosterThumb" />
                 ) : (
-                  <div style={{ width: 64, height: 64, borderRadius: 6, background: '#f8fafc', border: '1px solid #e5e7eb' }} />
+                  <div className="cbBrowsePosterThumb cbBrowsePosterThumbFallback" />
                 )}
                 <div>
-                  <div style={{ fontSize: uiTokens.typography.label }}>{poster.seen_at_name || 'Unknown seen at'}</div>
-                  <div style={{ fontSize: uiTokens.typography.selectedPill, color: uiTokens.colors.muted, marginTop: 2 }}>Captured: {formatCaptureHour(poster.created_at)}</div>
-                  <div style={{ fontSize: uiTokens.typography.selectedPill, color: uiTokens.colors.muted, marginTop: 2 }}>Items: {poster.item_count}</div>
-                  <div style={{ fontSize: uiTokens.typography.selectedPill, color: uiTokens.colors.muted, marginTop: 2 }}>Status: {poster.status || 'uploaded'}</div>
+                  <div className="cbBrowsePosterSeenAt">{poster.seen_at_name || 'Unknown seen at'}</div>
+                  <div className="cbBrowsePosterMeta">Captured: {formatCaptureHour(poster.created_at)}</div>
+                  <div className="cbBrowsePosterMeta">Items: {poster.item_count}</div>
+                  <div className="cbBrowsePosterMeta">Status: {poster.status || 'uploaded'}</div>
                 </div>
               </button>
             ))}
           </div>
         </section>
 
-        <section>
-          {error ? <p style={{ color: 'crimson' }}>{error}</p> : null}
+        <section className="cbBrowseWorkspace">
+          {error ? <p className="cbBrowseError">{error}</p> : null}
           <PosterViewer
             imageUrls={imageUrls}
             pins={pinRows}
@@ -195,13 +190,6 @@ export default function BrowseClient({
           />
         </section>
       </div>
-      <style jsx>{`
-        @media (max-width: 980px) {
-          .browse-layout {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </main>
   )
 }
