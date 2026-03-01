@@ -726,6 +726,7 @@ export default function CreateClient({
 
   const needsPinForNew = Boolean(selectedPoster && !editingEventId)
   const canSubmitItem = !saving && (!needsPinForNew || Boolean(point))
+  const placedItemsCount = useMemo(() => rows.filter((row) => Boolean(row.bbox)).length, [rows])
   const activeRows = useMemo(() => {
     if (!selectedItemId) return rows
     const lead = rows.find((row) => row.link_id === selectedItemId)
@@ -796,9 +797,12 @@ export default function CreateClient({
         ) : (
           <>
               <div className="cbMetaStrip">
-                <div><span>Captured</span><strong>{formatCaptureHour(selectedPoster.created_at)}</strong></div>
-                <div>
-                  <span>Found at</span>
+                <div className="cbMetaCell">
+                  <span className="cbMetaLabel">Captured</span>
+                  <strong className="cbMetaValue">{formatCaptureHour(selectedPoster.created_at)}</strong>
+                </div>
+                <div className="cbMetaCell">
+                  <span className="cbMetaLabel">Found at</span>
                   <div className="cbFoundAtEditor">
                     <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Found at" />
                     <button type="button" data-variant="secondary" onClick={saveSeenAt} disabled={savingSeenAt}>
@@ -806,15 +810,21 @@ export default function CreateClient({
                     </button>
                   </div>
                 </div>
-                <div><span>Status</span><strong>{posterStatusLabel(selectedPoster.status)}</strong></div>
-                <div><span>Items count</span><strong>{rows.length}</strong></div>
+                <div className="cbMetaCell">
+                  <span className="cbMetaLabel">Items count</span>
+                  <strong className="cbMetaValue">{rows.length}</strong>
+                </div>
+                <div className="cbMetaCell">
+                  <span className="cbMetaLabel">Pins placed</span>
+                  <strong className="cbMetaValue">{placedItemsCount}</strong>
+                </div>
               </div>
 
               <div className="cbControlRow">
                 <button data-variant="secondary" onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}>Zoom -</button>
                 <button data-variant="secondary" onClick={() => setZoom((z) => Math.min(5, Number((z + 0.2).toFixed(2))))}>Zoom +</button>
                 <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>Reset</button>
-                <button data-variant="secondary" onClick={fitToItems} disabled={rows.filter((r) => r.bbox).length === 0}>Fit to items</button>
+                <button data-variant="secondary" onClick={fitToItems} disabled={placedItemsCount === 0}>Fit to items</button>
                 <button data-variant="secondary" onClick={centerSelected} disabled={!selectedItemId && !point}>Center selected</button>
               </div>
 
