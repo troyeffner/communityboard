@@ -26,6 +26,7 @@ export default function ItemCard({
   children?: ReactNode
   testId?: string
 }) {
+  const selectionClass = selected ? 'cbSelectionCard cbSelectionCardSelected' : 'cbSelectionCard'
   return (
     <div
       role={onClick ? 'button' : undefined}
@@ -33,6 +34,7 @@ export default function ItemCard({
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       data-testid={testId}
+      className={selectionClass}
       onKeyDown={
         onClick
           ? (e) => {
@@ -45,8 +47,6 @@ export default function ItemCard({
       }
       style={{
         ...uiStyles.itemCard,
-        ...(selected ? uiStyles.itemCardSelected : {}),
-        ...(selected ? { border: uiTokens.border.selected, background: uiTokens.colors.selectedBg, boxShadow: 'inset 3px 0 0 #3b82f6' } : {}),
         padding: uiTokens.spacing[2],
         cursor: onClick ? 'pointer' : 'default',
       }}

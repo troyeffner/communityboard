@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ensureCbVid } from '@/lib/viewer-id'
 import PosterControls from '@/app/components/poster/PosterControls'
@@ -269,7 +270,9 @@ export default function PosterViewer({
           <div><strong>Captured:</strong> {formatPhotoTakenHour(photoTakenAt)}</div>
           <div>
             <strong>Found at:</strong>{' '}
-            {seenAt ? (seenAtHref ? <a href={seenAtHref}>{seenAt}</a> : seenAt) : '—'}
+            {seenAt
+              ? (seenAtHref ? <Link href={seenAtHref}>{seenAt}</Link> : seenAt)
+              : '—'}
           </div>
         </div>
       </PanelSection>
@@ -361,6 +364,7 @@ export default function PosterViewer({
               {showBothLocations ? <div className="cbItemMetaSecondary">Event at: {eventAtLabel}</div> : null}
               <div className="cbItemActionRow">
                 <button
+                  className="cbActionPrimary"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleUpvote(pin)
@@ -376,14 +380,14 @@ export default function PosterViewer({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="cbActionLink"
+                    className="cbActionLink cbActionSecondary"
                   >
                     Add to Google Calendar
                   </a>
                   <a
                     href={`/api/items/${encodeURIComponent(pin.event_id)}/ics`}
                     onClick={(e) => e.stopPropagation()}
-                    className="cbActionLink"
+                    className="cbActionLink cbActionSecondary"
                   >
                     Download .ics
                   </a>

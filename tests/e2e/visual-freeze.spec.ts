@@ -21,3 +21,17 @@ test('builder shared layout visual snapshots', async ({ page }) => {
   await expect(workspace).toHaveScreenshot('builder-workspace-desktop.png', { animations: 'disabled' })
   await expect(details).toHaveScreenshot('builder-details-rail-desktop.png', { animations: 'disabled' })
 })
+
+test('poster shared layout visual snapshots', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/poster/e2e-fixture')
+  const board = page.getByTestId('poster-view-grid')
+  const workspace = page.getByTestId('poster-panel-center')
+  const details = page.getByTestId('poster-panel-right')
+  await expect(board).toBeVisible()
+  await expect(workspace).toBeVisible()
+  await expect(details).toBeVisible()
+  await expect(board).toHaveScreenshot('poster-board-mobile.png', { animations: 'disabled' })
+  await expect(workspace).toHaveScreenshot('poster-workspace-mobile.png', { animations: 'disabled' })
+  await expect(details).toHaveScreenshot('poster-details-rail-mobile.png', { animations: 'disabled' })
+})

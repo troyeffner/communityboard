@@ -36,16 +36,19 @@ test.describe('CommunityBoard Verification Guardrails', () => {
     await expect(page.locator('a[href="/browse"]')).toBeVisible()
 
     const board = page.getByTestId('poster-view-grid')
+    const workspace = page.getByTestId('poster-panel-center')
     const stage = page.getByTestId('poster-stage')
     const rightRail = page.getByTestId('poster-panel-right')
 
     await expect(board).toBeVisible()
+    await expect(workspace).toBeVisible()
     await expect(stage).toBeVisible()
     await expect(rightRail).toBeVisible()
 
     await assertNoHorizontalOverflow(page)
 
     await expect(board).toHaveScreenshot('poster-board-mobile.png', { animations: 'disabled' })
+    await expect(workspace).toHaveScreenshot('poster-workspace-mobile.png', { animations: 'disabled' })
     await expect(rightRail).toHaveScreenshot('poster-details-rail-mobile.png', { animations: 'disabled' })
   })
 

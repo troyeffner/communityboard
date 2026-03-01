@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BoardHeader, BoardLayout } from '@/app/components/layout/BoardLayout'
 import { Panel, PanelSection } from '@/app/components/layout/Panel'
@@ -347,10 +346,6 @@ export default function BrowseClient({
   const leftPanel = (
     <Panel title="Browse" subtitle="Search, filter, and choose a poster board." testId="browse-panel-left">
       <PanelSection>
-        <Link href="/" className="cbPanelLink cbPanelLinkStrong">Return to Community Board</Link>
-      </PanelSection>
-
-      <PanelSection>
         <p className="cbPanelMicroLabel">Found at</p>
         <div className="cbTokenWrap">
           <button
@@ -504,6 +499,7 @@ export default function BrowseClient({
 
               <div className="cbItemActionRow">
                 <button
+                  className="cbActionPrimary"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleUpvote(pin)
@@ -520,14 +516,14 @@ export default function BrowseClient({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="cbActionLink"
+                    className="cbActionLink cbActionSecondary"
                   >
                     Add to Google Calendar
                   </a>
                   <a
                     href={`/api/items/${encodeURIComponent(pin.event_id)}/ics`}
                     onClick={(e) => e.stopPropagation()}
-                    className="cbActionLink"
+                    className="cbActionLink cbActionSecondary"
                   >
                     Download .ics
                   </a>

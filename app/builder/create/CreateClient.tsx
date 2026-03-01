@@ -759,7 +759,7 @@ export default function CreateClient({
             <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
               {uploadFile ? 'Change photo' : 'Choose file'}
             </button>
-            <button onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
+            <button className="cbActionPrimary" onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
               {uploadingPoster ? 'Uploading...' : 'Upload and select'}
             </button>
           </div>
@@ -905,8 +905,8 @@ export default function CreateClient({
               </div>
 
               <div className="cbActionRow">
-                <button onClick={markDone}>Mark done</button>
-                <button data-variant="danger" onClick={handleDeletePosterClick}>Delete poster</button>
+                <button className="cbActionPrimary" onClick={markDone}>Mark done</button>
+                <button className="cbActionDanger" data-variant="danger" onClick={handleDeletePosterClick}>Delete poster</button>
               </div>
           </>
         )}
@@ -993,9 +993,9 @@ export default function CreateClient({
                   {!editingEventId && !point ? <p className="cb-muted-text">Click the poster to place a pin before saving.</p> : null}
 
                   <div className="cbRow">
-                    <button onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
+                    <button className="cbActionPrimary" onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
                     {(editingEventId || point || isFormDirty) ? (
-                      <button data-variant="secondary" onClick={() => resetFormToNew()}>Cancel</button>
+                      <button className="cbActionSecondary" data-variant="secondary" onClick={() => resetFormToNew()}>Cancel</button>
                     ) : null}
                   </div>
                 </div>
@@ -1026,8 +1026,8 @@ export default function CreateClient({
                           <p><strong>Description:</strong> {row.event.description || '—'}</p>
                           {recurrenceLabel ? <p><strong>Cadence:</strong> {recurrenceLabel}</p> : null}
                           <div className="cbRow">
-                            <button data-variant="secondary" onClick={(e) => { e.stopPropagation(); startEdit(row) }}>Edit</button>
-                            <button data-variant="danger" onClick={(e) => { e.stopPropagation(); deleteItemRow(row) }}>Delete</button>
+                            <button className="cbActionSecondary" data-variant="secondary" onClick={(e) => { e.stopPropagation(); startEdit(row) }}>Edit</button>
+                            <button className="cbActionDanger" data-variant="danger" onClick={(e) => { e.stopPropagation(); deleteItemRow(row) }}>Delete</button>
                           </div>
                         </article>
                       )
@@ -1046,7 +1046,14 @@ export default function CreateClient({
     <>
       <BoardLayout
         testId="builder-create-panels"
-        header={<BoardHeader title="Create posters" subtitle="Use one board skeleton to review submissions, place pins, and edit poster details." />}
+        header={(
+          <BoardHeader
+            title="Create posters"
+            subtitle="Use one board skeleton to review submissions, place pins, and edit poster details."
+            leftLink={{ href: '/', label: 'Return to Community Board' }}
+            rightLink={{ href: '/browse', label: 'Browse posters' }}
+          />
+        )}
         left={<SubmissionsPanel />}
         center={<WorkspacePanel />}
         right={<PosterDetailsPanel />}

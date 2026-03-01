@@ -16,6 +16,9 @@
   --color-brand-hover: #1d4ed8;
   --color-danger: #dc2626;
   --color-danger-hover: #b91c1c;
+  --color-selection-bg: #eff6ff;
+  --color-selection-border: #93c5fd;
+  --color-selection-accent: #3b82f6;
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -270,7 +273,7 @@ textarea:focus {
 
 .cbBoardHeaderTitle {
   margin: 0;
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1.1;
 }
 
@@ -282,7 +285,7 @@ textarea:focus {
 
 .cbBoardLayoutColumns {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 360px;
+  grid-template-columns: 296px minmax(0, 1fr) 332px;
   gap: 12px;
   align-items: start;
 }
@@ -295,7 +298,7 @@ textarea:focus {
   height: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 420px;
+  min-height: 400px;
 }
 
 .cbLayoutPanelHeader {
@@ -311,7 +314,7 @@ textarea:focus {
 
 .cbLayoutPanelTitle {
   margin-bottom: 4px;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .cbLayoutPanelSubtitle {
@@ -328,7 +331,7 @@ textarea:focus {
 .cbLayoutPanelBody {
   margin-top: 8px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
 }
 
@@ -376,9 +379,15 @@ textarea:focus {
 .cbPosterDetailsList {
   display: grid;
   gap: 8px;
-  max-height: min(74vh, 880px);
+  max-height: min(72vh, 860px);
   overflow: auto;
   padding-right: 2px;
+}
+
+.cbSelectionCardSelected {
+  border: 1px solid var(--color-selection-border) !important;
+  background: var(--color-selection-bg) !important;
+  box-shadow: inset 3px 0 0 var(--color-selection-accent);
 }
 
 .cbPanelEmptyState {
@@ -410,6 +419,18 @@ textarea:focus {
   background: var(--color-bg-elevated);
 }
 
+.cbActionPrimary {
+  font-weight: 700;
+}
+
+.cbActionSecondary {
+  font-weight: 600;
+}
+
+.cbActionDanger {
+  font-weight: 700;
+}
+
 .cbBrowsePosterList {
   display: grid;
   gap: 8px;
@@ -428,9 +449,9 @@ textarea:focus {
 }
 
 .cbBrowsePosterCardActive {
-  border: 1px solid #93c5fd;
-  background: #eff6ff;
-  box-shadow: inset 3px 0 0 #3b82f6;
+  border: 1px solid var(--color-selection-border);
+  background: var(--color-selection-bg);
+  box-shadow: inset 3px 0 0 var(--color-selection-accent);
 }
 
 .cbBrowsePosterThumb {
@@ -498,9 +519,9 @@ textarea:focus {
 }
 
 .cbSubmissionCardActive {
-  border: 1px solid #93c5fd;
-  background: #eff6ff;
-  box-shadow: inset 3px 0 0 #3b82f6;
+  border: 1px solid var(--color-selection-border);
+  background: var(--color-selection-bg);
+  box-shadow: inset 3px 0 0 var(--color-selection-accent);
 }
 
 .cbSubmissionMeta {
@@ -669,9 +690,9 @@ textarea:focus {
 }
 
 .cbItemCardActive {
-  border-color: #93c5fd;
-  background: #eff6ff;
-  box-shadow: inset 3px 0 0 #3b82f6;
+  border-color: var(--color-selection-border);
+  background: var(--color-selection-bg);
+  box-shadow: inset 3px 0 0 var(--color-selection-accent);
 }
 
 .cbErrorMsg {
@@ -722,7 +743,7 @@ textarea:focus {
 
 @media (max-width: 1180px) {
   .cbBoardLayoutColumns {
-    grid-template-columns: 280px minmax(0, 1fr) 320px;
+    grid-template-columns: 260px minmax(0, 1fr) 300px;
   }
 }
 
@@ -731,11 +752,11 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
-  .cbBoardLayoutColLeft {
+  .cbBoardLayoutColCenter {
     order: 1;
   }
 
-  .cbBoardLayoutColCenter {
+  .cbBoardLayoutColLeft {
     order: 2;
   }
 

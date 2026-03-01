@@ -111,10 +111,38 @@ function getE2eFixturePoster(id: string) {
   }
 }
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: 'Found at: Community Board',
+async function resolveSeenAtForTitle(id: string): Promise<string | null> {
+  const fixture = getE2eFixturePoster(id)
+  if (fixture?.poster.seen_at_name) return fixture.poster.seen_at_name
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) return null
+
+  try {
+    const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
+    const response = await supabase
+      .from('poster_uploads')
+      .select('seen_at_name')
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle()
+    if (response.error) return null
+    return response.data?.seen_at_name || null
+  } catch {
+    return null
   }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params
+  const seenAt = await resolveSeenAtForTitle(id)
+  const title = `Found at: ${seenAt || 'Community Board'}`
+  return { title }
 }
 
 export default async function PosterPage({
