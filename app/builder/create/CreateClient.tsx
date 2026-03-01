@@ -50,6 +50,8 @@ type ItemFormState = {
   startAt: string
 }
 
+type FormMode = 'create' | 'edit'
+
 async function resizeImageForUpload(file: File): Promise<File> {
   const imageUrl = URL.createObjectURL(file)
   try {
@@ -187,13 +189,19 @@ export default function CreateClient({
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [formBaseline, setFormBaseline] = useState(() => getFormFingerprint(getNewItemFormState()))
+  const [isCreateItemOpen, setIsCreateItemOpen] = useState(false)
+  const [formMode, setFormMode] = useState<FormMode>('create')
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const seenAtAutosaveTimerRef = useRef<number | null>(null)
+  const seenAtSavedValueRef = useRef('')
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const createItemCardRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     document.title = 'Create posters'
   }, [])
 
-  const selectedRow = useMemo(() => rows.find((row) => row.link_id === selectedItemId) || null, [rows, selectedItemId])
-  const editingEventId = selectedRow?.event.id || null
+  const isEditing = formMode === 'edit' && Boolean(editingItemId)
 
   function getCurrentFormState(): ItemFormState {
     return {
@@ -221,10 +229,6 @@ export default function CreateClient({
 
   function setFormBaselineTo(form: ItemFormState) {
     setFormBaseline(getFormFingerprint(form))
-  }
-
-  function setFormBaselineToCurrent() {
-    setFormBaseline(getFormFingerprint(getCurrentFormState()))
   }
 
   const isFormDirty = getFormFingerprint(getCurrentFormState()) !== formBaseline
@@ -266,15 +270,17 @@ export default function CreateClient({
   async function loadRows(posterId: string | null) {
     if (!posterId) {
       setRows([])
-      return
+      return [] as PosterEventRow[]
     }
     const res = await fetch(`/api/manage/poster-events?poster_upload_id=${encodeURIComponent(posterId)}`)
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       setError(friendlyError(data?.error, 'Failed to load items on poster'))
-      return
+      return [] as PosterEventRow[]
     }
-    setRows((data.rows || []) as PosterEventRow[])
+    const nextRows = (data.rows || []) as PosterEventRow[]
+    setRows(nextRows)
+    return nextRows
   }
 
   async function selectPosterById(posterId: string, sourceUploads?: Upload[]) {
@@ -286,6 +292,9 @@ export default function CreateClient({
     setSelectedPoster(poster)
     setSelectedItemId(null)
     setPoint(null)
+    setIsCreateItemOpen(false)
+    setFormMode('create')
+    setEditingItemId(null)
     setError('')
     setMessage('')
     setZoom(1)
@@ -419,33 +428,52 @@ export default function CreateClient({
     centerOnPoint(active, Math.max(1.8, zoom))
   }
 
-  function startEdit(row: PosterEventRow) {
-    if (selectedItemId === row.link_id) return
-    if (!shouldDiscardUnsavedChanges('Switch items')) return
+  function focusCreateItemCard() {
+    window.setTimeout(() => {
+      createItemCardRef.current?.scrollIntoView({ block: 'nearest' })
+      titleInputRef.current?.focus()
+    }, 0)
+  }
+
+  function loadFormFromItem(row: PosterEventRow) {
     const nextForm = rowToFormState(row)
+    applyFormState(nextForm)
+    setFormBaselineTo(nextForm)
+  }
+
+  function resetFormToBlank(preserveSelection = false) {
+    const nextForm = getNewItemFormState()
+    if (!preserveSelection) setSelectedItemId(null)
+    setPoint(null)
+    applyFormState(nextForm)
+    setFormBaselineTo(nextForm)
+    setFormMode('create')
+    setEditingItemId(null)
+  }
+
+  function startEdit(row: PosterEventRow) {
+    if (selectedItemId !== row.link_id && !shouldDiscardUnsavedChanges('Switch items')) return
     setSelectedItemId(row.link_id)
     setPoint(null)
-    applyFormState(nextForm)
-    setFormBaselineTo(nextForm)
+    setFormMode('edit')
+    setEditingItemId(row.event.id)
+    setIsCreateItemOpen(true)
+    loadFormFromItem(row)
     setSeenAtName(selectedPoster?.seen_at_name || '')
+    focusCreateItemCard()
   }
 
-  function resetFormToNew() {
-    const nextForm = getNewItemFormState()
-    setSelectedItemId(null)
-    setPoint(null)
-    applyFormState(nextForm)
-    setFormBaselineTo(nextForm)
-  }
-
-  async function saveSeenAt() {
-    if (!selectedPoster?.id || !seenAtName.trim()) return true
+  async function saveSeenAt(nextSeenAtName = seenAtName) {
+    const posterId = selectedPoster?.id
+    const trimmedSeenAt = nextSeenAtName.trim()
+    if (!posterId || !trimmedSeenAt) return true
+    if (trimmedSeenAt === seenAtSavedValueRef.current) return true
     setSavingSeenAt(true)
     try {
       const res = await fetch('/api/manage/update-poster', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ poster_upload_id: selectedPoster.id, seen_at_name: seenAtName }),
+        body: JSON.stringify({ poster_upload_id: posterId, seen_at_name: trimmedSeenAt }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -453,13 +481,14 @@ export default function CreateClient({
         return false
       }
       try {
-        window.localStorage.setItem('submit_seen_at_name', seenAtName.trim())
+        window.localStorage.setItem('submit_seen_at_name', trimmedSeenAt)
       } catch {
         // ignore localStorage failures
       }
       const nextUploads = await loadUploads()
-      if (selectedPoster) {
-        const refreshed = nextUploads.find((u) => u.id === selectedPoster.id) || null
+      seenAtSavedValueRef.current = trimmedSeenAt
+      if (selectedPoster?.id === posterId) {
+        const refreshed = nextUploads.find((u) => u.id === posterId) || null
         setSelectedPoster(refreshed)
       }
       return true
@@ -486,12 +515,12 @@ export default function CreateClient({
 
     setSaving(true)
     try {
-      if (editingEventId) {
+      if (formMode === 'edit' && editingItemId) {
         const res = await fetch('/api/builder/update-event', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            event_id: editingEventId,
+            event_id: editingItemId,
             type: itemType,
             title: effectiveTitle,
             recurrence_mode: itemType === 'recurring_event' ? recurrenceMode : null,
@@ -508,9 +537,12 @@ export default function CreateClient({
           return
         }
         setMessage('Updated.')
-        await loadRows(selectedPoster?.id || null)
+        const nextRows = await loadRows(selectedPoster.id)
+        const editedRow = nextRows.find((row) => row.event.id === editingItemId)
+        if (editedRow) setSelectedItemId(editedRow.link_id)
         await loadUploads()
-        setFormBaselineToCurrent()
+        resetFormToBlank(true)
+        setIsCreateItemOpen(false)
         return
       }
 
@@ -538,11 +570,14 @@ export default function CreateClient({
         return
       }
 
-      setMessage('Saved. Place another pin to add another item.')
-      setPoint(null)
-      setFormBaselineToCurrent()
-      await loadRows(selectedPoster.id)
+      const createdItemId = String(data?.item_id || '').trim()
+      setMessage('Saved.')
+      const nextRows = await loadRows(selectedPoster.id)
+      const createdRow = nextRows.find((row) => row.event.id === createdItemId)
+      if (createdRow) setSelectedItemId(createdRow.link_id)
       await loadUploads()
+      resetFormToBlank(true)
+      setIsCreateItemOpen(false)
     } finally {
       setSaving(false)
     }
@@ -657,7 +692,7 @@ export default function CreateClient({
       return
     }
 
-    if (selectedItemId === row.link_id) resetFormToNew()
+    if (selectedItemId === row.link_id) resetFormToBlank()
     await loadRows(selectedPoster?.id || null)
     await loadUploads()
   }
@@ -724,7 +759,7 @@ export default function CreateClient({
     setDeleteModalOpen(true)
   }
 
-  const needsPinForNew = Boolean(selectedPoster && !editingEventId)
+  const needsPinForNew = Boolean(selectedPoster && formMode === 'create')
   const canSubmitItem = !saving && (!needsPinForNew || Boolean(point))
   const placedItemsCount = useMemo(() => rows.filter((row) => Boolean(row.bbox)).length, [rows])
   const activeRows = useMemo(() => {
@@ -735,6 +770,33 @@ export default function CreateClient({
   }, [rows, selectedItemId])
 
   const visibleUploads = uploads.filter((u) => !Boolean(u.is_done) && normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE)
+
+  useEffect(() => {
+    const initialSeenAt = selectedPoster?.seen_at_name || ''
+    seenAtSavedValueRef.current = initialSeenAt.trim()
+    if (seenAtAutosaveTimerRef.current) {
+      window.clearTimeout(seenAtAutosaveTimerRef.current)
+      seenAtAutosaveTimerRef.current = null
+    }
+  }, [selectedPoster?.id, selectedPoster?.seen_at_name])
+
+  useEffect(() => {
+    if (!selectedPoster?.id) return
+    if (!seenAtName.trim()) return
+    if (seenAtName.trim() === seenAtSavedValueRef.current) return
+    if (seenAtAutosaveTimerRef.current) window.clearTimeout(seenAtAutosaveTimerRef.current)
+    seenAtAutosaveTimerRef.current = window.setTimeout(() => {
+      void saveSeenAt(seenAtName)
+      seenAtAutosaveTimerRef.current = null
+    }, 700)
+    return () => {
+      if (seenAtAutosaveTimerRef.current) {
+        window.clearTimeout(seenAtAutosaveTimerRef.current)
+        seenAtAutosaveTimerRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seenAtName, selectedPoster?.id])
 
   function SubmissionsPanel() {
     return (
@@ -804,11 +866,20 @@ export default function CreateClient({
                 <div className="cbMetaCell">
                   <span className="cbMetaLabel">Found at</span>
                   <div className="cbFoundAtEditor">
-                    <input value={seenAtName} onChange={(e) => setSeenAtName(e.target.value)} placeholder="Found at" />
-                    <button type="button" data-variant="secondary" onClick={saveSeenAt} disabled={savingSeenAt}>
-                      {savingSeenAt ? 'Saving...' : 'Save'}
-                    </button>
+                    <input
+                      value={seenAtName}
+                      onChange={(e) => setSeenAtName(e.target.value)}
+                      onBlur={() => {
+                        if (seenAtAutosaveTimerRef.current) {
+                          window.clearTimeout(seenAtAutosaveTimerRef.current)
+                          seenAtAutosaveTimerRef.current = null
+                        }
+                        void saveSeenAt(seenAtName)
+                      }}
+                      placeholder="Found at"
+                    />
                   </div>
+                  {savingSeenAt ? <span className="cbMetaInlineStatus">Saving...</span> : null}
                 </div>
                 <div className="cbMetaCell">
                   <span className="cbMetaLabel">Items count</span>
@@ -860,7 +931,7 @@ export default function CreateClient({
                           didDragRef.current = false
                           return
                         }
-                        if (editingEventId && !shouldDiscardUnsavedChanges('Start a new item')) return
+                        if (isEditing && !shouldDiscardUnsavedChanges('Start a new item')) return
 
                         const rect = e.currentTarget.getBoundingClientRect()
                         const x = (e.clientX - rect.left) / rect.width
@@ -868,7 +939,10 @@ export default function CreateClient({
 
                         setPoint({ x: Number(Math.max(0, Math.min(1, x)).toFixed(4)), y: Number(Math.max(0, Math.min(1, y)).toFixed(4)) })
                         setSelectedItemId(null)
-                        if (editingEventId) setFormBaselineToCurrent()
+                        if (isEditing) {
+                          resetFormToBlank()
+                          setIsCreateItemOpen(true)
+                        }
                       }}
                       style={{
                         left: `${stageMetrics.offsetX}px`,
@@ -899,7 +973,7 @@ export default function CreateClient({
                     )
                   })}
 
-                  {!editingEventId && point ? (
+                  {formMode === 'create' && point ? (
                     <div
                       className="cbPinDraft"
                       style={{
@@ -937,7 +1011,27 @@ export default function CreateClient({
               {message ? <p className="cbInfoMsg">{message}</p> : null}
 
               <section className="cbFormCard">
-                <h3 className="cbSubhead">{editingEventId ? 'Edit item' : 'Create item'}</h3>
+                <div className="cbFormCardHeaderRow">
+                  <h3 className="cbSubhead" ref={createItemCardRef}>Create item</h3>
+                  <button
+                    type="button"
+                    data-variant="secondary"
+                    className="cbActionSecondary"
+                    onClick={() => {
+                      if (isCreateItemOpen) {
+                        resetFormToBlank(true)
+                        setIsCreateItemOpen(false)
+                        return
+                      }
+                      resetFormToBlank(true)
+                      setIsCreateItemOpen(true)
+                      focusCreateItemCard()
+                    }}
+                  >
+                    {isCreateItemOpen ? 'Close' : 'Open'}
+                  </button>
+                </div>
+                {isCreateItemOpen ? (
                 <div className="cbFormGrid">
                   <label>
                     Item type
@@ -950,7 +1044,7 @@ export default function CreateClient({
 
                   <label>
                     Title
-                    <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
+                    <input ref={titleInputRef} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
                   </label>
 
                   <label>
@@ -997,15 +1091,25 @@ export default function CreateClient({
                     </fieldset>
                   ) : null}
 
-                  {!editingEventId && !point ? <p className="cb-muted-text">Click the poster to place a pin before saving.</p> : null}
+                  {formMode === 'create' && !point ? <p className="cb-muted-text">Click the poster to place a pin before saving.</p> : null}
 
                   <div className="cbRow">
-                    <button className="cbActionPrimary" onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : editingEventId ? 'Save changes' : 'Add item'}</button>
-                    {(editingEventId || point || isFormDirty) ? (
-                      <button className="cbActionSecondary" data-variant="secondary" onClick={() => resetFormToNew()}>Cancel</button>
+                    <button className="cbActionPrimary" onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : formMode === 'edit' ? 'Save changes' : 'Add item'}</button>
+                    {formMode === 'edit' ? (
+                      <button
+                        className="cbActionSecondary"
+                        data-variant="secondary"
+                        onClick={() => {
+                          resetFormToBlank(true)
+                          setIsCreateItemOpen(false)
+                        }}
+                      >
+                        Cancel
+                      </button>
                     ) : null}
                   </div>
                 </div>
+                ) : null}
               </section>
 
               <hr className="cbDivider" />

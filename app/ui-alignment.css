@@ -177,8 +177,8 @@
 
 .cbFoundAtEditor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
   align-items: end;
 }
 
@@ -187,14 +187,13 @@
   height: 36px;
   padding-top: 6px;
   padding-bottom: 6px;
+  width: 100%;
 }
 
-.cbFoundAtEditor button {
-  min-height: 36px;
-  height: 36px;
-  padding-top: 0;
-  padding-bottom: 0;
-  white-space: nowrap;
+.cbMetaInlineStatus {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--color-text-muted);
 }
 
 .cbControlRow {
@@ -265,6 +264,13 @@
   display: grid;
   gap: 10px;
   background: #fff;
+}
+
+.cbFormCardHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .cbFormGrid {
