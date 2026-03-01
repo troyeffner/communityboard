@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { ITEM_TYPES, type ItemType, normalizeItemType } from '@/lib/itemTypes'
 import { POSTER_STATUSES, eventStatusLabel, posterStatusLabel, normalizePosterStatus } from '@/lib/statuses'
 import { BoardHeader, BoardLayout } from '@/app/components/layout/BoardLayout'
-import { Panel, PanelSection } from '@/app/components/layout/Panel'
+import { Panel } from '@/app/components/layout/Panel'
 import { PosterDetailsList, PosterDetailsRail } from '@/app/components/layout/RightRail'
 
 type Upload = {
@@ -737,37 +737,34 @@ export default function CreateClient({
 
   function SubmissionsPanel() {
     return (
-      <Panel title="Submissions" subtitle="Choose a poster, then place pins and draft items." testId="builder-panel-submissions">
-        <PanelSection>
-          <div className="cbSubmissionsNav">
-            <a href="/builder/create" className="cb-tab-button cb-tab-button-active">Create drafts</a>
-            <a href="/builder/tend" className="cb-tab-button">Tend board</a>
-          </div>
-        </PanelSection>
+      <Panel
+        title="Submissions"
+        subtitle="Choose a poster, then place pins and draft items."
+        className="cbSubmissionsNoHeaderDivider"
+        testId="builder-panel-submissions"
+      >
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+          className="cbUploadInput"
+        />
+        <div className="cbRow cbSubmissionsHeaderActions">
+          <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
+            {uploadFile ? 'Change file' : 'Choose file'}
+          </button>
+          <button className="cbActionPrimary" onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
+            {uploadingPoster ? 'Uploading...' : 'Upload and select'}
+          </button>
+        </div>
+        <hr className="cbDivider cbSubmissionsPrimaryDivider" />
 
-        <PanelSection>
-          <h3 className="cbSubhead">Upload poster</h3>
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-            className="cbUploadInput"
-          />
-          <div className="cbRow">
-            <button type="button" data-variant="secondary" onClick={() => uploadInputRef.current?.click()} disabled={uploadingPoster}>
-              {uploadFile ? 'Change photo' : 'Choose file'}
-            </button>
-            <button className="cbActionPrimary" onClick={uploadFromCreate} disabled={!uploadFile || uploadingPoster}>
-              {uploadingPoster ? 'Uploading...' : 'Upload and select'}
-            </button>
-          </div>
-          <div className="cbRow">
-            <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
-            <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
-          </div>
-        </PanelSection>
+        <div className="cbRow cbSubmissionsSecondaryActions">
+          <button data-variant="secondary" onClick={goToNextUntendedPoster}>Next untended poster</button>
+          <button data-variant="secondary" onClick={loadUploads}>Refresh</button>
+        </div>
 
         <div className="cbSubmissionList">
           {visibleUploads.map((upload) => {
