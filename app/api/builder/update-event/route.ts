@@ -71,6 +71,7 @@ export async function PATCH(req: Request) {
     if ('location' in body) legacyUpdates.location = location || null
     if ('description' in body) legacyUpdates.description = description || null
     if (status) legacyUpdates.status = status
+    if (itemType) legacyUpdates.is_recurring = itemType === 'recurring_event'
     if (startAtRaw) legacyUpdates.start_at = startAtRaw.length === 16 ? `${startAtRaw}:00` : startAtRaw
     const fallback = await supabase.from('events').update(legacyUpdates).eq('id', eventId)
     if (fallback.error) return jsonError(fallback.error.message, 500)

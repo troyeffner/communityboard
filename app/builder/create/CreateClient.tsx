@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { ITEM_TYPES, type ItemType, normalizeItemType } from '@/lib/itemTypes'
-import { POSTER_STATUSES, eventStatusLabel, posterStatusLabel, normalizePosterStatus } from '@/lib/statuses'
+import { POSTER_STATUSES, posterStatusLabel, normalizePosterStatus } from '@/lib/statuses'
 import { BoardHeader, BoardLayout } from '@/app/components/layout/BoardLayout'
 import { Panel } from '@/app/components/layout/Panel'
 import { PosterDetailsList, PosterDetailsRail } from '@/app/components/layout/RightRail'
@@ -108,10 +108,6 @@ function formatCaptureHour(value?: string | null) {
   })
 }
 
-function statusLabel(statusValue: string) {
-  return eventStatusLabel(statusValue)
-}
-
 function isTimeBoundType(type: string) {
   return type === 'event' || type === 'recurring_event' || type === 'class_program'
 }
@@ -192,10 +188,12 @@ export default function CreateClient({
   const [isCreateItemOpen, setIsCreateItemOpen] = useState(false)
   const [formMode, setFormMode] = useState<FormMode>('create')
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [pinPromptActive, setPinPromptActive] = useState(false)
   const seenAtAutosaveTimerRef = useRef<number | null>(null)
   const seenAtSavedValueRef = useRef('')
   const titleInputRef = useRef<HTMLInputElement | null>(null)
-  const createItemCardRef = useRef<HTMLElement | null>(null)
+  const createItemCardRef = useRef<HTMLHeadingElement | null>(null)
+  const itemCardRefs = useRef<Record<string, HTMLElement | null>>({})
 
   useEffect(() => {
     document.title = 'Create posters'
@@ -435,6 +433,12 @@ export default function CreateClient({
     }, 0)
   }
 
+  function focusStageForPin() {
+    setPinPromptActive(true)
+    stageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    window.setTimeout(() => setPinPromptActive(false), 1400)
+  }
+
   function loadFormFromItem(row: PosterEventRow) {
     const nextForm = rowToFormState(row)
     applyFormState(nextForm)
@@ -449,6 +453,7 @@ export default function CreateClient({
     setFormBaselineTo(nextForm)
     setFormMode('create')
     setEditingItemId(null)
+    setPinPromptActive(false)
   }
 
   function startEdit(row: PosterEventRow) {
@@ -477,7 +482,7 @@ export default function CreateClient({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(friendlyError(data?.error, 'Failed to save Found at'))
+        setError(friendlyError(data?.error, 'Failed to save Seen at'))
         return false
       }
       try {
@@ -542,12 +547,12 @@ export default function CreateClient({
         if (editedRow) setSelectedItemId(editedRow.link_id)
         await loadUploads()
         resetFormToBlank(true)
-        setIsCreateItemOpen(false)
         return
       }
 
       if (!point) {
         setError('Click the poster to place a pin before saving.')
+        focusStageForPin()
         return
       }
 
@@ -577,7 +582,7 @@ export default function CreateClient({
       if (createdRow) setSelectedItemId(createdRow.link_id)
       await loadUploads()
       resetFormToBlank(true)
-      setIsCreateItemOpen(false)
+      setPoint(null)
     } finally {
       setSaving(false)
     }
@@ -762,12 +767,14 @@ export default function CreateClient({
   const needsPinForNew = Boolean(selectedPoster && formMode === 'create')
   const canSubmitItem = !saving && (!needsPinForNew || Boolean(point))
   const placedItemsCount = useMemo(() => rows.filter((row) => Boolean(row.bbox)).length, [rows])
-  const activeRows = useMemo(() => {
-    if (!selectedItemId) return rows
-    const lead = rows.find((row) => row.link_id === selectedItemId)
-    if (!lead) return rows
-    return [lead, ...rows.filter((row) => row.link_id !== selectedItemId)]
-  }, [rows, selectedItemId])
+  const rowsSortedByNewest = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const aTime = new Date(a.created_at || '').getTime()
+      const bTime = new Date(b.created_at || '').getTime()
+      return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime)
+    })
+  }, [rows])
+  const activeRows = rowsSortedByNewest
 
   const visibleUploads = uploads.filter((u) => !Boolean(u.is_done) && normalizePosterStatus(u.status) !== POSTER_STATUSES.DONE)
 
@@ -779,6 +786,13 @@ export default function CreateClient({
       seenAtAutosaveTimerRef.current = null
     }
   }, [selectedPoster?.id, selectedPoster?.seen_at_name])
+
+  useEffect(() => {
+    if (!selectedItemId) return
+    const el = itemCardRefs.current[selectedItemId]
+    if (!el) return
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selectedItemId])
 
   useEffect(() => {
     if (!selectedPoster?.id) return
@@ -838,7 +852,7 @@ export default function CreateClient({
                 <div className="cbSubmissionMeta">
                   <div><span>Captured:</span> {formatCaptureHour(upload.created_at)}</div>
                   <div><span>Status:</span> {posterStatusLabel(upload.status)}</div>
-                  <div><span>Found at:</span> {upload.seen_at_name || '—'}</div>
+                  <div><span>Seen at:</span> {upload.seen_at_name || '—'}</div>
                   <div><span>Items count:</span> {itemsCount}</div>
                 </div>
                 {upload.public_url ? <img src={upload.public_url} alt="Poster thumbnail" className="cbSubmissionThumb" /> : <div className="cbSubmissionThumb cbSubmissionThumbEmpty">No image</div>}
@@ -864,7 +878,7 @@ export default function CreateClient({
                   <strong className="cbMetaValue">{formatCaptureHour(selectedPoster.created_at)}</strong>
                 </div>
                 <div className="cbMetaCell">
-                  <span className="cbMetaLabel">Found at</span>
+                  <span className="cbMetaLabel">Seen at</span>
                   <div className="cbFoundAtEditor">
                     <input
                       value={seenAtName}
@@ -876,7 +890,7 @@ export default function CreateClient({
                         }
                         void saveSeenAt(seenAtName)
                       }}
-                      placeholder="Found at"
+                      placeholder="Seen at"
                     />
                   </div>
                   {savingSeenAt ? <span className="cbMetaInlineStatus">Saving...</span> : null}
@@ -901,7 +915,7 @@ export default function CreateClient({
 
               <div
                 ref={stageRef}
-                className="cbPosterStage"
+                className={pinPromptActive ? 'cbPosterStage cbPosterStagePrompt' : 'cbPosterStage'}
                 onMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY }; didDragRef.current = false }}
                 onMouseMove={(e) => {
                   if (!dragRef.current) return
@@ -941,8 +955,9 @@ export default function CreateClient({
                         setSelectedItemId(null)
                         if (isEditing) {
                           resetFormToBlank()
-                          setIsCreateItemOpen(true)
                         }
+                        setIsCreateItemOpen(true)
+                        focusCreateItemCard()
                       }}
                       style={{
                         left: `${stageMetrics.offsetX}px`,
@@ -1012,11 +1027,11 @@ export default function CreateClient({
 
               <section className="cbFormCard">
                 <div className="cbFormCardHeaderRow">
-                  <h3 className="cbSubhead" ref={createItemCardRef}>Create item</h3>
+                  <h3 className="cbSubhead" ref={createItemCardRef}>{formMode === 'edit' ? 'Edit item' : 'Create item'}</h3>
                   <button
                     type="button"
                     data-variant="secondary"
-                    className="cbActionSecondary"
+                    className="cbActionSecondary cbCreateItemToggle"
                     onClick={() => {
                       if (isCreateItemOpen) {
                         resetFormToBlank(true)
@@ -1028,7 +1043,7 @@ export default function CreateClient({
                       focusCreateItemCard()
                     }}
                   >
-                    {isCreateItemOpen ? 'Close' : 'Open'}
+                    {isCreateItemOpen ? 'Close' : 'Open'} <span aria-hidden>{isCreateItemOpen ? '▴' : '▾'}</span>
                   </button>
                 </div>
                 {isCreateItemOpen ? (
@@ -1091,7 +1106,14 @@ export default function CreateClient({
                     </fieldset>
                   ) : null}
 
-                  {formMode === 'create' && !point ? <p className="cb-muted-text">Click the poster to place a pin before saving.</p> : null}
+                  {formMode === 'create' && !point ? (
+                    <p className="cb-muted-text cbPinRequiredHint">
+                      Pin required to save.{' '}
+                      <button type="button" className="cbActionLink" onClick={focusStageForPin}>
+                        Select pin
+                      </button>
+                    </p>
+                  ) : null}
 
                   <div className="cbRow">
                     <button className="cbActionPrimary" onClick={saveEvent} disabled={!canSubmitItem}>{saving ? 'Saving...' : formMode === 'edit' ? 'Save changes' : 'Add item'}</button>
@@ -1101,7 +1123,6 @@ export default function CreateClient({
                         data-variant="secondary"
                         onClick={() => {
                           resetFormToBlank(true)
-                          setIsCreateItemOpen(false)
                         }}
                       >
                         Cancel
@@ -1128,17 +1149,24 @@ export default function CreateClient({
                         : null
 
                       return (
-                        <article key={row.link_id} className={selectedItemId === row.link_id ? 'cbItemCard cbItemCardActive' : 'cbItemCard'} onClick={() => startEdit(row)}>
-                          <h4>{row.event.title || '(Draft item)'}</h4>
-                          <p><strong>Status:</strong> {statusLabel(row.event.status)} • {(row.event.item_type || 'event').replaceAll('_', ' ')}</p>
+                        <article
+                          key={row.link_id}
+                          ref={(el) => { itemCardRefs.current[row.link_id] = el }}
+                          className={selectedItemId === row.link_id ? 'cbItemCard cbItemCardActive' : 'cbItemCard'}
+                          onClick={() => startEdit(row)}
+                        >
+                          <div className="cbItemCardHead">
+                            <h4>{row.event.title || '(Draft item)'}</h4>
+                            <span className="cbItemCardType">{(row.event.item_type || 'event').replaceAll('_', ' ')}</span>
+                          </div>
                           <p><strong>Date/time:</strong> {startLabel}</p>
-                          <p><strong>Found at:</strong> {selectedPoster.seen_at_name || '—'}</p>
+                          <p><strong>Seen at:</strong> {selectedPoster.seen_at_name || '—'}</p>
                           <p><strong>Event at:</strong> {row.event.location || '—'}</p>
                           <p><strong>Description:</strong> {row.event.description || '—'}</p>
                           {recurrenceLabel ? <p><strong>Cadence:</strong> {recurrenceLabel}</p> : null}
                           <div className="cbRow">
                             <button className="cbActionSecondary" data-variant="secondary" onClick={(e) => { e.stopPropagation(); startEdit(row) }}>Edit</button>
-                            <button className="cbActionDanger" data-variant="danger" onClick={(e) => { e.stopPropagation(); deleteItemRow(row) }}>Delete</button>
+                            <button className="cbActionLinkDanger" onClick={(e) => { e.stopPropagation(); deleteItemRow(row) }}>Delete</button>
                           </div>
                         </article>
                       )
@@ -1176,7 +1204,7 @@ export default function CreateClient({
             <h3>Delete poster</h3>
             <div className="cbModalMeta">
               <div>Created: {new Date(selectedPoster.created_at).toLocaleString()}</div>
-              <div>Found at: {selectedPoster.seen_at_name || '—'}</div>
+              <div>Seen at: {selectedPoster.seen_at_name || '—'}</div>
               <div>Linked items: {selectedPoster.linked_count ?? selectedPoster.event_count ?? 0}</div>
             </div>
 
