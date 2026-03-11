@@ -115,7 +115,7 @@ function EventList({
             )}
             {e.seen_at_name && (
               <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6 }}>
-                Found at: {e.seen_at_name}
+                Seen at: {e.seen_at_name}
               </div>
             )}
             <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -178,7 +178,7 @@ function EventList({
                     title: e.title,
                     start_at: e.start_at,
                     location: e.location,
-                    description: [e.description || '', e.seen_at_name ? `Found at: ${e.seen_at_name}` : ''].filter(Boolean).join('\n'),
+                    description: [e.description || '', e.seen_at_name ? `Seen at: ${e.seen_at_name}` : ''].filter(Boolean).join('\n'),
                   })}
                   target="_blank"
                   rel="noreferrer"
@@ -212,7 +212,7 @@ function EventList({
                     lineHeight: '30px',
                   }}
                 >
-                  Download .ics
+                  Download ICS
                 </a>
               </div>
             )}
@@ -256,7 +256,7 @@ function EventList({
                     lineHeight: '30px',
                   }}
                 >
-                  Download .ics
+                  Download ICS
                 </a>
               </div>
             )}

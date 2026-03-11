@@ -1,0 +1,34 @@
+{
+  "source_registry_id": "timeline_sources_v1",
+  "updated_at": "2026-03-10",
+  "owner": "TE.ENG_Fiona",
+  "sources": [
+    {
+      "id": "seed_local_historical_events",
+      "name": "Seed Local Historical Events",
+      "mode": "local_json",
+      "path": "ether/productions/sample_timeline_seed.json",
+      "license": "internal-seed",
+      "country_scope": "global",
+      "enabled": true
+    },
+    {
+      "id": "example_remote_timeline",
+      "name": "Example Remote Timeline (disabled by default)",
+      "mode": "http_json",
+      "url": "https://example.org/timeline.json",
+      "license": "unknown",
+      "rate_limit_per_minute": 30,
+      "compliance": {
+        "review_status": "pending",
+        "use_allowed": false,
+        "data_class": "public",
+        "terms_url": "https://example.org/terms",
+        "evidence_ref": "pending-review"
+      },
+      "country_scope": "global",
+      "enabled": false
+    }
+  ],
+  "notes": "Remote sources remain disabled until source compliance gates are approved and CB_ALLOW_REMOTE_ETHER_INGEST=1 is set."
+}

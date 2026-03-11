@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-03-10T20:19:13.867Z",
+  "source": "ingest-ether-timelines-pass1",
+  "source_registry": "/Users/troyeffner/Dropbox/DEV/communityboard/ether/sources/timeline_sources.json",
+  "enabled_sources": 1,
+  "normalized_events_total": 5,
+  "soil_output_path": "/Users/troyeffner/Dropbox/DEV/communityboard/trunk/soil/community/events_ingest_20260310_2019.jsonl",
+  "source_summaries": [
+    {
+      "source_id": "seed_local_historical_events",
+      "mode": "local_json",
+      "skipped": false,
+      "records_in_source": 5,
+      "normalized_events_written": 5,
+      "raw_packet_path": "/Users/troyeffner/Dropbox/DEV/communityboard/ether/ingest/raw/seed_local_historical_events_20260310_2019.json"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "layer_type": "client_instance",
+  "template_id": "communityboard_ffa_instance",
+  "template_version_id": "communityboard_ffa_v0.1",
+  "parent_template_id": "smallbiz_ffa_domain_template",
+  "parent_version_id": "smallbiz_ffa_domain_v0.1",
+  "classification": "client_confidential",
+  "forked_from_layer": "domain_template",
+  "forked_at_version": "smallbiz_ffa_domain_v0.1",
+  "upgrade_strategy": "manual_merge",
+  "needs_review": false,
+  "updated_at": "2026-03-01T19:20:00Z",
+  "framework_foundation": {
+    "epistemic_state_policy": {
+      "field_name": "epistemic_state",
+      "allowed_values": [
+        "seed",
+        "hypothesis",
+        "stabilized"
+      ],
+      "default_for_new_records": "seed",
+      "applies_to": "all_framework_foundation_records"
+    },
+    "taxonomy": {
+      "canonical_terms": {
+        "cognitive_frame": "user meaning-making frame/context for a job",
+        "execution_mode": "strategy/stance used to execute tasks under constraints",
+        "workflow_pattern": "reusable task composition pattern",
+        "task": "atomic verb-noun action unit"
+      },
+      "alias_map": {
+        "mental_space": "cognitive_frame",
+        "mode": "execution_mode",
+        "tower": "workflow_pattern",
+        "task_cluster": "workflow_pattern"
+      }
+    },
+    "assumptions": [],
+    "hypotheses": [],
+    "experiments": [],
+    "evidence": [],
+    "cognitive_frames": [],
+    "execution_modes": [],
+    "workflow_patterns": [],
+    "tasks": [],
+    "desired_outcomes": [],
+    "opportunities": [],
+    "solutions": [],
+    "ost_links": [],
+    "metaphors": [],
+    "public_copy_atoms": [],
+    "alignment_issues": [],
+    "edges": [],
+    "seed_data_policy": {
+      "seed_is_exploratory": true,
+      "required_seed_metadata_fields": [
+        "seed_label",
+        "evaluation_status",
+        "probe_intent"
+      ],
+      "evaluation_status_allowed_values": [
+        "research_backed",
+        "research_needed"
+      ],
+      "promotion_rule": "seed_items_require_evidence_before_stabilized"
+    }
+  },
+  "meta": {
+    "epistemic_state_scale": [
+      "seed",
+      "hypothesis",
+      "stabilized"
+    ],
+    "last_updated": "2026-03-01T21:29:14Z"
+  }
+}

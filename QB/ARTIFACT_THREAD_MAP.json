@@ -1,0 +1,49 @@
+{
+  "project": "communityboard",
+  "project_type": "standalone_product",
+  "updated_at": "2026-03-01T18:54:43Z",
+  "artifact_mappings": [
+    {
+      "artifact_type": "framework_foundation",
+      "primary_thread": "07",
+      "secondary_threads": ["00_QB", "08"],
+      "status": "active",
+      "owner": "QB"
+    },
+    {
+      "artifact_type": "operating_canon",
+      "primary_thread": "00_QB",
+      "secondary_threads": ["07"],
+      "status": "active",
+      "owner": "QB"
+    },
+    {
+      "artifact_type": "execution_control",
+      "primary_thread": "00_QB",
+      "secondary_threads": ["01", "02", "03", "04", "05", "06", "07", "08"],
+      "status": "active",
+      "owner": "QB"
+    },
+    {
+      "artifact_type": "governance_gate",
+      "primary_thread": "05",
+      "secondary_threads": ["00_QB", "08"],
+      "status": "active",
+      "owner": "QB"
+    },
+    {
+      "artifact_type": "alignment_and_drift",
+      "primary_thread": "07",
+      "secondary_threads": ["00_QB", "01", "08"],
+      "status": "active",
+      "owner": "QB"
+    },
+    {
+      "artifact_type": "bootstrap_prompt",
+      "primary_thread": "00_QB",
+      "secondary_threads": ["01"],
+      "status": "active",
+      "owner": "QB"
+    }
+  ]
+}

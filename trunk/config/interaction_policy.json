@@ -1,0 +1,10 @@
+{
+  "policy_id": "communityboard_interaction_policy_v1",
+  "updated_at": "2026-03-10",
+  "owner": "TE.ENG_Fiona",
+  "status": "active",
+  "vote_limit_per_24h": 30,
+  "tag_promotion_threshold": 3,
+  "notes": "Runtime values currently loaded via env-backed defaults in lib/trunk/interactionPolicy.ts. This file is the trunk policy anchor."
+}
+

@@ -112,7 +112,7 @@ export default function SubmitClient() {
       return
     }
     if (!seenAtName.trim()) {
-      setErrorText('Found at is required.')
+      setErrorText('Seen at is required.')
       return
     }
 
@@ -194,9 +194,9 @@ export default function SubmitClient() {
 
       <section style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 16, display: 'grid', gap: 12, marginTop: 14 }}>
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Found at</h3>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Seen at</h3>
           <label style={{ display: 'block' }}>
-            Found at
+            Seen at
             <input
               value={seenAtName}
               onChange={(e) => setSeenAtName(e.target.value)}
@@ -205,7 +205,7 @@ export default function SubmitClient() {
             />
           </label>
           <label style={{ display: 'block', marginTop: 8, fontSize: 13 }}>
-            <input type="checkbox" checked={reuseSeenAt} onChange={(e) => setReuseSeenAt(e.target.checked)} /> Use same seen-at for next submit
+            <input type="checkbox" checked={reuseSeenAt} onChange={(e) => setReuseSeenAt(e.target.checked)} /> Use same Seen at for next submit
           </label>
         </div>
 

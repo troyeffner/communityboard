@@ -110,9 +110,11 @@ export default function PosterStage({
                   width: active ? 18 : 12,
                   height: active ? 18 : 12,
                   borderRadius: 999,
-                  background: active ? '#ef4444' : '#22c55e',
-                  border: '2px solid #fff',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                  background: active ? 'var(--color-pin-selected)' : 'var(--color-pin-default)',
+                  border: active ? '2.5px solid #fff' : '2px solid #fff',
+                  boxShadow: active
+                    ? '0 0 0 3px rgba(239, 68, 68, 0.35), 0 1px 4px rgba(0,0,0,0.35)'
+                    : '0 1px 4px rgba(0,0,0,0.35)',
                   cursor: 'pointer',
                 }}
               />

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
-import { POSTER_STATUSES } from '@/lib/statuses'
+import { buildPosterUploadInsertCandidates, isUploadInsertRetryable } from '@/lib/trunk/uploadPolicy'
 
 export const runtime = 'nodejs'
 
@@ -9,9 +9,9 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-function isPosterStatusEnumMismatch(error: { message?: string } | null | undefined) {
+function isMissingColumn(error: { code?: string; message?: string } | null | undefined, column: string) {
   const message = (error?.message || '').toLowerCase()
-  return message.includes('poster_status') && message.includes('new')
+  return error?.code === '42703' || message.includes(column.toLowerCase()) || message.includes('schema cache')
 }
 
 export async function POST(req: Request) {
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   if (!file.type.startsWith('image/')) return jsonError('File must be an image')
 
   const seen_at_name = String(form.get('seen_at_name') || '').trim() || null
-  if (!seen_at_name) return jsonError('Found at is required')
+  if (!seen_at_name) return jsonError('Seen at is required')
 
   // Read file into a Buffer
   const arrayBuffer = await file.arrayBuffer()
@@ -56,80 +56,31 @@ export async function POST(req: Request) {
   if (uploadErr) return jsonError(uploadErr.message, 500)
 
   // Insert poster_uploads row
-  const insertPayload = {
-    file_path: filePath,
-    status: POSTER_STATUSES.NEW,
-    seen_at_name,
-    is_done: false,
+  const insertCandidates = buildPosterUploadInsertCandidates(filePath, seen_at_name)
+
+  let row: { id?: string } | null = null
+  let insertErr: { code?: string; message?: string } | null = null
+
+  for (const candidate of insertCandidates) {
+    const attempt = await supabase
+      .from('poster_uploads')
+      .insert([candidate as never])
+      .select('id')
+      .single()
+    if (!attempt.error && attempt.data) {
+      row = attempt.data
+      insertErr = null
+      break
+    }
+    insertErr = attempt.error
+    if (!attempt.error) continue
+    if (isUploadInsertRetryable(attempt.error, isMissingColumn)) {
+      continue
+    }
+    return jsonError(attempt.error.message, 500)
   }
 
-  const insert = await supabase
-    .from('poster_uploads')
-    .insert([insertPayload])
-    .select('id')
-    .single()
-
-  let row = insert.data
-  let insertErr = insert.error
-  if (insertErr) {
-    const message = (insertErr.message || '').toLowerCase()
-    const invalidStatusEnum = isPosterStatusEnumMismatch(insertErr)
-    const missingSeenAtName =
-      insertErr.code === '42703' ||
-      message.includes('seen_at_name') ||
-      message.includes('schema cache')
-
-    if (invalidStatusEnum) {
-      const fallbackLegacyStatus = await supabase
-        .from('poster_uploads')
-        .insert([
-          {
-            file_path: filePath,
-            status: POSTER_STATUSES.UPLOADED,
-            seen_at_name,
-          },
-        ])
-        .select('id')
-        .single()
-
-      row = fallbackLegacyStatus.data
-      insertErr = fallbackLegacyStatus.error
-    } else if (missingSeenAtName) {
-      return jsonError('Run migration: poster_uploads.seen_at_name', 500)
-    } else if (!message.includes('seen_at_') && !message.includes('done')) {
-      return jsonError(insertErr.message, 500)
-    }
-
-    if (insertErr) {
-      const fallbackWithoutLabel = await supabase
-        .from('poster_uploads')
-        .insert([
-          {
-            file_path: filePath,
-            status: POSTER_STATUSES.NEW,
-            seen_at_name,
-          },
-        ])
-        .select('id')
-        .single()
-
-      row = fallbackWithoutLabel.data
-      insertErr = fallbackWithoutLabel.error
-    }
-
-    if (insertErr) {
-      const fallbackPlain = await supabase
-        .from('poster_uploads')
-        .insert([{ file_path: filePath, status: POSTER_STATUSES.UPLOADED }])
-        .select('id')
-        .single()
-
-      row = fallbackPlain.data
-      insertErr = fallbackPlain.error
-    }
-  }
-
-  if (insertErr) return jsonError(insertErr.message, 500)
+  if (insertErr) return jsonError(insertErr.message || 'Failed to create upload record', 500)
   if (!row?.id) return jsonError('Failed to create upload record', 500)
 
   return NextResponse.json({ ok: true, id: row.id, poster_upload_id: row.id })

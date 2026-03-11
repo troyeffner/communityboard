@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ATTRIBUTES, AUDIENCE, EVENT_CATEGORIES } from '@/lib/taxonomy'
 
-type EventStatus = 'draft' | 'published' | 'unpublished'
+type EventStatus = 'draft' | 'published' | 'archived'
 
 type PosterUpload = {
   id: string
@@ -107,6 +107,10 @@ function schemaAwareError(message: string | undefined, fallback: string) {
     return 'Database schema is out of date for this action. Schema check: /api/health/schema'
   }
   return raw || fallback
+}
+
+function statusCopy(raw: string | null | undefined) {
+  return String(raw || '').toLowerCase() === 'published' ? 'Done' : (raw || '—')
 }
 
 export default function ManagePage() {
@@ -563,11 +567,11 @@ export default function ManagePage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setFormError(schemaAwareError(data?.error, 'Failed to save Found at'))
+        setFormError(schemaAwareError(data?.error, 'Failed to save Seen at'))
         return
       }
       await loadUploads()
-      setMessage('Found at saved.')
+      setMessage('Seen at saved.')
     } finally {
       setSavingSeenAt(false)
     }
@@ -637,7 +641,7 @@ export default function ManagePage() {
       body: JSON.stringify({ event_id: eventId }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) setApprovalError(data?.error || 'Publish failed')
+    if (!res.ok) setApprovalError(data?.error || 'Mark done failed')
     await refreshData()
     setApprovingEventId(null)
   }
@@ -686,10 +690,10 @@ export default function ManagePage() {
     <main style={{ padding: 16, fontFamily: 'sans-serif', height: '100vh', overflow: 'hidden' }}>
       <h1 style={{ margin: '0 0 12px 0' }}>Manage</h1>
       <section style={{ border: '1px solid #ddd', borderRadius: 10, padding: 10, marginBottom: 12 }}>
-        <h2 style={{ margin: '0 0 8px 0' }}>Recently planted</h2>
+        <h2 style={{ margin: '0 0 8px 0' }}>Recently tended</h2>
         {approvalError && <p style={{ color: 'crimson', marginTop: 0 }}>{approvalError}</p>}
         {approvalQueue.length === 0 ? (
-          <p style={{ margin: 0, opacity: 0.7 }}>No recently planted events waiting to publish.</p>
+          <p style={{ margin: 0, opacity: 0.7 }}>No recently tended items waiting to mark done.</p>
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
             {approvalQueue.map((item) => (
@@ -703,7 +707,7 @@ export default function ManagePage() {
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button data-variant="secondary" onClick={() => focusEvent(item as unknown as AllEventRow)}>Edit</button>
                   <button onClick={() => approveEvent(item.id)} disabled={approvingEventId === item.id}>
-                    {approvingEventId === item.id ? 'Publishing...' : 'Publish'}
+                    {approvingEventId === item.id ? 'Marking done...' : 'Mark done'}
                   </button>
                 </div>
               </div>
@@ -749,7 +753,7 @@ export default function ManagePage() {
                 <div style={{ fontSize: 13 }}>{u.status} • events: {u.event_count}</div>
                 {u.seen_at_name && (
                   <div style={{ fontSize: 12, marginTop: 2 }}>
-                    Found at: {u.seen_at_name}
+                    Seen at: {u.seen_at_name}
                   </div>
                 )}
                 {(u.linked_count ?? u.event_count ?? 0) === 0 && (
@@ -780,7 +784,7 @@ export default function ManagePage() {
             <>
               {selectedUpload.seen_at_name && (
                 <p style={{ margin: '0 0 8px 0', fontSize: 13 }}>
-                  Found at: <strong>{selectedUpload.seen_at_name}</strong>
+                  Seen at: <strong>{selectedUpload.seen_at_name}</strong>
                 </p>
               )}
               <div
@@ -829,7 +833,7 @@ export default function ManagePage() {
               </div>
 
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={markDone} disabled={updatingDone}>{updatingDone ? 'Saving...' : ((selectedUpload?.is_done ?? selectedUpload?.done ?? Boolean(selectedUpload?.processed_at)) ? 'Mark Incomplete' : 'Mark Done')}</button>
+                <button onClick={markDone} disabled={updatingDone}>{updatingDone ? 'Saving...' : ((selectedUpload?.is_done ?? selectedUpload?.done ?? Boolean(selectedUpload?.processed_at)) ? 'Done' : 'Mark done')}</button>
                 <button data-variant="secondary" onClick={() => { setHasUserAdjustedView(true); setZoom((z) => Math.min(4, Number((z + 0.25).toFixed(2)))) }}>Zoom +</button>
                 <button data-variant="secondary" onClick={() => { setHasUserAdjustedView(true); setZoom((z) => Math.max(1, Number((z - 0.25).toFixed(2)))) }}>Zoom -</button>
                 <button data-variant="secondary" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); setHasUserAdjustedView(false) }}>Reset view</button>
@@ -853,8 +857,8 @@ export default function ManagePage() {
           <p style={{ fontSize: 12, opacity: 0.7, margin: '6px 0 0 0' }}>Venue/location: Where the event happens.</p>
 
           <div style={{ marginTop: 10, border: '1px solid #e5e7eb', borderRadius: 8, padding: 10 }}>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Found at</h3>
-            <p style={{ fontSize: 12, opacity: 0.7, margin: '0 0 8px 0' }}>Found at: where you found this poster/business card.</p>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Seen at</h3>
+            <p style={{ fontSize: 12, opacity: 0.7, margin: '0 0 8px 0' }}>Seen at: where you saw this poster/business card.</p>
             <label style={{ display: 'block', marginTop: 8 }}>Location name
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                 <input value={sourcePlace} onChange={(e) => setSourcePlace(e.target.value)} style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }} />
@@ -909,7 +913,7 @@ export default function ManagePage() {
           <label style={{ display: 'block', marginTop: 8 }}>Status
             <select value={status} onChange={(e) => setStatus(e.target.value as EventStatus)} style={{ width: '100%', marginTop: 4, padding: 10, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="draft">draft</option>
-              <option value="published">published</option>
+              <option value="published">done</option>
             </select>
           </label>
 
@@ -961,7 +965,7 @@ export default function ManagePage() {
                   <tr key={row.link_id} onClick={() => focusOnLink(row.link_id)} style={{ background: activeLinkId === row.link_id ? '#f0fdf4' : 'transparent' }}>
                     <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{row.event.title}</td>
                     <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{formatDateTime(row.created_at)}</td>
-                    <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{row.event.status}</td>
+                    <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{statusCopy(row.event.status)}</td>
                     <td style={{ padding: 8, borderTop: '1px solid #eee' }}>
                       <button data-variant="secondary" onClick={(e) => { e.stopPropagation(); startEditingEvent(row.event, selectedPosterId) }}>Edit</button>{' '}
                       <button data-variant="danger" onClick={(e) => { e.stopPropagation(); deleteLinked(row.link_id) }} disabled={deletingLinkId === row.link_id}>
@@ -977,7 +981,7 @@ export default function ManagePage() {
           <h3 style={{ marginTop: 18, marginBottom: 8 }}>All Items</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | EventStatus)} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
-              <option value="all">All status</option><option value="draft">Draft</option><option value="published">Published</option>
+              <option value="all">All status</option><option value="draft">Draft</option><option value="published">Done</option>
             </select>
             <select value={linkedFilter} onChange={(e) => setLinkedFilter(e.target.value as 'all' | 'linked' | 'unlinked')} style={{ padding: 8, border: '1px solid #cbd5e1', borderRadius: 8 }}>
               <option value="all">All link states</option><option value="linked">Linked</option><option value="unlinked">Unlinked</option>
@@ -1025,7 +1029,7 @@ export default function ManagePage() {
                   <tr key={event.id}>
                     <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{event.title}</td>
                     <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{formatDateTime(event.start_at)}</td>
-                    <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{event.status}</td>
+                    <td style={{ padding: 8, borderTop: '1px solid #eee' }}>{statusCopy(event.status)}</td>
                     <td style={{ padding: 8, borderTop: '1px solid #eee' }}>
                       {event.is_linked ? (
                         <span>Linked ({event.linked_count})</span>

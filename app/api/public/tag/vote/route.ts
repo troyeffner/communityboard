@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
 import { internalServerError, jsonError } from '@/lib/apiErrors'
+import { appendSignalFiber, signalObjectId } from '@/lib/trunk/fiberWriter'
+import { getInteractionPolicy } from '@/lib/trunk/interactionPolicy'
 
 function fingerprintFromRequest(req: Request) {
   const cbVid = req.headers.get('x-cb-vid')?.trim()
@@ -12,6 +14,7 @@ function fingerprintFromRequest(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const policy = getInteractionPolicy()
   const body = await req.json().catch(() => null)
   if (!body) return jsonError('Invalid JSON')
   const eventId = String(body.event_id || '').trim()
@@ -35,7 +38,9 @@ export async function POST(req: Request) {
     if (message.includes('relation "tag_votes"')) return jsonError('Tag voting is not enabled yet. Run migrations.', 500)
     return internalServerError('public/tag/vote recent vote query failed', recentVotes.error)
   }
-  if ((recentVotes.count || 0) >= 30) return jsonError('Vote limit reached (30 per 24h).', 429)
+  if ((recentVotes.count || 0) >= policy.voteLimitPer24h) {
+    return jsonError(`Vote limit reached (${policy.voteLimitPer24h} per 24h).`, 429)
+  }
 
   const insertVote = await supabase
     .from('tag_votes')
@@ -51,13 +56,25 @@ export async function POST(req: Request) {
 
   const votes = countVotes.count || 0
   let promoted = false
-  if (votes >= 3) {
+  if (votes >= policy.tagPromotionThreshold) {
     const promote = await supabase
       .from('event_tags')
       .upsert([{ event_id: eventId, tag_id: tagId, source: 'community' }], { onConflict: 'event_id,tag_id' })
     if (promote.error) return internalServerError('public/tag/vote promote failed', promote.error)
     promoted = true
   }
+
+  void appendSignalFiber({
+    sourceSurface: 'app/api/public/tag/vote',
+    eventType: 'tag_vote',
+    objectType: 'event_tag',
+    objectId: signalObjectId([eventId, tagId]),
+    actorType: 'community',
+    actorId: fingerprint,
+    payload: { event_id: eventId, tag_id: tagId, votes, promoted },
+    tags: ['communityboard', 'signal', 'tag-vote'],
+    lineage: 'communityboard.trunk-cutover.pass2.signal',
+  })
 
   return NextResponse.json({ ok: true, votes, promoted })
 }

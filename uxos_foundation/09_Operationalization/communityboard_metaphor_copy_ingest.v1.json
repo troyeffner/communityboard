@@ -1,0 +1,317 @@
+{
+  "governance": {
+    "canon_lock_enabled": true,
+    "rules": [
+      { "id": "MG1", "description": "every_page_has_page_metaphor_or_explicit_system_inheritance", "enforce": "error" },
+      { "id": "MG2", "description": "interaction_metaphor_requires_object_or_action_mapping", "enforce": "error" },
+      { "id": "MG3", "description": "canon_metaphor_requires_applies_to_do_not_do_and_owner", "enforce": "error" },
+      { "id": "CG1", "description": "cta_requires_action_object_and_primary_job", "enforce": "error" },
+      { "id": "CG2", "description": "marketing_claim_requires_capability_or_blocking_claim_gap", "enforce": "error" },
+      { "id": "CG3", "description": "canon_copy_requires_mappings_and_no_open_blocking_issues", "enforce": "error" },
+      { "id": "LK1", "description": "canon_changes_only_via_approved_changeset", "enforce": "error" }
+    ]
+  },
+  "metaphors": [
+    {
+      "id": "met_sys_cb_001",
+      "level": "system",
+      "name": "Community board stewardship",
+      "statement": "Capture local boards, pin useful items, and keep the board trustworthy through tending.",
+      "applies_to": {
+        "page_ids": ["page_public_home", "page_public_browse", "page_public_poster", "page_builder_create", "page_builder_tend"],
+        "object_ids": ["obj_community_board", "obj_poster_upload", "obj_poster_item", "obj_pin"],
+        "action_ids": ["act_submit_photo", "act_create_draft_item", "act_pin_to_board", "act_select_item"],
+        "job_ids": ["job_discover_board_items", "job_draft_item_from_poster", "job_tend_and_pin_board"]
+      },
+      "do_not_do": [
+        "do_not_mix_event_and_item_language_on_same_surface",
+        "do_not_mix_seen_at_and_found_at_without_clear_precedence",
+        "do_not_present_builder_error_copy_as_end_user_cta"
+      ],
+      "tone_tags": ["practical", "civic", "clear"],
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "owner": "product_design",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "met_page_cb_001",
+      "level": "page",
+      "name": "Poster workspace",
+      "statement": "Builder create page is a workspace where poster context and pinned item authoring happen together.",
+      "applies_to": {
+        "page_ids": ["page_builder_create"],
+        "object_ids": ["obj_poster_upload", "obj_poster_item", "obj_pin", "obj_seen_at"],
+        "action_ids": ["act_select_poster", "act_place_pin", "act_create_draft_item", "act_save_seen_at"]
+      },
+      "do_not_do": [
+        "do_not_clear_form_state_on_pin_change",
+        "do_not_hide_items_list_far_from_item_editor"
+      ],
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "owner": "builder_ux",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "met_page_cb_002",
+      "level": "page",
+      "name": "Poster inspector",
+      "statement": "Poster page is a board-first viewer where selected item and pin stay in parity.",
+      "applies_to": {
+        "page_ids": ["page_public_poster"],
+        "object_ids": ["obj_poster_upload", "obj_poster_item", "obj_pin"],
+        "action_ids": ["act_select_item", "act_upvote_item", "act_open_google_calendar", "act_download_ics"]
+      },
+      "do_not_do": [
+        "do_not reorder list positions when selected item changes",
+        "do_not duplicate item IA containers with conflicting hierarchy"
+      ],
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "owner": "public_ux",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    }
+  ],
+  "public_copy_atoms": [
+    {
+      "id": "copy_cb_001",
+      "type": "cta",
+      "channel": "public_site",
+      "surface_id": "page_public_home",
+      "placement": "header_link",
+      "text": "Submit a poster photo",
+      "intent": {
+        "primary_job_id": "job_submit_poster_photo",
+        "desired_outcome_id": "outcome_fast_mobile_submit"
+      },
+      "references": {
+        "object_ids": ["obj_poster_upload"],
+        "action_ids": ["act_submit_photo"],
+        "capability_ids": ["cap_submit_compress_upload"]
+      },
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "copy_cb_002",
+      "type": "cta",
+      "channel": "in_product",
+      "surface_id": "page_builder_create",
+      "placement": "inspector_primary",
+      "text": "Add item",
+      "intent": {
+        "primary_job_id": "job_draft_item_from_poster",
+        "desired_outcome_id": "outcome_item_pin_accuracy"
+      },
+      "references": {
+        "object_ids": ["obj_poster_item", "obj_pin"],
+        "action_ids": ["act_create_draft_item", "act_place_pin"],
+        "capability_ids": ["cap_builder_create_item"]
+      },
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "copy_cb_003",
+      "type": "cta",
+      "channel": "in_product",
+      "surface_id": "page_builder_tend",
+      "placement": "table_row_action",
+      "text": "Publish",
+      "intent": {
+        "primary_job_id": "job_tend_and_pin_board",
+        "desired_outcome_id": "outcome_safe_board_curation"
+      },
+      "references": {
+        "object_ids": ["obj_poster_item"],
+        "action_ids": ["act_pin_to_board"],
+        "capability_ids": ["cap_builder_pin_item"]
+      },
+      "constraints": {
+        "must_not_imply": ["wording_must_be_pin_to_board_not_publish"]
+      },
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "copy_cb_004",
+      "type": "label",
+      "channel": "in_product",
+      "surface_id": "page_builder_create",
+      "placement": "poster_meta_label",
+      "text": "Found at",
+      "intent": {},
+      "references": {
+        "object_ids": ["obj_seen_at"],
+        "action_ids": ["act_save_seen_at"]
+      },
+      "constraints": {
+        "must_not_imply": ["prefer_seen_at_canonical_name"]
+      },
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "copy_cb_005",
+      "type": "cta",
+      "channel": "public_site",
+      "surface_id": "page_public_poster",
+      "placement": "header_link_primary",
+      "text": "Return to Community Board",
+      "intent": {
+        "primary_job_id": "job_discover_board_items"
+      },
+      "references": {
+        "object_ids": ["obj_community_board"],
+        "action_ids": ["act_search_board"]
+      },
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "copy_cb_006",
+      "type": "error",
+      "channel": "in_product",
+      "surface_id": "page_builder_create",
+      "placement": "global_error",
+      "text": "Required database fields are unavailable in this environment. Verify /api/health/schema.",
+      "intent": {},
+      "references": {
+        "object_ids": ["obj_seen_at"],
+        "action_ids": ["act_save_seen_at"],
+        "capability_ids": ["cap_schema_healthcheck"]
+      },
+      "status": "active",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    }
+  ],
+  "alignment_issues": [
+    {
+      "id": "issue_cb_001",
+      "issue_type": "copy_ooux_mismatch",
+      "severity": "blocking",
+      "detected_by": "manual",
+      "from_entity_id": "copy_cb_004",
+      "to_entity_id": "obj_seen_at",
+      "summary": "Seen-at vocabulary contract is broken by mixed `Found at` and `Seen at` copy across create, submit, poster, and manage pages.",
+      "details": "Canonical field is poster_uploads.seen_at_name, but public and builder copy still mixes names and user intent.",
+      "suggested_fix": "Standardize display term to `Seen at` while keeping DB field unchanged.",
+      "status": "open",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "issue_cb_002",
+      "issue_type": "copy_ooux_mismatch",
+      "severity": "blocking",
+      "detected_by": "manual",
+      "from_entity_id": "copy_cb_003",
+      "to_entity_id": "act_pin_to_board",
+      "summary": "Builder Tend still uses `Publish`/`Published` labels instead of `Pin to board`/`Pinned`.",
+      "details": "Status and CTA text do not match canonical action semantics requested for OOUX alignment.",
+      "suggested_fix": "Rename visible labels and table statuses while preserving backend status codes.",
+      "status": "open",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "issue_cb_003",
+      "issue_type": "claim_capability_gap",
+      "severity": "blocking",
+      "detected_by": "manual",
+      "from_entity_id": "copy_cb_006",
+      "to_entity_id": "cap_builder_save_poster_meta",
+      "summary": "UI exposes schema-missing remediation to end users, but capability to self-remediate does not exist on those surfaces.",
+      "details": "Poster and builder pages surface migration instructions as if user can resolve production schema state directly.",
+      "suggested_fix": "Gate schema error copy to admin/dev surfaces and present user-safe fallback messaging publicly.",
+      "status": "open",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "issue_cb_004",
+      "issue_type": "copy_ooux_mismatch",
+      "severity": "blocking",
+      "detected_by": "manual",
+      "from_entity_id": "page_public_poster",
+      "summary": "Poster item IA splits selected item content from list content and reorders cards, breaking stable object hierarchy.",
+      "details": "Selected item card is moved/repeated and CTA context is inconsistent with list parity.",
+      "suggested_fix": "Render single poster-items IA list with in-place selected state and no reorder-on-select behavior.",
+      "status": "open",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "issue_cb_005",
+      "issue_type": "copy_ooux_mismatch",
+      "severity": "blocking",
+      "detected_by": "manual",
+      "from_entity_id": "page_builder_create",
+      "summary": "CTA mappings are missing as first-class records for several primary actions (Upload and select, Next untended poster, Mark Done, Delete poster).",
+      "details": "Checklist requires CTA->action/object/job mappings; runtime copy exists but without canonical mapping records.",
+      "suggested_fix": "Add copy atom entries for all primary builder CTAs with explicit action/object/job references.",
+      "status": "open",
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    }
+  ],
+  "edges": [
+    { "from_id": "copy_cb_001", "to_id": "act_submit_photo", "type": "aligns_with", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "copy_cb_002", "to_id": "act_create_draft_item", "type": "aligns_with", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "copy_cb_003", "to_id": "issue_cb_002", "type": "violates", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "copy_cb_004", "to_id": "issue_cb_001", "type": "violates", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "copy_cb_006", "to_id": "issue_cb_003", "type": "violates", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "met_sys_cb_001", "to_id": "page_builder_create", "type": "frames", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "met_sys_cb_001", "to_id": "page_public_poster", "type": "frames", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "issue_cb_004", "to_id": "issue_cb_005", "type": "conflicts_with", "created_version_id": "cb_ooux_v1" }
+  ]
+}

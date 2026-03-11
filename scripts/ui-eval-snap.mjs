@@ -26,7 +26,7 @@ const EXPECTED_TITLES = {
   '/submit': 'Submit',
   '/browse': 'Browse posters',
   '/builder/create': 'Create posters',
-  '/poster/e2e-fixture': 'Found at: E2E Community Board',
+  '/poster/e2e-fixture': 'Seen at: E2E Community Board',
 }
 
 function sleep(ms) {

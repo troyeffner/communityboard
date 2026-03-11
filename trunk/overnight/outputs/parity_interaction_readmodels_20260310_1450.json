@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-03-10T14:50:42.840Z",
+  "source": "parity-interaction-readmodels-pass1",
+  "parity": {
+    "event_votes": {
+      "keys": 0,
+      "leftTotal": 0,
+      "rightTotal": 0,
+      "mismatches": []
+    },
+    "tag_votes": {
+      "keys": 0,
+      "leftTotal": 0,
+      "rightTotal": 0,
+      "mismatches": []
+    },
+    "poster_item_upvotes": {
+      "keys": 0,
+      "leftTotal": 0,
+      "rightTotal": 0,
+      "mismatches": []
+    }
+  },
+  "warnings": [
+    "legacy table missing: public.event_votes",
+    "legacy table missing: public.tag_votes",
+    "legacy table missing: public.poster_item_upvotes"
+  ],
+  "status": "partial_missing_legacy_tables"
+}

@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-03-10T20:12:57.555Z",
+  "source": "nightly-growth-pass2",
+  "policy": {
+    "stable_tag_min_count": 2,
+    "registry_max_tags": 500,
+    "cadence": "hourly",
+    "timezone": "America/New_York"
+  },
+  "observed_tag_count": 0,
+  "stable_tag_count": 0,
+  "stable_tags": []
+}

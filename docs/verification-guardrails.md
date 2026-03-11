@@ -1,3 +1,13 @@
+---
+type: verification-guardrails
+from: communityboard-docs
+date: 2026-03-10
+status: active
+topics: [testing, release-readiness, schema-health]
+fractals: [communityboard]
+cluster: quality-gates
+---
+
 # Verification Guardrails
 
 ## CI Commands

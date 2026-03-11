@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CommunityBoard Event Soil Schema v1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "date",
+    "title",
+    "source_id",
+    "ingested_at"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "description": "ISO date when available"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "location": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "emotion_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_id": {
+      "type": "string"
+    },
+    "source_record_index": {
+      "type": "integer"
+    },
+    "source_lineage": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "url_or_path": {
+          "type": "string"
+        },
+        "license": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "ingested_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}
+

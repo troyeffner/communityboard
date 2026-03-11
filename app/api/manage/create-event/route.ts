@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     title?: string
     description?: string
     start_at?: string
-    status?: 'draft' | 'published' | 'unpublished'
+    status?: 'draft' | 'published' | 'archived'
     event_category?: string | null
     event_attributes?: string[] | string | null
     event_audience?: string[] | string | null
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     return badRequest('Unauthorized', 401)
   }
   if (!title?.trim()) return badRequest('Title is required')
-  if (status !== 'draft' && status !== 'published' && status !== 'unpublished') return badRequest('Invalid status')
+  if (status !== 'draft' && status !== 'published' && status !== 'archived') return badRequest('Invalid status')
   const categorySet = toSet(EVENT_CATEGORIES)
   const attributeSet = toSet(ATTRIBUTES)
   const audienceSet = toSet(AUDIENCE)

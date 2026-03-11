@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-03-10T14:49:49.788Z",
+  "generator": "generate-interaction-readmodels-pass1",
+  "source_rows_total": 0,
+  "source_signal_rows": 0,
+  "source_files": 0,
+  "model": "interaction_summary",
+  "totals": {
+    "events": 0,
+    "event_votes": 0,
+    "event_tags": 0,
+    "tag_votes": 0,
+    "items": 0,
+    "item_upvotes": 0
+  }
+}

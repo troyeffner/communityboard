@@ -1,0 +1,11 @@
+{
+  "project": "communityboard",
+  "project_slug": "communityboard",
+  "domain": "communityboard.localhost",
+  "gateway_port": 8080,
+  "base_url": "http://communityboard.localhost:8080",
+  "upstream_host": "127.0.0.1",
+  "upstream_port": 4102,
+  "updated_at": "2026-03-02T03:47:22.169Z",
+  "notes": "Managed by UXOS/scripts/local_domain_sync.mjs"
+}

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CMD="${1:-}"
+
+case "$CMD" in
+  check)
+    "$ROOT/QB/scripts/qb_check.sh"
+    ;;
+  plan)
+    "$ROOT/QB/scripts/qb_plan.sh"
+    ;;
+  report)
+    "$ROOT/QB/scripts/qb_report.sh"
+    ;;
+  sync)
+    "$ROOT/QB/scripts/qb_sync.sh"
+    ;;
+  check-updates)
+    "$ROOT/QB/scripts/qb_sync.sh"
+    ;;
+  refresh-wow)
+    "$ROOT/QB/scripts/qb_refresh_wow.sh" "${@:2}"
+    ;;
+  instrument)
+    "$ROOT/QB/scripts/qb_instrument.sh" "${@:2}"
+    ;;
+  ffa-state-migrate)
+    "$ROOT/QB/scripts/qb_ffa_state_migrate.sh" "${@:2}"
+    ;;
+  ffa-plan-sync)
+    "$ROOT/QB/scripts/qb_ffa_plan_sync.sh" "${@:2}"
+    ;;
+  ffa-reconcile)
+    "$ROOT/QB/scripts/qb_ffa_reconcile.sh" "${@:2}"
+    ;;
+  ack-update)
+    "$ROOT/QB/scripts/qb_ack_update.sh" "${@:2}"
+    ;;
+  supabase-env)
+    "$ROOT/QB/scripts/qb_supabase_env.sh" "${@:2}"
+    ;;
+  compact)
+    "$ROOT/QB/scripts/qb_compact.sh" "${@:2}"
+    ;;
+  *)
+    echo "Usage: ./QB/qb {check|plan|report|sync|check-updates|refresh-wow|instrument|ffa-state-migrate|ffa-plan-sync|ffa-reconcile|ack-update|supabase-env|compact}"
+    exit 1
+    ;;
+esac

@@ -58,8 +58,8 @@ test.describe('CommunityBoard Verification Guardrails', () => {
 
     const shell = page.getByTestId('builder-create-panels')
     await expect(shell).toBeVisible()
-    await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/create"]')).toBeVisible()
-    await expect(page.getByTestId('builder-panel-submissions').locator('a[href="/builder/tend"]')).toBeVisible()
+    await expect(page.getByTestId('builder-panel-submissions')).toContainText('Choose file')
+    await expect(page.getByTestId('builder-panel-submissions')).toContainText('Upload and select')
     await expect(page.getByTestId('builder-panel-workspace')).toBeVisible()
     await expect(page.getByTestId('builder-panel-inspector')).toBeVisible()
 

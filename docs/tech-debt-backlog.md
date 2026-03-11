@@ -1,3 +1,13 @@
+---
+type: tech-debt-backlog
+from: communityboard-docs
+date: 2026-03-10
+status: active
+topics: [technical-debt, backlog, prioritization]
+fractals: [communityboard]
+cluster: tech-debt
+---
+
 # CommunityBoard Prioritized Tech Debt Backlog
 
 ## Priority Order

@@ -1,3 +1,13 @@
+---
+type: workflow-regression-spec
+from: communityboard-docs
+date: 2026-03-10
+status: active
+topics: [builder, regression, workflow, qa]
+fractals: [communityboard]
+cluster: quality-gates
+---
+
 # Builder Workflow Spec + Regression Checklist
 
 ## Selection + form state behavior spec

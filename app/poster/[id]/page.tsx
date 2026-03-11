@@ -141,7 +141,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   const seenAt = await resolveSeenAtForTitle(id)
-  const title = `Found at: ${seenAt || 'Community Board'}`
+  const title = `Seen at: ${seenAt || 'Community Board'}`
   return { title }
 }
 

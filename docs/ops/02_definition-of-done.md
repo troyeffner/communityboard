@@ -1,3 +1,13 @@
+---
+type: definition-of-done
+from: communityboard-ops
+date: 2026-03-10
+status: active
+topics: [quality-gates, release-readiness, ci]
+fractals: [communityboard]
+cluster: ops-quality
+---
+
 # Definition of Done
 
 "Ship" means all of the following are true:

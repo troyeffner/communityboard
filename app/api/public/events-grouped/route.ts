@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getPosterSeenAt } from '@/lib/seenAt'
 import { internalServerError, jsonError } from '@/lib/apiErrors'
+import { loadInteractionReadmodels, readFromTrunkEnabled } from '@/lib/trunk/readmodels'
 
 type EventStatus = 'draft' | 'published'
 
@@ -44,6 +45,14 @@ export async function GET() {
   if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
+  const useTrunkRead = readFromTrunkEnabled()
+  const interactionModels = useTrunkRead
+    ? await loadInteractionReadmodels().catch(() => ({
+        eventVotes: new Map<string, number>(),
+        tagVotes: new Map<string, number>(),
+        itemUpvotes: new Map<string, number>(),
+      }))
+    : null
 
   const primary = await supabase
     .from('events')
@@ -118,6 +127,7 @@ export async function GET() {
       created_at: event.created_at,
       poster_public_url,
       seen_at_name: latestSeenAtByEvent.get(event.id) || null,
+      upvotes: interactionModels?.eventVotes.get(event.id) || 0,
     }
   })
 
@@ -140,5 +150,6 @@ export async function GET() {
     this_week: thisWeek,
     upcoming,
     recurring,
+    read_source: useTrunkRead ? 'trunk-overlay-with-legacy-fallback' : 'legacy',
   })
 }

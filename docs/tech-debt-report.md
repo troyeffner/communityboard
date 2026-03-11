@@ -1,3 +1,13 @@
+---
+type: tech-debt-report
+from: communityboard-docs
+date: 2026-03-10
+status: historical
+topics: [technical-debt, audit, risk]
+fractals: [communityboard]
+cluster: tech-debt
+---
+
 # CommunityBoard Technical Debt Report
 
 Date: 2026-02-26

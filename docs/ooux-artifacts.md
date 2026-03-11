@@ -1,3 +1,13 @@
+---
+type: document
+from: communityboard-docs
+date: 2026-03-10
+status: active
+topics: [documentation, product, operations]
+fractals: [communityboard]
+cluster: docs
+---
+
 # CommunityBoard OOUX Artifacts
 
 ## Object Map

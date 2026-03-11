@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "owner": "CommunityBoard PM",
+  "last_updated": "2026-03-01T19:29:54Z",
+  "hypothesis_register": "QB/RESEARCH_EXPERIMENT_REGISTER.md",
+  "learning_scoreboard": "QB/RESEARCH_LEARNING_SCOREBOARD.md",
+  "review_cadence": "weekly",
+  "blockers": []
+}

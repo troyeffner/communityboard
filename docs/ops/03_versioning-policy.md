@@ -1,3 +1,13 @@
+---
+type: versioning-policy
+from: communityboard-ops
+date: 2026-03-10
+status: active
+topics: [versioning, canon, governance]
+fractals: [communityboard]
+cluster: ops-governance
+---
+
 # Versioning Policy
 
 ## Canon Versioning

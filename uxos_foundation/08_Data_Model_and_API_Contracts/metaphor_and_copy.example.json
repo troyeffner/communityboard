@@ -1,0 +1,429 @@
+{
+  "governance": {
+    "canon_lock_enabled": true,
+    "rules": [
+      { "id": "MG1", "description": "every_page_has_page_metaphor_or_explicit_system_inheritance", "enforce": "error" },
+      { "id": "MG2", "description": "interaction_metaphor_requires_object_or_action_mapping", "enforce": "error" },
+      { "id": "MG3", "description": "canon_metaphor_requires_applies_to_do_not_do_and_owner", "enforce": "error" },
+      { "id": "CG1", "description": "cta_requires_action_object_and_primary_job", "enforce": "error" },
+      { "id": "CG2", "description": "marketing_claim_requires_capability_or_blocking_claim_gap", "enforce": "error" },
+      { "id": "CG3", "description": "canon_copy_requires_mappings_and_no_open_blocking_issues", "enforce": "error" },
+      { "id": "LK1", "description": "canon_changes_only_via_approved_changeset", "enforce": "error" }
+    ]
+  },
+  "metaphors": [
+    {
+      "id": "met_sys_001",
+      "level": "system",
+      "name": "Signal Router",
+      "statement": "CommunityBoard routes local signals into verifiable community actions.",
+      "description": "System framing for creation, verification, and publication pathways.",
+      "applies_to": {
+        "page_ids": ["page_public_feed", "page_submit_pipeline", "page_verification_guardrails"],
+        "object_ids": ["obj_submission", "obj_post", "obj_verification_ticket"],
+        "action_ids": ["act_submit", "act_verify", "act_publish"],
+        "job_ids": ["job_publish_update", "job_assess_local_relevance"]
+      },
+      "do_not_do": [
+        "do_not_frame_submission_as_instant_publish_without_validation",
+        "do_not_imply_all_posts_are_pre_verified"
+      ],
+      "tone_tags": ["clear", "credible", "local"],
+      "status": "canon",
+      "version_id": "ver_2_0_0",
+      "owner": "ux_strategy",
+      "timestamps": {
+        "created_at": "2026-02-20T10:00:00Z",
+        "updated_at": "2026-02-28T09:30:00Z"
+      }
+    },
+    {
+      "id": "met_page_001",
+      "level": "page",
+      "name": "Guided Submission Lane",
+      "statement": "The submit surface guides contributors through a short lane from signal to publishable post.",
+      "applies_to": {
+        "page_ids": ["page_submit_pipeline"],
+        "object_ids": ["obj_submission"],
+        "action_ids": ["act_submit", "act_attach_evidence"],
+        "job_ids": ["job_publish_update"]
+      },
+      "do_not_do": [
+        "do_not_describe_lane_as_one_tap_publish",
+        "do_not_hide_required_evidence_steps"
+      ],
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "owner": "product_design_lead",
+      "timestamps": {
+        "created_at": "2026-02-21T10:00:00Z",
+        "updated_at": "2026-02-28T09:45:00Z"
+      }
+    },
+    {
+      "id": "met_page_002",
+      "level": "page",
+      "name": "Trust Filter Desk",
+      "statement": "Verification surface acts as a trust filter desk before public exposure.",
+      "applies_to": {
+        "page_ids": ["page_verification_guardrails"],
+        "object_ids": ["obj_verification_ticket", "obj_submission"],
+        "action_ids": ["act_verify", "act_request_revision"],
+        "job_ids": ["job_assess_local_relevance"]
+      },
+      "do_not_do": [
+        "do_not_frame_verification_as_optional_for_flagged_content"
+      ],
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "owner": "trust_ops",
+      "timestamps": {
+        "created_at": "2026-02-21T11:00:00Z",
+        "updated_at": "2026-02-28T09:45:00Z"
+      }
+    },
+    {
+      "id": "met_int_001",
+      "level": "interaction",
+      "name": "Attach Proof Step",
+      "statement": "Evidence attachment is a required proof step before completion.",
+      "applies_to": {
+        "page_ids": ["page_submit_pipeline"],
+        "interaction_ids": ["int_submit_attach_proof"],
+        "object_ids": ["obj_submission"],
+        "action_ids": ["act_attach_evidence"]
+      },
+      "do_not_do": [
+        "do_not_allow_skip_for_high_risk_submission_types"
+      ],
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "owner": "interaction_designer",
+      "timestamps": {
+        "created_at": "2026-02-21T12:00:00Z",
+        "updated_at": "2026-02-28T09:45:00Z"
+      }
+    },
+    {
+      "id": "met_int_002",
+      "level": "interaction",
+      "name": "Confidence Meter",
+      "statement": "A visible confidence meter signals verification progress before publish.",
+      "applies_to": {
+        "page_ids": ["page_submit_pipeline"],
+        "interaction_ids": ["int_submit_confidence_meter"],
+        "surface_element_ids": ["el_submit_progress_meter"],
+        "object_ids": ["obj_verification_ticket"],
+        "action_ids": ["act_verify"]
+      },
+      "do_not_do": [
+        "do_not_show_full_confidence_when_checks_are_incomplete"
+      ],
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "owner": "interaction_designer",
+      "timestamps": {
+        "created_at": "2026-02-21T12:10:00Z",
+        "updated_at": "2026-02-28T09:45:00Z"
+      }
+    },
+    {
+      "id": "met_int_003",
+      "level": "interaction",
+      "name": "Review Queue Handoff",
+      "statement": "Verification handoff explicitly queues uncertain submissions for reviewer action.",
+      "applies_to": {
+        "page_ids": ["page_verification_guardrails"],
+        "interaction_ids": ["int_verify_queue_handoff"],
+        "object_ids": ["obj_verification_ticket"],
+        "action_ids": ["act_route_to_reviewer"]
+      },
+      "do_not_do": [
+        "do_not_imply_auto_approval_for_unreviewed_tickets"
+      ],
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "owner": "trust_ops",
+      "timestamps": {
+        "created_at": "2026-02-21T12:20:00Z",
+        "updated_at": "2026-02-28T09:45:00Z"
+      }
+    }
+  ],
+  "public_copy_atoms": [
+    {
+      "id": "copy_001",
+      "type": "cta",
+      "channel": "in_product",
+      "surface_id": "page_submit_pipeline",
+      "placement": "primary_button",
+      "text": "Submit for Review",
+      "intent": {
+        "primary_job_id": "job_publish_update",
+        "desired_outcome_id": "outcome_publish_quality"
+      },
+      "references": {
+        "object_ids": ["obj_submission"],
+        "action_ids": ["act_submit"],
+        "capability_ids": ["cap_submission_pipeline"]
+      },
+      "constraints": {
+        "must_not_imply": ["instant_public_publish"]
+      },
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-22T10:00:00Z",
+        "updated_at": "2026-02-28T09:50:00Z"
+      }
+    },
+    {
+      "id": "copy_002",
+      "type": "cta",
+      "channel": "public_site",
+      "surface_id": "page_marketing_home",
+      "placement": "hero_primary",
+      "text": "Publish Instantly",
+      "intent": {
+        "primary_job_id": "job_publish_update"
+      },
+      "references": {
+        "object_ids": ["obj_post"],
+        "action_ids": ["act_publish"],
+        "capability_ids": []
+      },
+      "constraints": {
+        "must_not_imply": ["no_verification_required"]
+      },
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-22T10:05:00Z",
+        "updated_at": "2026-02-28T09:50:00Z"
+      }
+    },
+    {
+      "id": "copy_003",
+      "type": "cta",
+      "channel": "in_product",
+      "surface_id": "page_verification_guardrails",
+      "placement": "queue_row_action",
+      "text": "Route to Reviewer",
+      "intent": {
+        "primary_job_id": "job_assess_local_relevance"
+      },
+      "references": {
+        "object_ids": ["obj_verification_ticket"],
+        "action_ids": ["act_route_to_reviewer"],
+        "capability_ids": ["cap_moderation_queue"]
+      },
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-22T10:10:00Z",
+        "updated_at": "2026-02-28T09:50:00Z"
+      }
+    },
+    {
+      "id": "copy_004",
+      "type": "headline",
+      "channel": "public_site",
+      "surface_id": "page_marketing_home",
+      "placement": "hero_title",
+      "text": "Verified local updates in minutes",
+      "intent": {
+        "primary_job_id": "job_publish_update",
+        "desired_outcome_id": "outcome_trust_in_feed"
+      },
+      "references": {
+        "object_ids": ["obj_post", "obj_verification_ticket"],
+        "action_ids": ["act_verify", "act_publish"],
+        "capability_ids": ["cap_verification_pipeline"]
+      },
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-22T10:15:00Z",
+        "updated_at": "2026-02-28T09:50:00Z"
+      }
+    },
+    {
+      "id": "copy_005",
+      "type": "label",
+      "channel": "in_product",
+      "surface_id": "page_submit_pipeline",
+      "placement": "evidence_upload_label",
+      "text": "Attach supporting proof",
+      "intent": {},
+      "references": {
+        "object_ids": ["obj_submission"],
+        "action_ids": ["act_attach_evidence"]
+      },
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-22T10:20:00Z",
+        "updated_at": "2026-02-28T09:50:00Z"
+      }
+    },
+    {
+      "id": "copy_006",
+      "type": "marketing_claim",
+      "channel": "public_site",
+      "surface_id": "page_marketing_home",
+      "placement": "trust_band",
+      "text": "100% accuracy guaranteed",
+      "intent": {
+        "primary_job_id": "job_assess_local_relevance",
+        "desired_outcome_id": "outcome_trust_in_feed"
+      },
+      "references": {
+        "object_ids": ["obj_post"],
+        "action_ids": ["act_verify"],
+        "capability_ids": []
+      },
+      "constraints": {
+        "required_disclaimer": "accuracy_rate_is_probabilistic_not_absolute"
+      },
+      "status": "active",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-22T10:25:00Z",
+        "updated_at": "2026-02-28T09:50:00Z"
+      }
+    }
+  ],
+  "alignment_issues": [
+    {
+      "id": "issue_001",
+      "issue_type": "metaphor_conflict",
+      "severity": "high",
+      "detected_by": "rule_engine",
+      "from_entity_id": "met_page_001",
+      "to_entity_id": "met_sys_001",
+      "summary": "Page metaphor implies direct publish, conflicting with system requirement for verification routing.",
+      "details": "Submit lane wording in dependent copy suggests immediate publication without trust checks.",
+      "suggested_fix": "Revise page metaphor statement and dependent hero CTA language to retain review-first framing.",
+      "status": "open",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-28T10:00:00Z",
+        "updated_at": "2026-02-28T10:00:00Z"
+      }
+    },
+    {
+      "id": "issue_002",
+      "issue_type": "copy_ooux_mismatch",
+      "severity": "blocking",
+      "detected_by": "rule_engine",
+      "from_entity_id": "copy_002",
+      "to_entity_id": "act_publish",
+      "summary": "CTA text implies immediate publish, but canonical flow requires submit and verification before publish action.",
+      "details": "Mapped action `act_publish` is downstream and not available on hero CTA entry point.",
+      "suggested_fix": "Change CTA to `Submit for Review` and map action to `act_submit` with object `obj_submission`.",
+      "status": "open",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-28T10:01:00Z",
+        "updated_at": "2026-02-28T10:01:00Z"
+      }
+    },
+    {
+      "id": "issue_003",
+      "issue_type": "claim_capability_gap",
+      "severity": "blocking",
+      "detected_by": "rule_engine",
+      "from_entity_id": "copy_006",
+      "summary": "Marketing claim has no capability mapping proving guarantee-level accuracy.",
+      "details": "Claim exceeds current capability evidence and lacks linked capability IDs.",
+      "suggested_fix": "Downgrade claim language or link validated capability with disclaimer.",
+      "status": "open",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-28T10:02:00Z",
+        "updated_at": "2026-02-28T10:02:00Z"
+      }
+    },
+    {
+      "id": "issue_004",
+      "issue_type": "terminology_inconsistency",
+      "severity": "medium",
+      "detected_by": "rule_engine",
+      "from_entity_id": "copy_001",
+      "to_entity_id": "copy_002",
+      "summary": "Mixed terminology between `Submit for Review` and `Publish Instantly` for the same top-level journey.",
+      "status": "open",
+      "version_id": "ver_2_0_1",
+      "timestamps": {
+        "created_at": "2026-02-28T10:03:00Z",
+        "updated_at": "2026-02-28T10:03:00Z"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from_id": "met_sys_001",
+      "to_id": "page_submit_pipeline",
+      "type": "frames",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "met_page_001",
+      "to_id": "page_submit_pipeline",
+      "type": "frames",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "met_int_001",
+      "to_id": "int_submit_attach_proof",
+      "type": "frames",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "copy_001",
+      "to_id": "act_submit",
+      "type": "implies",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "copy_001",
+      "to_id": "obj_submission",
+      "type": "implies",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "copy_001",
+      "to_id": "job_publish_update",
+      "type": "implies",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "copy_004",
+      "to_id": "outcome_trust_in_feed",
+      "type": "implies",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "copy_002",
+      "to_id": "met_sys_001",
+      "type": "aligns_with",
+      "created_version_id": "ver_2_0_1",
+      "metadata": {
+        "alignment_score": 0.2,
+        "status": "weak"
+      }
+    },
+    {
+      "from_id": "issue_001",
+      "to_id": "met_page_001",
+      "type": "violates",
+      "created_version_id": "ver_2_0_1"
+    },
+    {
+      "from_id": "issue_002",
+      "to_id": "copy_002",
+      "type": "violates",
+      "created_version_id": "ver_2_0_1"
+    }
+  ]
+}

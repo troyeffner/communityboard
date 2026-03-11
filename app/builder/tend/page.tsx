@@ -28,7 +28,7 @@ function toDateTimeLocal(value?: string | null) {
 }
 
 function statusLabel(statusValue: string) {
-  return eventStatusLabel(statusValue)
+  return normalizeEventStatus(statusValue, EVENT_STATUSES.DRAFT) === EVENT_STATUSES.PUBLISHED ? 'Done' : eventStatusLabel(statusValue)
 }
 
 export default function BuilderTendPage() {
@@ -77,14 +77,14 @@ export default function BuilderTendPage() {
     return () => { cancelled = true }
   }, [status, linked, q])
 
-  async function publish(eventId: string) {
+  async function markDone(eventId: string) {
     const res = await fetch('/api/builder/publish-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event_id: eventId }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return setError(data?.error || 'Publish failed')
+    if (!res.ok) return setError(data?.error || 'Failed to mark done')
     await load()
   }
 
@@ -152,14 +152,14 @@ export default function BuilderTendPage() {
           Tend board
         </Link>
       </div>
-      <h1 style={{ margin: 0 }}>Builder Tend</h1>
-      <p style={{ marginTop: 6, opacity: 0.8 }}>Tend items and pin to board</p>
+      <h1 style={{ margin: 0 }}>Tend board</h1>
+      <p style={{ marginTop: 6, opacity: 0.8 }}>Tend items and mark done</p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">All status</option>
           <option value="draft">Draft</option>
-          <option value="published">Published</option>
+          <option value="published">Done</option>
         </select>
         <select value={linked} onChange={(e) => setLinked(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
           <option value="all">Linked + unlinked</option>
@@ -192,7 +192,7 @@ export default function BuilderTendPage() {
                 <td style={{ borderTop: '1px solid #eee', padding: 8 }}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {normalizeEventStatus(row.status, EVENT_STATUSES.DRAFT) !== EVENT_STATUSES.PUBLISHED && (
-                      <button onClick={() => publish(row.id)}>Publish</button>
+                      <button onClick={() => markDone(row.id)}>Mark done</button>
                     )}
                     <button data-variant="secondary" onClick={() => beginEdit(row)}>Edit</button>
                     <button data-variant="danger" onClick={() => removeEvent(row.id)}>Remove</button>
@@ -214,7 +214,7 @@ export default function BuilderTendPage() {
             <input type="datetime-local" value={editStartAt} onChange={(e) => setEditStartAt(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
             <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={{ padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }}>
               <option value="draft">Draft</option>
-              <option value="published">Published</option>
+              <option value="published">Done</option>
             </select>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={saveEdit}>Save changes</button>

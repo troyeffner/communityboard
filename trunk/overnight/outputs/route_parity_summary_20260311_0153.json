@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-03-11T01:53:51.013Z",
+  "source": "emit-route-parity-summary-pass4",
+  "read_mode": "legacy",
+  "parity_source_file": "/Users/troyeffner/Dropbox/DEV/communityboard/trunk/overnight/outputs/parity_interaction_readmodels_20260311_0153.json",
+  "parity_status": "partial_missing_legacy_tables",
+  "parity_warnings": [
+    "legacy table missing: public.event_votes",
+    "legacy table missing: public.tag_votes",
+    "legacy table missing: public.poster_item_upvotes"
+  ],
+  "deploy_summary_file": "/Users/troyeffner/Dropbox/DEV/communityboard/trunk/overnight/outputs/readmodel_deploy_summary_20260311_0153.json",
+  "deploy_summary": {
+    "deploy_event_rows": 2,
+    "total_lifecycles": 2,
+    "by_provider": [
+      {
+        "key": "github-actions",
+        "count": 1
+      },
+      {
+        "key": "vercel",
+        "count": 1
+      }
+    ],
+    "by_stage": [
+      {
+        "key": "ci",
+        "count": 1
+      },
+      {
+        "key": "intent",
+        "count": 1
+      }
+    ],
+    "by_status": [
+      {
+        "key": "planned",
+        "count": 1
+      },
+      {
+        "key": "started",
+        "count": 1
+      }
+    ]
+  },
+  "ether_lint_file": "/Users/troyeffner/Dropbox/DEV/communityboard/trunk/overnight/outputs/ether_sources_lint_20260311_0050.json",
+  "ether_lint": {
+    "errors_count": 0,
+    "warnings_count": 1
+  },
+  "routes": [
+    "/api/public/browse",
+    "/api/public/events-grouped",
+    "/api/events"
+  ]
+}

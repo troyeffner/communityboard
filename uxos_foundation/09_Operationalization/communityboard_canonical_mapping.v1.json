@@ -1,0 +1,149 @@
+{
+  "version": "v1",
+  "generated_at": "2026-02-28T00:00:00Z",
+  "scope": "communityboard",
+  "canonical_entities": {
+    "actors": [
+      { "id": "actor_public_viewer", "name": "Public viewer" },
+      { "id": "actor_public_submitter", "name": "Public submitter" },
+      { "id": "actor_community_builder", "name": "Community builder" }
+    ],
+    "jobs": [
+      { "id": "job_discover_board_items", "name": "Discover relevant board items" },
+      { "id": "job_submit_poster_photo", "name": "Submit a poster photo for tending" },
+      { "id": "job_capture_board_context", "name": "Capture board context (seen-at + photo time)" },
+      { "id": "job_draft_item_from_poster", "name": "Create draft items pinned to poster coordinates" },
+      { "id": "job_tend_and_pin_board", "name": "Tend draft items and pin them to board" },
+      { "id": "job_review_poster_items", "name": "Inspect all items on a poster and act" }
+    ],
+    "objects": [
+      { "id": "obj_community_board", "name": "Community board feed" },
+      { "id": "obj_poster_upload", "name": "Poster upload" },
+      { "id": "obj_poster_image", "name": "Poster image" },
+      { "id": "obj_poster_item", "name": "Poster item" },
+      { "id": "obj_pin", "name": "Pin coordinate" },
+      { "id": "obj_seen_at", "name": "Seen-at location text" },
+      { "id": "obj_upvote", "name": "Anonymous upvote" },
+      { "id": "obj_tag", "name": "Community tag" }
+    ],
+    "actions": [
+      { "id": "act_submit_photo", "name": "Submit poster photo" },
+      { "id": "act_select_poster", "name": "Select poster" },
+      { "id": "act_place_pin", "name": "Place pin on poster" },
+      { "id": "act_create_draft_item", "name": "Create draft item" },
+      { "id": "act_edit_item", "name": "Edit item" },
+      { "id": "act_delete_item", "name": "Delete item or link" },
+      { "id": "act_pin_to_board", "name": "Pin item to board (publish)" },
+      { "id": "act_mark_poster_done", "name": "Mark poster done" },
+      { "id": "act_save_seen_at", "name": "Save seen-at metadata" },
+      { "id": "act_search_board", "name": "Search board content" },
+      { "id": "act_filter_by_seen_at", "name": "Filter by seen-at" },
+      { "id": "act_select_item", "name": "Select item card/pin" },
+      { "id": "act_upvote_item", "name": "Upvote item" },
+      { "id": "act_suggest_tag", "name": "Suggest tag" },
+      { "id": "act_open_google_calendar", "name": "Open Google calendar action" },
+      { "id": "act_download_ics", "name": "Download ICS file" }
+    ],
+    "pages": [
+      { "id": "page_public_home", "route": "/", "label": "Community Board home" },
+      { "id": "page_public_submit", "route": "/submit", "label": "Submit a poster photo" },
+      { "id": "page_public_browse", "route": "/browse", "label": "Browse posters" },
+      { "id": "page_public_poster", "route": "/poster/[id]", "label": "Poster view" },
+      { "id": "page_builder_create", "route": "/builder/create", "label": "Create drafts workspace" },
+      { "id": "page_builder_tend", "route": "/builder/tend", "label": "Tend board workspace" },
+      { "id": "page_manage_admin", "route": "/manage", "label": "Legacy manage admin page" }
+    ],
+    "outcomes": [
+      { "id": "outcome_fast_mobile_submit", "name": "Fast mobile capture and submit" },
+      { "id": "outcome_item_pin_accuracy", "name": "Items accurately mapped to poster coordinates" },
+      { "id": "outcome_clear_public_discovery", "name": "Public can discover useful items quickly" },
+      { "id": "outcome_high_metadata_integrity", "name": "Seen-at and poster metadata stay consistent" },
+      { "id": "outcome_safe_board_curation", "name": "Builders can curate without data loss" }
+    ],
+    "capabilities": [
+      { "id": "cap_submit_compress_upload", "name": "Client compress + upload poster photo", "routes": ["/api/submit/upload", "/api/submit/signed-upload", "/api/submit/finalize-upload"] },
+      { "id": "cap_builder_create_item", "name": "Create item from poster + pin", "routes": ["/api/builder/create-event-from-poster"] },
+      { "id": "cap_builder_edit_item", "name": "Edit existing item", "routes": ["/api/builder/update-event"] },
+      { "id": "cap_builder_delete_item", "name": "Delete item or poster link", "routes": ["/api/builder/delete-event", "/api/builder/delete-poster-link"] },
+      { "id": "cap_builder_pin_item", "name": "Pin item to board", "routes": ["/api/builder/publish-event"] },
+      { "id": "cap_builder_poster_queue", "name": "Fetch next untended poster", "routes": ["/api/builder/next-poster", "/api/manage/list-uploads-with-counts"] },
+      { "id": "cap_builder_save_poster_meta", "name": "Save seen-at / poster status metadata", "routes": ["/api/manage/update-poster", "/api/builder/mark-upload-done"] },
+      { "id": "cap_public_browse_posters", "name": "Browse posters + item pins", "routes": ["/api/public/browse"] },
+      { "id": "cap_public_events_feed", "name": "Render public items from published status", "routes": ["/api/events", "/api/public/events-grouped"] },
+      { "id": "cap_public_item_upvote", "name": "Anonymous upvote per viewer", "routes": ["/api/items/[id]/upvote", "/api/vote/event"] },
+      { "id": "cap_public_calendar_export", "name": "Calendar deep links + ICS generation", "routes": ["/api/items/[id]/ics", "/api/events/[id]/ics"] },
+      { "id": "cap_schema_healthcheck", "name": "Schema health endpoint for seen-at guardrail", "routes": ["/api/health/schema"] }
+    ]
+  },
+  "route_to_canonical_mapping": [
+    {
+      "route": "/builder/create",
+      "page_id": "page_builder_create",
+      "jobs": ["job_draft_item_from_poster", "job_capture_board_context"],
+      "primary_objects": ["obj_poster_upload", "obj_poster_item", "obj_pin", "obj_seen_at"],
+      "primary_actions": ["act_select_poster", "act_place_pin", "act_create_draft_item", "act_save_seen_at", "act_mark_poster_done"],
+      "supporting_outcomes": ["outcome_item_pin_accuracy", "outcome_high_metadata_integrity"]
+    },
+    {
+      "route": "/builder/tend",
+      "page_id": "page_builder_tend",
+      "jobs": ["job_tend_and_pin_board"],
+      "primary_objects": ["obj_poster_item"],
+      "primary_actions": ["act_pin_to_board", "act_edit_item", "act_delete_item"],
+      "supporting_outcomes": ["outcome_safe_board_curation"]
+    },
+    {
+      "route": "/browse",
+      "page_id": "page_public_browse",
+      "jobs": ["job_discover_board_items", "job_review_poster_items"],
+      "primary_objects": ["obj_community_board", "obj_poster_upload", "obj_poster_item", "obj_pin"],
+      "primary_actions": ["act_search_board", "act_filter_by_seen_at", "act_select_poster", "act_select_item", "act_upvote_item", "act_open_google_calendar", "act_download_ics"],
+      "supporting_outcomes": ["outcome_clear_public_discovery"]
+    },
+    {
+      "route": "/poster/[id]",
+      "page_id": "page_public_poster",
+      "jobs": ["job_review_poster_items"],
+      "primary_objects": ["obj_poster_upload", "obj_poster_item", "obj_pin", "obj_seen_at", "obj_tag"],
+      "primary_actions": ["act_select_item", "act_upvote_item", "act_suggest_tag", "act_open_google_calendar", "act_download_ics"],
+      "supporting_outcomes": ["outcome_clear_public_discovery", "outcome_item_pin_accuracy"]
+    }
+  ],
+  "unresolved_mappings": [
+    {
+      "id": "map_gap_001",
+      "severity": "blocking",
+      "type": "model_duality",
+      "summary": "Runtime still uses both poster_items and events/poster_event_links, so object/action mapping is not singular.",
+      "evidence_files": [
+        "app/api/builder/create-event-from-poster/route.ts",
+        "app/api/public/browse/route.ts",
+        "app/api/builder/events/route.ts"
+      ]
+    },
+    {
+      "id": "map_gap_002",
+      "severity": "high",
+      "type": "terminology_drift",
+      "summary": "UI copy mixes Found at/Seen at and Publish/Pin to board terminology across builder/public/admin surfaces.",
+      "evidence_files": [
+        "app/builder/create/CreateClient.tsx",
+        "app/builder/tend/page.tsx",
+        "app/page.tsx",
+        "app/poster/[id]/PosterViewer.tsx",
+        "app/manage/page.tsx"
+      ]
+    },
+    {
+      "id": "map_gap_003",
+      "severity": "high",
+      "type": "cta_contract_missing",
+      "summary": "No canonical machine-readable CTA mapping exists in runtime; intent/action/object mapping is only implicit in components.",
+      "evidence_files": [
+        "app/components/PublicEventsList.tsx",
+        "app/builder/create/CreateClient.tsx",
+        "app/poster/[id]/PosterViewer.tsx"
+      ]
+    }
+  ]
+}

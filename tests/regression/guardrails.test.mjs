@@ -89,9 +89,9 @@ test('proxy sets viewer_id cookie and protects admin paths', () => {
   assert.equal(src.includes("pathname.startsWith('/admin')"), true)
 })
 
-test('schema check links are surfaced in user-facing error paths', () => {
+test('schema check links are gated to admin/builder paths only', () => {
   const createSrc = read(path.join(repoRoot, 'app/builder/create/CreateClient.tsx'))
   const posterSrc = read(path.join(repoRoot, 'app/poster/[id]/page.tsx'))
   assert.equal(createSrc.includes('/api/health/schema'), true)
-  assert.equal(posterSrc.includes('Check schema health'), true)
+  assert.equal(posterSrc.includes('Check schema health'), false)
 })

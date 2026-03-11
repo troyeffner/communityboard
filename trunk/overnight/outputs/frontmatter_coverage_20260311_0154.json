@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-03-11T01:54:36.007Z",
+  "source": "report-frontmatter-coverage-pass1",
+  "policy": {
+    "exclude_prefixes": [
+      "QB/INBOX/",
+      "QB/OUTBOX/",
+      "QB/dispatch/",
+      "QB/_coach_return_packs/",
+      "QB/report_",
+      "trunk/overnight/outputs/"
+    ]
+  },
+  "targets": [
+    "QB",
+    "docs",
+    "trunk"
+  ],
+  "totals": {
+    "markdown_files": 71,
+    "with_frontmatter": 71,
+    "missing_frontmatter": 0,
+    "coverage_percent": 100
+  },
+  "by_area": [
+    {
+      "area": "docs",
+      "total": 13,
+      "covered": 13,
+      "missing": 0,
+      "coverage_percent": 100
+    },
+    {
+      "area": "QB",
+      "total": 37,
+      "covered": 37,
+      "missing": 0,
+      "coverage_percent": 100
+    },
+    {
+      "area": "trunk",
+      "total": 21,
+      "covered": 21,
+      "missing": 0,
+      "coverage_percent": 100
+    }
+  ],
+  "missing_frontmatter_files": []
+}

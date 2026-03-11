@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getViewerIdFromCookie } from '@/lib/viewer-id'
+import { appendSignalFiber, signalObjectId } from '@/lib/trunk/fiberWriter'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -40,6 +41,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .from('poster_items' as never)
     .update({ upvote_count: upvotes } as never)
     .eq('id', itemId)
+
+  void appendSignalFiber({
+    sourceSurface: 'app/api/items/[id]/upvote:POST',
+    eventType: 'item_upvote',
+    objectType: 'poster_item',
+    objectId: signalObjectId([itemId]),
+    actorType: 'community',
+    actorId: viewerId,
+    payload: { poster_item_id: itemId, upvotes, votedByMe, action: 'upvote' },
+    tags: ['communityboard', 'signal', 'item-upvote'],
+    lineage: 'communityboard.trunk-cutover.pass2.signal',
+  })
+
   return NextResponse.json({ upvotes, votedByMe })
 }
 
@@ -73,5 +87,18 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
     .from('poster_items' as never)
     .update({ upvote_count: upvotes } as never)
     .eq('id', itemId)
+
+  void appendSignalFiber({
+    sourceSurface: 'app/api/items/[id]/upvote:DELETE',
+    eventType: 'item_unvote',
+    objectType: 'poster_item',
+    objectId: signalObjectId([itemId]),
+    actorType: 'community',
+    actorId: viewerId,
+    payload: { poster_item_id: itemId, upvotes, votedByMe, action: 'unvote' },
+    tags: ['communityboard', 'signal', 'item-upvote'],
+    lineage: 'communityboard.trunk-cutover.pass2.signal',
+  })
+
   return NextResponse.json({ upvotes, votedByMe })
 }

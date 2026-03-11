@@ -1,0 +1,13 @@
+{
+  "UXOS": {"health":"green","blockers_count":0,"top_next_action":"Adopt RB_v3.0","confidence":"high"},
+  "communityboard": {"health":"yellow","blockers_count":3,"top_next_action":"Continue taxonomy/schema alignment","confidence":"medium"},
+  "satbuttons": {"health":"yellow","blockers_count":2,"top_next_action":"Seed repo + define event schema","confidence":"medium"},
+  "ffa": {"health":"yellow","blockers_count":2,"top_next_action":"Formalize AI-optional boundary","confidence":"medium"},
+  "SmallBiz": {"health":"green","blockers_count":1,"top_next_action":"Lock version handshake","confidence":"high"},
+  "Livability": {"health":"green","blockers_count":1,"top_next_action":"Surface tagging pilot validation","confidence":"high"},
+  "tyfbaf": {"health":"green","blockers_count":1,"top_next_action":"Finalize launch gate","confidence":"high"},
+  "xmind": {"health":"yellow","blockers_count":2,"top_next_action":"Define minimal v1 scope","confidence":"low"},
+  "nojarg": {"health":"yellow","blockers_count":2,"top_next_action":"Define product scope","confidence":"low"},
+  "SoundPad": {"health":"green","blockers_count":0,"top_next_action":"Maintain stability","confidence":"high"},
+  "story-lab": {"health":"yellow","blockers_count":2,"top_next_action":"Resolve consent + analytics model","confidence":"medium"}
+}

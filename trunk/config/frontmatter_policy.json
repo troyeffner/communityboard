@@ -1,0 +1,13 @@
+{
+  "policy_id": "frontmatter_coverage_policy_v1",
+  "targets": ["QB", "docs", "trunk"],
+  "exclude_prefixes": [
+    "QB/INBOX/",
+    "QB/OUTBOX/",
+    "QB/dispatch/",
+    "QB/_coach_return_packs/",
+    "QB/report_",
+    "trunk/overnight/outputs/"
+  ],
+  "notes": "Coverage metric excludes queue/history/generated artifacts so governance baseline coverage remains actionable."
+}

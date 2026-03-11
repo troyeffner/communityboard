@@ -1,0 +1,38 @@
+[
+  {
+    "date": "1957-10-04",
+    "title": "Sputnik 1 launched",
+    "location": "Soviet Union",
+    "tags": ["space", "cold-war", "technology"],
+    "emotion_tags": ["awe", "fear"]
+  },
+  {
+    "date": "1969-07-20",
+    "title": "Apollo 11 moon landing",
+    "location": "United States",
+    "tags": ["space", "innovation", "media"],
+    "emotion_tags": ["awe", "hope"]
+  },
+  {
+    "date": "1989-11-09",
+    "title": "Fall of the Berlin Wall",
+    "location": "Germany",
+    "tags": ["politics", "unity", "history"],
+    "emotion_tags": ["relief", "hope"]
+  },
+  {
+    "date": "2001-09-11",
+    "title": "September 11 attacks",
+    "location": "United States",
+    "tags": ["terrorism", "security", "global-politics"],
+    "emotion_tags": ["grief", "fear"]
+  },
+  {
+    "date": "2008-09-15",
+    "title": "Global financial crisis escalation",
+    "location": "Global",
+    "tags": ["economy", "finance", "policy"],
+    "emotion_tags": ["anxiety", "uncertainty"]
+  }
+]
+

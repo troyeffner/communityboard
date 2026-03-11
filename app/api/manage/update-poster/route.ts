@@ -14,6 +14,11 @@ function isMissingSeenAtName(error: { code?: string; message?: string } | null |
   )
 }
 
+function isMissingColumn(error: { code?: string; message?: string } | null | undefined, column: string) {
+  const message = (error?.message || '').toLowerCase()
+  return error?.code === '42703' || message.includes(column.toLowerCase()) || message.includes('schema cache')
+}
+
 async function handleUpdatePoster(body: unknown) {
   if (!body || typeof body !== 'object') return jsonError('Invalid JSON')
   const payload = body as Record<string, unknown>
@@ -38,15 +43,51 @@ async function handleUpdatePoster(body: unknown) {
   if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
 
-  const result = await supabase
+  let result = await supabase
     .from('poster_uploads')
     .update(updates)
     .eq('id', posterUploadId)
     .select('id,file_path,status,created_at,seen_at_name')
     .maybeSingle()
 
-  if (result.error && isMissingSeenAtName(result.error)) {
-    return jsonError('Run migration: poster_uploads.seen_at_name', 500)
+  if (result.error && isMissingSeenAtName(result.error) && typeof updates.seen_at_name === 'string') {
+    const trimmedSeenAt = updates.seen_at_name
+    const statusOnly = typeof updates.status === 'string' ? { status: updates.status } : {}
+
+    const candidates: Array<Record<string, unknown>> = [
+      { ...statusOnly, seen_at_label: trimmedSeenAt },
+      { ...statusOnly, seen_at: trimmedSeenAt },
+      { ...statusOnly, source_place: trimmedSeenAt },
+      statusOnly,
+    ]
+
+    for (const candidate of candidates) {
+      const attempt = await supabase
+        .from('poster_uploads')
+        .update(candidate as never)
+        .eq('id', posterUploadId)
+        .select('id,file_path,status,created_at')
+        .maybeSingle()
+      if (!attempt.error) {
+        result = {
+          data: attempt.data ? { ...attempt.data, seen_at_name: trimmedSeenAt } : null,
+          error: null,
+          count: attempt.count,
+          status: attempt.status,
+          statusText: attempt.statusText,
+        }
+        break
+      }
+      if (
+        isMissingColumn(attempt.error, 'seen_at_label') ||
+        isMissingColumn(attempt.error, 'seen_at') ||
+        isMissingColumn(attempt.error, 'source_place')
+      ) {
+        continue
+      }
+      result = attempt as typeof result
+      break
+    }
   }
 
   if (result.error) return jsonError(result.error.message, 500)

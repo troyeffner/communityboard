@@ -13,7 +13,7 @@ function isMissingRecurrenceColumnError(error: { code?: string; message?: string
   )
 }
 
-type EventStatus = 'draft' | 'published' | 'unpublished'
+type EventStatus = 'draft' | 'published' | 'archived'
 
 type FallbackEventRow = {
   id: string
@@ -53,7 +53,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('events')
     .select('id,title,location,description,start_at,status,created_at,poster_event_links(id,poster_upload_id)')
-    .in('status', ['draft', 'unpublished'])
+    .in('status', ['draft'])
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -64,7 +64,7 @@ export async function GET() {
     const fallback = await supabase
       .from('events')
       .select('id,title,location,description,start_at,status,created_at,poster_event_links(id,poster_upload_id)')
-      .in('status', ['draft', 'unpublished'])
+      .in('status', ['draft'])
       .order('created_at', { ascending: false })
       .limit(100)
 

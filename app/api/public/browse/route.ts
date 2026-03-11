@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getViewerIdFromCookie } from '@/lib/viewer-id'
 import { getPosterSeenAt } from '@/lib/seenAt'
 import { internalServerError, jsonError } from '@/lib/apiErrors'
+import { loadInteractionReadmodels, readFromTrunkEnabled } from '@/lib/trunk/readmodels'
 
 type PosterRow = {
   id: string
@@ -49,6 +50,14 @@ export async function GET(req: Request) {
   const selectedPoster = params.get('poster')?.trim() || ''
   const seenAt = params.get('seenAt')?.trim() || ''
   const viewerId = getViewerIdFromCookie(req.headers.get('cookie'))
+  const useTrunkRead = readFromTrunkEnabled()
+  const interactionModels = useTrunkRead
+    ? await loadInteractionReadmodels().catch(() => ({
+        eventVotes: new Map<string, number>(),
+        tagVotes: new Map<string, number>(),
+        itemUpvotes: new Map<string, number>(),
+      }))
+    : null
 
   const postersWithVenue = await supabase
     .from('poster_uploads')
@@ -179,6 +188,8 @@ export async function GET(req: Request) {
       }
 
       items = rawItems.map((row) => ({
+        // Trunk overlay is opt-in by feature flag; legacy value remains fallback.
+        upvote_count: interactionModels?.itemUpvotes.get(row.id) ?? Number(row.upvote_count || 0),
         id: row.id,
         title: row.title || 'Item',
         type: row.type || 'event',
@@ -187,7 +198,6 @@ export async function GET(req: Request) {
         location_text: row.location_text || null,
         x: Number(row.x),
         y: Number(row.y),
-        upvote_count: Number(row.upvote_count || 0),
         did_upvote: didUpvoteSet.has(row.id),
       }))
     } else {
@@ -226,5 +236,6 @@ export async function GET(req: Request) {
     active_poster_id: activePosterId,
     items,
     tag_facets: [],
+    read_source: useTrunkRead ? 'trunk-overlay-with-legacy-fallback' : 'legacy',
   })
 }

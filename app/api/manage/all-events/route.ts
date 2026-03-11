@@ -6,7 +6,7 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-type EventStatus = 'draft' | 'published' | 'unpublished'
+type EventStatus = 'draft' | 'published' | 'archived'
 
 type EventRow = {
   id: string

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ATTRIBUTES, AUDIENCE, asStringArray, toSet } from '@/lib/taxonomy'
 import { getPosterSeenAt } from '@/lib/seenAt'
+import { loadInteractionReadmodels, readFromTrunkEnabled } from '@/lib/trunk/readmodels'
 
 type EventRow = {
   id: string
@@ -58,6 +59,14 @@ export async function GET(req: Request) {
   const selectedAudience = audience.filter((tag) => audSet.has(tag))
 
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const useTrunkRead = readFromTrunkEnabled()
+  const interactionModels = useTrunkRead
+    ? await loadInteractionReadmodels().catch(() => ({
+        eventVotes: new Map<string, number>(),
+        tagVotes: new Map<string, number>(),
+        itemUpvotes: new Map<string, number>(),
+      }))
+    : null
   const voterVid = req.headers.get('x-cb-vid')?.trim() || null
   const primaryEvents = await supabase
     .from('events')
@@ -94,14 +103,16 @@ export async function GET(req: Request) {
   const eventsData = (primaryEvents.data || []) as EventRow[]
   if (eventsData.length > 0) {
     const eventIds = eventsData.map((event) => event.id)
-    const votesResult = await supabase
-      .from('event_votes')
-      .select('event_id')
-      .in('event_id', eventIds)
+    if (!useTrunkRead) {
+      const votesResult = await supabase
+        .from('event_votes')
+        .select('event_id')
+        .in('event_id', eventIds)
 
-    if (!votesResult.error) {
-      for (const row of (votesResult.data || []) as EventVoteRow[]) {
-        upvotesByEvent.set(row.event_id, (upvotesByEvent.get(row.event_id) || 0) + 1)
+      if (!votesResult.error) {
+        for (const row of (votesResult.data || []) as EventVoteRow[]) {
+          upvotesByEvent.set(row.event_id, (upvotesByEvent.get(row.event_id) || 0) + 1)
+        }
       }
     }
 
@@ -140,7 +151,7 @@ export async function GET(req: Request) {
       poster_public_url: posterPublicUrl,
       poster_upload_id: latestPosterUploadByEvent.get(event.id) || null,
       seen_at_name: latestSeenAtByEvent.get(event.id) || null,
-      upvotes: upvotesByEvent.get(event.id) || 0,
+      upvotes: interactionModels?.eventVotes.get(event.id) ?? upvotesByEvent.get(event.id) ?? 0,
       votedByMe: votedByMeEventIds.has(event.id),
     }
   })
@@ -157,5 +168,12 @@ export async function GET(req: Request) {
   })
   const upcoming = oneTime.filter((e) => new Date(e.start_at).getTime() > weekLater.getTime())
 
-  return NextResponse.json({ rows: filtered, today, this_week: thisWeek, upcoming, recurring })
+  return NextResponse.json({
+    rows: filtered,
+    today,
+    this_week: thisWeek,
+    upcoming,
+    recurring,
+    read_source: useTrunkRead ? 'trunk-overlay-with-legacy-fallback' : 'legacy',
+  })
 }

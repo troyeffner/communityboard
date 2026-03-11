@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-03-10T20:08:34.523Z",
+  "source": "emit-route-parity-summary-pass4",
+  "read_mode": "legacy",
+  "parity_source_file": "/Users/troyeffner/Dropbox/DEV/communityboard/trunk/overnight/outputs/parity_interaction_readmodels_20260310_2008.json",
+  "parity_status": "partial_missing_legacy_tables",
+  "parity_warnings": [
+    "legacy table missing: public.event_votes",
+    "legacy table missing: public.tag_votes",
+    "legacy table missing: public.poster_item_upvotes"
+  ],
+  "routes": [
+    "/api/public/browse",
+    "/api/public/events-grouped",
+    "/api/events"
+  ]
+}

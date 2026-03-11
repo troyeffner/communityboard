@@ -1,0 +1,9 @@
+{
+  "pending": false,
+  "update_id": "coach_change_update_20260301",
+  "summary": "Coach update pending: ingest latest FFA/OST/seed/guidance/communication WoW changes before work.",
+  "set_at": "2026-03-01T23:58:00Z",
+  "required_before_work": true,
+  "acknowledged_by": "QB",
+  "acknowledged_at": "2026-03-01T23:26:05Z"
+}

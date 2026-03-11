@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { appendSignalFiber, signalObjectId } from '@/lib/trunk/fiberWriter'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -46,6 +47,18 @@ export async function POST(req: Request) {
     .eq('event_id', eventId)
 
   if (countResult.error) return jsonError(countResult.error.message, 500)
+
+  void appendSignalFiber({
+    sourceSurface: 'app/api/vote/event',
+    eventType: 'event_vote',
+    objectType: 'event',
+    objectId: signalObjectId([eventId]),
+    actorType: 'community',
+    actorId: voterVid,
+    payload: { event_id: eventId, upvotes: countResult.count || 0 },
+    tags: ['communityboard', 'signal', 'event-vote'],
+    lineage: 'communityboard.trunk-cutover.pass2.signal',
+  })
 
   return NextResponse.json({ upvotes: countResult.count || 0, votedByMe: true })
 }

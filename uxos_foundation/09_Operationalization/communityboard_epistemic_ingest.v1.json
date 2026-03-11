@@ -1,0 +1,214 @@
+{
+  "governance": {
+    "rules": [
+      { "id": "GR1", "description": "every_hypothesis_links_to_at_least_one_assumption", "enforce": "error" },
+      { "id": "GR2", "description": "every_experiment_links_to_at_least_one_hypothesis", "enforce": "error" },
+      { "id": "GR3", "description": "hypothesis_result_requires_evidence_for_terminal_states", "enforce": "error" },
+      { "id": "GR4", "description": "canon_assumption_requires_links_confidence_risk_and_evidence_or_pending_reason", "enforce": "error" },
+      { "id": "GR5", "description": "canonical_entity_change_marks_related_epistemic_records_needs_review", "enforce": "warning" }
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "asm_cb_001",
+      "domain": "System",
+      "statement": "poster_uploads.seen_at_name is the single source of truth for seen-at context across submit, builder, and public poster views.",
+      "linked_entities": [
+        { "entity_type": "object", "entity_id": "obj_seen_at" },
+        { "entity_type": "capability", "entity_id": "cap_builder_save_poster_meta" },
+        { "entity_type": "page", "entity_id": "page_builder_create" },
+        { "entity_type": "page", "entity_id": "page_public_poster" }
+      ],
+      "confidence": "med",
+      "risk": "high",
+      "evidence_pending_reason": "schema_mismatch_errors_still_visible_on_ui",
+      "version_id": "cb_ooux_v1",
+      "status": "active",
+      "needs_review": true,
+      "owner": "engineering",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "asm_cb_002",
+      "domain": "Job",
+      "statement": "Builders can create high-quality draft items faster when pin placement and form editing are decoupled.",
+      "linked_entities": [
+        { "entity_type": "job", "entity_id": "job_draft_item_from_poster" },
+        { "entity_type": "page", "entity_id": "page_builder_create" },
+        { "entity_type": "outcome", "entity_id": "outcome_item_pin_accuracy" }
+      ],
+      "confidence": "med",
+      "risk": "med",
+      "evidence_pending_reason": "no_form_abandonment_telemetry",
+      "version_id": "cb_ooux_v1",
+      "status": "active",
+      "owner": "product",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "asm_cb_003",
+      "domain": "Need",
+      "statement": "Public users need item cards and pin selection parity to trust poster interpretation.",
+      "linked_entities": [
+        { "entity_type": "job", "entity_id": "job_review_poster_items" },
+        { "entity_type": "page", "entity_id": "page_public_poster" },
+        { "entity_type": "outcome", "entity_id": "outcome_clear_public_discovery" }
+      ],
+      "confidence": "high",
+      "risk": "med",
+      "evidence_pending_reason": "manual_qc_only",
+      "version_id": "cb_ooux_v1",
+      "status": "active",
+      "owner": "ux",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    }
+  ],
+  "hypotheses": [
+    {
+      "id": "hyp_cb_001",
+      "derived_from_assumptions": ["asm_cb_001"],
+      "intervention": "Remove non-canonical seen-at fallbacks from read/write paths and route all updates through /api/manage/update-poster.",
+      "predicted_outcome": "Schema-related seen-at regressions will drop and save success rate will stabilize.",
+      "metric": "seen_at_save_error_rate",
+      "baseline": "unknown",
+      "success_threshold": "<=1%",
+      "timeframe": "2 weeks",
+      "instrumentation_unavailable_reason": "no_dashboard_for_seen_at_errors",
+      "result": "pending",
+      "linked_entities": [
+        { "entity_type": "object", "entity_id": "obj_seen_at" },
+        { "entity_type": "capability", "entity_id": "cap_builder_save_poster_meta" }
+      ],
+      "version_id": "cb_ooux_v1",
+      "needs_review": false,
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "hyp_cb_002",
+      "derived_from_assumptions": ["asm_cb_002"],
+      "intervention": "Keep form state intact when creating or moving a pending pin in /builder/create.",
+      "predicted_outcome": "Draft completion rate improves and repeated data re-entry decreases.",
+      "metric": "draft_completion_rate",
+      "baseline": "unknown",
+      "success_threshold": ">=20% relative improvement",
+      "timeframe": "2 weeks",
+      "instrumentation_unavailable_reason": "no_dropoff_analytics",
+      "result": "pending",
+      "linked_entities": [
+        { "entity_type": "page", "entity_id": "page_builder_create" },
+        { "entity_type": "action", "entity_id": "act_place_pin" },
+        { "entity_type": "action", "entity_id": "act_create_draft_item" }
+      ],
+      "version_id": "cb_ooux_v1",
+      "needs_review": false,
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "hyp_cb_003",
+      "derived_from_assumptions": ["asm_cb_003"],
+      "intervention": "Unify poster item cards under one IA level and keep selected card in-place while only changing selected state.",
+      "predicted_outcome": "Users can compare items faster and understand pin-to-item mapping with less confusion.",
+      "metric": "poster_item_selection_confusion_reports",
+      "baseline": "high (qualitative)",
+      "success_threshold": "<=50% current reports",
+      "timeframe": "2 weeks",
+      "instrumentation_unavailable_reason": "qualitative reports only",
+      "result": "pending",
+      "linked_entities": [
+        { "entity_type": "page", "entity_id": "page_public_poster" },
+        { "entity_type": "action", "entity_id": "act_select_item" },
+        { "entity_type": "object", "entity_id": "obj_pin" }
+      ],
+      "version_id": "cb_ooux_v1",
+      "needs_review": false,
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    }
+  ],
+  "experiments": [
+    {
+      "id": "exp_cb_001",
+      "type": "log_analysis",
+      "hypothesis_ids": ["hyp_cb_001"],
+      "design": "Track API error messages for seen-at save routes and health endpoint status by environment.",
+      "status": "planned",
+      "outputs": ["ev_cb_001"],
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "exp_cb_002",
+      "type": "usability",
+      "hypothesis_ids": ["hyp_cb_002", "hyp_cb_003"],
+      "design": "Task walkthrough: place pin, fill form, switch item, save draft, re-open poster page and select other items.",
+      "status": "planned",
+      "outputs": ["ev_cb_002"],
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev_cb_001",
+      "source": "research_note",
+      "summary": "Current UI still displays schema-missing messages for seen_at_name in builder and poster contexts.",
+      "strength": "high",
+      "supports": { "assumption_ids": ["asm_cb_001"] },
+      "artifacts": ["screenshot_builder_schema_missing", "screenshot_poster_schema_missing"],
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    },
+    {
+      "id": "ev_cb_002",
+      "source": "research_note",
+      "summary": "Users report confusion when selected item card reorders to top and when duplicate IA containers appear in poster viewer.",
+      "strength": "high",
+      "supports": {
+        "assumption_ids": ["asm_cb_003"],
+        "hypothesis_ids": ["hyp_cb_003"]
+      },
+      "artifacts": ["screenshot_poster_card_reorder", "screenshot_duplicate_item_container"],
+      "version_id": "cb_ooux_v1",
+      "timestamps": {
+        "created_at": "2026-02-28T00:00:00Z",
+        "updated_at": "2026-02-28T00:00:00Z"
+      }
+    }
+  ],
+  "edges": [
+    { "from_id": "asm_cb_001", "to_id": "hyp_cb_001", "type": "informs", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "asm_cb_002", "to_id": "hyp_cb_002", "type": "informs", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "asm_cb_003", "to_id": "hyp_cb_003", "type": "informs", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "hyp_cb_001", "to_id": "exp_cb_001", "type": "tested_by", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "hyp_cb_002", "to_id": "exp_cb_002", "type": "tested_by", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "hyp_cb_003", "to_id": "exp_cb_002", "type": "tested_by", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "exp_cb_001", "to_id": "ev_cb_001", "type": "produces", "created_version_id": "cb_ooux_v1" },
+    { "from_id": "exp_cb_002", "to_id": "ev_cb_002", "type": "produces", "created_version_id": "cb_ooux_v1" }
+  ]
+}

@@ -17,7 +17,7 @@ type Row = {
   address: string | null
   attributes: string[] | null
   audience: string[] | null
-  status: 'draft' | 'published' | 'unpublished'
+  status: 'draft' | 'published' | 'archived'
   created_at: string
 }
 

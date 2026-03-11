@@ -1,0 +1,219 @@
+{
+  "version": "v1",
+  "updated_at": "2026-03-01T18:42:00-05:00",
+  "source_of_truth": {
+    "canonical_mapping_file": "/Users/troyeffner/Dropbox/DEV/communityboard/uxos_foundation/09_Operationalization/communityboard_canonical_mapping.v1.json",
+    "hypothesis_register_file": "/Users/troyeffner/Dropbox/DEV/communityboard/QB/HYPOTHESIS_REGISTER.md"
+  },
+  "desired_outcome_catalog": [
+    {
+      "id": "do_fast_mobile_submit",
+      "linked_ooux_outcome_id": "outcome_fast_mobile_submit",
+      "name": "Fast mobile submit with low friction"
+    },
+    {
+      "id": "do_item_pin_accuracy",
+      "linked_ooux_outcome_id": "outcome_item_pin_accuracy",
+      "name": "Pins accurately represent item locations"
+    },
+    {
+      "id": "do_clear_public_discovery",
+      "linked_ooux_outcome_id": "outcome_clear_public_discovery",
+      "name": "Public discovery is relevant and trustworthy"
+    },
+    {
+      "id": "do_high_metadata_integrity",
+      "linked_ooux_outcome_id": "outcome_high_metadata_integrity",
+      "name": "Poster metadata remains consistent"
+    },
+    {
+      "id": "do_safe_board_curation",
+      "linked_ooux_outcome_id": "outcome_safe_board_curation",
+      "name": "Builder curation is safe and efficient"
+    }
+  ],
+  "schema": {
+    "id": "string",
+    "status": "proposed|planned|running|concluded",
+    "priority": "p0|p1|p2",
+    "owner": "string",
+    "mapping": {
+      "jobs": "canonical job ids[]",
+      "ooux": {
+        "actors": "canonical actor ids[]",
+        "objects": "canonical object ids[]",
+        "actions": "canonical action ids[]",
+        "outcomes": "canonical outcome ids[]",
+        "capabilities": "canonical capability ids[]"
+      },
+      "desired_outcomes": "desired outcome ids[]",
+      "pages": [
+        {
+          "page_id": "canonical page id",
+          "route": "route string",
+          "role": "primary|secondary|evidence"
+        }
+      ]
+    },
+    "traceability": {
+      "work_queue_dependencies": "wq ids[]",
+      "blockers": "status.json blocker ids[]"
+    }
+  },
+  "rows": [
+    {
+      "id": "h_20260301_viewpoint_fairness_filter_signal",
+      "status": "proposed",
+      "priority": "p1",
+      "owner": "PM",
+      "mapping": {
+        "jobs": [
+          "job_discover_board_items",
+          "job_review_poster_items",
+          "job_tend_and_pin_board"
+        ],
+        "ooux": {
+          "actors": [
+            "actor_public_viewer",
+            "actor_community_builder"
+          ],
+          "objects": [
+            "obj_community_board",
+            "obj_poster_item",
+            "obj_tag",
+            "obj_upvote"
+          ],
+          "actions": [
+            "act_search_board",
+            "act_filter_by_seen_at",
+            "act_select_item",
+            "act_upvote_item",
+            "act_suggest_tag"
+          ],
+          "outcomes": [
+            "outcome_clear_public_discovery"
+          ],
+          "capabilities": [
+            "cap_public_browse_posters",
+            "cap_public_events_feed",
+            "cap_public_item_upvote"
+          ]
+        },
+        "desired_outcomes": [
+          "do_clear_public_discovery"
+        ],
+        "pages": [
+          {
+            "page_id": "page_public_browse",
+            "route": "/browse",
+            "role": "primary"
+          },
+          {
+            "page_id": "page_public_poster",
+            "route": "/poster/[id]",
+            "role": "primary"
+          },
+          {
+            "page_id": "page_builder_tend",
+            "route": "/builder/tend",
+            "role": "secondary"
+          }
+        ]
+      },
+      "traceability": {
+        "work_queue_dependencies": [
+          "wq_413",
+          "wq_414",
+          "wq_415",
+          "wq_416"
+        ],
+        "blockers": [
+          "b13",
+          "b14",
+          "b15"
+        ]
+      }
+    },
+    {
+      "id": "h_20260301_known_unknown_venue_model",
+      "status": "proposed",
+      "priority": "p1",
+      "owner": "PM",
+      "mapping": {
+        "jobs": [
+          "job_discover_board_items",
+          "job_review_poster_items",
+          "job_tend_and_pin_board"
+        ],
+        "ooux": {
+          "actors": [
+            "actor_public_viewer",
+            "actor_community_builder"
+          ],
+          "objects": [
+            "obj_community_board",
+            "obj_poster_upload",
+            "obj_poster_item"
+          ],
+          "actions": [
+            "act_search_board",
+            "act_filter_by_seen_at",
+            "act_select_poster",
+            "act_select_item"
+          ],
+          "outcomes": [
+            "outcome_clear_public_discovery",
+            "outcome_high_metadata_integrity"
+          ],
+          "capabilities": [
+            "cap_public_browse_posters",
+            "cap_public_poster_view",
+            "cap_manage_list_uploads"
+          ]
+        },
+        "desired_outcomes": [
+          "do_clear_public_discovery",
+          "do_high_metadata_integrity"
+        ],
+        "pages": [
+          {
+            "page_id": "page_public_browse",
+            "route": "/browse",
+            "role": "primary"
+          },
+          {
+            "page_id": "page_public_poster",
+            "route": "/poster/[id]",
+            "role": "primary"
+          },
+          {
+            "page_id": "page_builder_create",
+            "route": "/builder/create",
+            "role": "secondary"
+          }
+        ]
+      },
+      "traceability": {
+        "work_queue_dependencies": [
+          "wq_402",
+          "wq_403",
+          "wq_413",
+          "wq_426"
+        ],
+        "blockers": [
+          "b13",
+          "b16"
+        ]
+      }
+    }
+  ],
+  "backlog": {
+    "next_row_candidates": [
+      "h_20260301_mobile_browse_above_fold",
+      "h_20260301_upvote_activation",
+      "h_20260301_filter_pill_taxonomy",
+      "h_20260301_known_unknown_venue_model"
+    ],
+    "note": "Add rows only with canonical IDs from communityboard_canonical_mapping.v1.json."
+  }
+}

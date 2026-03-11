@@ -1,0 +1,248 @@
+{
+  "governance": {
+    "rules": [
+      { "id": "GR1", "description": "every_hypothesis_links_to_at_least_one_assumption", "enforce": "error" },
+      { "id": "GR2", "description": "every_experiment_links_to_at_least_one_hypothesis", "enforce": "error" },
+      { "id": "GR3", "description": "hypothesis_result_requires_evidence_for_terminal_states", "enforce": "error" },
+      { "id": "GR4", "description": "canon_assumption_requires_links_confidence_risk_and_evidence_or_pending_reason", "enforce": "error" },
+      { "id": "GR5", "description": "canonical_entity_change_marks_related_epistemic_records_needs_review", "enforce": "warning" }
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "asm_001",
+      "domain": "Job",
+      "statement": "People posting neighborhood updates need to publish in under two minutes on mobile.",
+      "linked_entities": [
+        { "entity_type": "job", "entity_id": "job_publish_update" },
+        { "entity_type": "page", "entity_id": "page_submit_pipeline" },
+        { "entity_type": "thread", "entity_id": "04_submit_pipeline" }
+      ],
+      "confidence": "med",
+      "risk": "high",
+      "evidence_refs": ["ev_001"],
+      "version_id": "ver_1_0_0",
+      "status": "active",
+      "needs_review": false,
+      "owner": "design_lead",
+      "timestamps": {
+        "created_at": "2026-02-28T10:00:00Z",
+        "updated_at": "2026-02-28T10:00:00Z"
+      }
+    },
+    {
+      "id": "asm_002",
+      "domain": "Capability",
+      "statement": "Trust signals before submission reduce low-quality posts from first-time contributors.",
+      "linked_entities": [
+        { "entity_type": "capability", "entity_id": "cap_trust_scoring" },
+        { "entity_type": "object", "entity_id": "obj_submission" },
+        { "entity_type": "outcome", "entity_id": "outcome_quality_rate" }
+      ],
+      "confidence": "low",
+      "risk": "high",
+      "evidence_pending_reason": "instrumentation_not_shipped_for_pre_submit_quality_signal",
+      "version_id": "ver_1_0_0",
+      "status": "active",
+      "needs_review": false,
+      "timestamps": {
+        "created_at": "2026-02-28T10:05:00Z",
+        "updated_at": "2026-02-28T10:05:00Z"
+      }
+    },
+    {
+      "id": "asm_003",
+      "domain": "Context",
+      "statement": "Nighttime contributors have lower tolerance for multi-step verification flows.",
+      "linked_entities": [
+        { "entity_type": "actor", "entity_id": "actor_first_time_contributor" },
+        { "entity_type": "page", "entity_id": "page_verification_guardrails" },
+        { "entity_type": "thread", "entity_id": "05_verification_guardrails" }
+      ],
+      "confidence": "med",
+      "risk": "med",
+      "evidence_refs": ["ev_002"],
+      "version_id": "ver_1_1_0",
+      "status": "canon",
+      "needs_review": true,
+      "owner": "product_strategy",
+      "timestamps": {
+        "created_at": "2026-02-28T10:10:00Z",
+        "updated_at": "2026-02-28T12:00:00Z"
+      }
+    }
+  ],
+  "hypotheses": [
+    {
+      "id": "hyp_001",
+      "derived_from_assumptions": ["asm_001"],
+      "intervention": "Replace the current 4-field submit form with a progressive 2-step composer in the mobile submit pipeline.",
+      "predicted_outcome": "Median time-to-publish will decrease for first-time contributors.",
+      "metric": "median_time_to_publish_seconds",
+      "baseline": 210,
+      "success_threshold": "<=150",
+      "timeframe": "14_days_post_release",
+      "experiment_id": "exp_001",
+      "result": "confirmed",
+      "measured_value": 138,
+      "version_id": "ver_1_1_0",
+      "timestamps": {
+        "created_at": "2026-02-28T10:20:00Z",
+        "updated_at": "2026-02-28T12:30:00Z"
+      }
+    },
+    {
+      "id": "hyp_002",
+      "derived_from_assumptions": ["asm_002", "asm_003"],
+      "intervention": "Show a pre-submit trust checklist and defer strict verification until after first successful post.",
+      "predicted_outcome": "Low-quality submission rate will decrease without reducing successful completion for nighttime contributors.",
+      "metric": "low_quality_submission_rate",
+      "baseline": "0.22",
+      "success_threshold": "<=0.16",
+      "timeframe": "21_days",
+      "experiment_id": "exp_001",
+      "result": "inconclusive",
+      "measured_value": "0.19",
+      "version_id": "ver_1_1_0",
+      "timestamps": {
+        "created_at": "2026-02-28T10:25:00Z",
+        "updated_at": "2026-02-28T12:35:00Z"
+      }
+    }
+  ],
+  "experiments": [
+    {
+      "id": "exp_001",
+      "type": "ab_test",
+      "hypothesis_ids": ["hyp_001", "hyp_002"],
+      "design": "A/B test across mobile submit variants with event instrumentation for submission latency and quality flags.",
+      "sample": {
+        "n": 1200,
+        "segments": ["first_time_contributor", "nighttime_contributor"]
+      },
+      "start_date": "2026-02-01",
+      "end_date": "2026-02-22",
+      "status": "completed",
+      "instrumentation_refs": ["inst_mobile_submit_v2"],
+      "outputs": ["ev_001", "ev_002"]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev_001",
+      "source": "experiment",
+      "summary": "Variant B reduced median publish time from 210s to 138s for first-time contributors.",
+      "strength": "high",
+      "supports": {
+        "assumption_ids": ["asm_001"],
+        "hypothesis_ids": ["hyp_001"]
+      },
+      "contradicts": {},
+      "artifacts": ["artifact_dashboard_442", "artifact_query_77"],
+      "timestamps": {
+        "created_at": "2026-02-28T12:20:00Z",
+        "updated_at": "2026-02-28T12:20:00Z"
+      }
+    },
+    {
+      "id": "ev_002",
+      "source": "analytics",
+      "summary": "Nighttime completion improved slightly, but quality-rate reduction was below threshold and segment variance was high.",
+      "strength": "med",
+      "supports": {
+        "assumption_ids": ["asm_003"]
+      },
+      "contradicts": {
+        "assumption_ids": ["asm_002"],
+        "hypothesis_ids": ["hyp_002"]
+      },
+      "artifacts": ["artifact_notebook_19"],
+      "timestamps": {
+        "created_at": "2026-02-28T12:25:00Z",
+        "updated_at": "2026-02-28T12:25:00Z"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from_id": "asm_001",
+      "to_id": "hyp_001",
+      "type": "informs",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "asm_002",
+      "to_id": "hyp_002",
+      "type": "informs",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "asm_003",
+      "to_id": "hyp_002",
+      "type": "informs",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "hyp_001",
+      "to_id": "exp_001",
+      "type": "tested_by",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "hyp_002",
+      "to_id": "exp_001",
+      "type": "tested_by",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "exp_001",
+      "to_id": "ev_001",
+      "type": "produces",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "exp_001",
+      "to_id": "ev_002",
+      "type": "produces",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "ev_001",
+      "to_id": "asm_001",
+      "type": "updates",
+      "created_version_id": "ver_1_1_0",
+      "metadata": {
+        "confidence_before": "med",
+        "confidence_after": "high",
+        "risk_before": "high",
+        "risk_after": "med",
+        "rationale": "Observed publish-time reduction exceeded threshold with high-strength evidence."
+      }
+    },
+    {
+      "from_id": "ev_002",
+      "to_id": "asm_002",
+      "type": "updates",
+      "created_version_id": "ver_1_1_0",
+      "metadata": {
+        "confidence_before": "low",
+        "confidence_after": "low",
+        "risk_before": "high",
+        "risk_after": "high",
+        "rationale": "Signal is mixed and below success threshold; keep elevated risk and require follow-up experiment."
+      }
+    },
+    {
+      "from_id": "ev_002",
+      "to_id": "hyp_002",
+      "type": "contradicts",
+      "created_version_id": "ver_1_1_0"
+    },
+    {
+      "from_id": "ev_001",
+      "to_id": "hyp_001",
+      "type": "supports",
+      "created_version_id": "ver_1_1_0"
+    }
+  ]
+}

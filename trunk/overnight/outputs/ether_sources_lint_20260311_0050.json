@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-03-11T00:50:05.967Z",
+  "source": "lint-ether-sources-pass1",
+  "registry_path": "/Users/troyeffner/Dropbox/DEV/communityboard/ether/sources/timeline_sources.json",
+  "sources_total": 2,
+  "errors_count": 0,
+  "warnings_count": 1,
+  "errors": [],
+  "warnings": [
+    {
+      "source_id": "example_remote_timeline",
+      "issue": "disabled remote source has incomplete compliance metadata",
+      "details": [
+        "compliance.use_allowed must be true",
+        "compliance.review_status must be approved",
+        "license must be declared (not unknown)"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "package": "uxos_foundation",
+  "generated_at": "2026-02-28T19:59:09.882Z",
+  "source_root": "/Users/troyeffner/Dropbox/DEV/UXOS",
+  "output_root": "/Users/troyeffner/Dropbox/DEV/communityboard/uxos_foundation",
+  "copied_files": [
+    "07_Strategy_Canon_Artifacts/UXOS_Encoded_Foundation_Baseline.md",
+    "08_Data_Model_and_API_Contracts/UXOS_Epistemic_Layer_Assumptions_vs_Hypotheses.md",
+    "08_Data_Model_and_API_Contracts/epistemic.types.ts",
+    "08_Data_Model_and_API_Contracts/epistemic.example.json",
+    "08_Data_Model_and_API_Contracts/UXOS_Metaphor_Public_Surface_Alignment_Layer.md",
+    "08_Data_Model_and_API_Contracts/metaphor_and_copy.types.ts",
+    "08_Data_Model_and_API_Contracts/metaphor_and_copy.example.json"
+  ],
+  "governance_rule_sets": {
+    "epistemic": [
+      "GR1",
+      "GR2",
+      "GR3",
+      "GR4",
+      "GR5"
+    ],
+    "metaphor_and_copy": [
+      "MG1",
+      "MG2",
+      "MG3",
+      "CG1",
+      "CG2",
+      "CG3",
+      "LK1"
+    ]
+  },
+  "next_command": "uxos align scan --surface <id> --since <version>"
+}

@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { POSTER_STATUSES } from '@/lib/statuses'
+import { buildPosterUploadInsertCandidates, isUploadInsertRetryable } from '@/lib/trunk/uploadPolicy'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
-function isPosterStatusEnumMismatch(error: { message?: string } | null | undefined) {
+function isMissingColumn(error: { code?: string; message?: string } | null | undefined, column: string) {
   const message = (error?.message || '').toLowerCase()
-  return message.includes('poster_status') && message.includes('new')
+  return error?.code === '42703' || message.includes(column.toLowerCase()) || message.includes('schema cache')
 }
 
 export async function POST(req: Request) {
@@ -23,37 +23,31 @@ export async function POST(req: Request) {
   if (!url || !serviceKey) return jsonError('Missing Supabase env vars', 500)
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } })
-  let insert = await supabase
-    .from('poster_uploads')
-    .insert([{ file_path: filePath, status: POSTER_STATUSES.NEW, seen_at_name: seenAtName, is_done: false }])
-    .select('id')
-    .single()
+  const insertCandidates = buildPosterUploadInsertCandidates(filePath, seenAtName)
 
-  if (insert.error && isPosterStatusEnumMismatch(insert.error)) {
-    insert = await supabase
+  let row: { id?: string } | null = null
+  let insertErr: { code?: string; message?: string } | null = null
+
+  for (const candidate of insertCandidates) {
+    const attempt = await supabase
       .from('poster_uploads')
-      .insert([{ file_path: filePath, status: POSTER_STATUSES.UPLOADED, seen_at_name: seenAtName }])
+      .insert([candidate as never])
       .select('id')
       .single()
-  }
-  if (insert.error) {
-    const msg = (insert.error.message || '').toLowerCase()
-    const missingSeenAt = insert.error.code === '42703' || msg.includes('seen_at_name') || msg.includes('schema cache')
-    if (missingSeenAt) return jsonError('Run migration: poster_uploads.seen_at_name', 500)
-  }
-  if (insert.error) {
-    const msg = (insert.error.message || '').toLowerCase()
-    const missingSeenAtAny = insert.error.code === '42703' || msg.includes('seen_at_name') || msg.includes('schema cache')
-    if (missingSeenAtAny) {
-      insert = await supabase
-        .from('poster_uploads')
-        .insert([{ file_path: filePath, status: POSTER_STATUSES.UPLOADED }])
-        .select('id')
-        .single()
+    if (!attempt.error && attempt.data) {
+      row = attempt.data
+      insertErr = null
+      break
     }
+    insertErr = attempt.error
+    if (!attempt.error) continue
+    if (isUploadInsertRetryable(attempt.error, isMissingColumn)) {
+      continue
+    }
+    return jsonError(attempt.error.message, 500)
   }
 
-  if (insert.error) return jsonError(insert.error.message, 500)
-  if (!insert.data?.id) return jsonError('Failed to create upload record', 500)
-  return NextResponse.json({ ok: true, id: insert.data.id, poster_upload_id: insert.data.id })
+  if (insertErr) return jsonError(insertErr.message || 'Failed to create upload record', 500)
+  if (!row?.id) return jsonError('Failed to create upload record', 500)
+  return NextResponse.json({ ok: true, id: row.id, poster_upload_id: row.id })
 }

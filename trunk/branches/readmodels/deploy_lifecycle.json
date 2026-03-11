@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-03-11T01:54:35.382Z",
+  "source": "generate-deploy-readmodels-pass1",
+  "source_file": "/Users/troyeffner/Dropbox/DEV/communityboard/trunk/fibers/work/deploy_events.jsonl",
+  "source_rows_total": 2,
+  "deploy_event_rows": 2,
+  "summary": {
+    "total_lifecycles": 2,
+    "by_provider": [
+      {
+        "key": "github-actions",
+        "count": 1
+      },
+      {
+        "key": "vercel",
+        "count": 1
+      }
+    ],
+    "by_stage": [
+      {
+        "key": "ci",
+        "count": 1
+      },
+      {
+        "key": "intent",
+        "count": 1
+      }
+    ],
+    "by_status": [
+      {
+        "key": "planned",
+        "count": 1
+      },
+      {
+        "key": "started",
+        "count": 1
+      }
+    ]
+  },
+  "lifecycle_rows": [
+    {
+      "provider": "github-actions",
+      "target": "communityboard",
+      "stage": "ci",
+      "object_id": "github-actions:communityboard:ci",
+      "last_status": "started",
+      "last_ref": "testsha",
+      "last_created_at": "2026-03-10T21:03:16.154Z",
+      "total_events": 1,
+      "count_by_status": {
+        "started": 1
+      }
+    },
+    {
+      "provider": "vercel",
+      "target": "communityboard",
+      "stage": "intent",
+      "object_id": "vercel:communityboard:intent",
+      "last_status": "planned",
+      "last_ref": null,
+      "last_created_at": "2026-03-10T20:16:41.877Z",
+      "total_events": 1,
+      "count_by_status": {
+        "planned": 1
+      }
+    }
+  ]
+}

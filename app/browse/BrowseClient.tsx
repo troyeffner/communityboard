@@ -8,7 +8,6 @@ import { PosterDetailsList, PosterDetailsRail } from '@/app/components/layout/Ri
 import PosterControls from '@/app/components/poster/PosterControls'
 import PosterStage from '@/app/components/poster/PosterStage'
 import ItemCard from '@/app/components/poster/ItemCard'
-import { ensureCbVid } from '@/lib/viewer-id'
 
 type PosterRow = {
   id: string
@@ -115,6 +114,7 @@ export default function BrowseClient({
   const [items, setItems] = useState<ItemRow[]>([])
   const [activePosterId, setActivePosterId] = useState(initialPoster)
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
 
   const [stageSize, setStageSize] = useState({ width: 1, height: 1 })
   const [imageNatural, setImageNatural] = useState({ width: 1, height: 1 })
@@ -124,7 +124,7 @@ export default function BrowseClient({
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [selectedEventId, setSelectedEventId] = useState<string | null>(() => initialItem || null)
-  const [pinVotes, setPinVotes] = useState<Record<string, { upvote_count: number; did_upvote: boolean }>>({})
+  const itemCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
     document.title = 'Browse posters'
@@ -159,6 +159,7 @@ export default function BrowseClient({
   useEffect(() => {
     let cancelled = false
     const run = async () => {
+      setIsLoading(true)
       const params = new URLSearchParams()
       if (posterParam) params.set('poster', posterParam)
       if (seenAt) params.set('seenAt', seenAt)
@@ -170,6 +171,7 @@ export default function BrowseClient({
 
       if (!res.ok) {
         setError(data?.error || 'Failed to load browse data')
+        setIsLoading(false)
         return
       }
 
@@ -181,6 +183,7 @@ export default function BrowseClient({
       const nextPoster = String(data.active_poster_id || '')
       setActivePosterId(nextPoster)
       if (nextPoster !== posterParam) setPosterParam(nextPoster)
+      setIsLoading(false)
     }
 
     run()
@@ -235,12 +238,7 @@ export default function BrowseClient({
     return pinRows[0] || null
   }, [effectiveSelectedEventId, pinRows])
 
-  const orderedPins = useMemo(() => {
-    if (!effectiveSelectedEventId) return [...pinRows]
-    const lead = pinRows.find((pin) => pin.event_id === effectiveSelectedEventId)
-    if (!lead) return [...pinRows]
-    return [lead, ...pinRows.filter((pin) => pin.event_id !== effectiveSelectedEventId)]
-  }, [pinRows, effectiveSelectedEventId])
+  const orderedPins = useMemo(() => [...pinRows], [pinRows])
 
   const imageUrl = allFailed ? '' : (imageUrls[imageIndex] || imageUrls[0] || '')
   const stageMetrics = useMemo(() => {
@@ -322,31 +320,42 @@ export default function BrowseClient({
     centerOnPin(target, nextZoom)
   }
 
-  async function toggleUpvote(pin: Pin) {
-    const viewerId = ensureCbVid()
-    const hasUpvoted = pinVotes[pin.event_id]?.did_upvote ?? pin.did_upvote ?? false
-    const method = hasUpvoted ? 'DELETE' : 'POST'
+  useEffect(() => {
+    const selectedId = effectiveSelectedEventId
+    if (!selectedId) return
+    const el = itemCardRefs.current[selectedId]
+    if (!el) return
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [effectiveSelectedEventId])
 
-    const res = await fetch(`/api/items/${encodeURIComponent(pin.event_id)}/upvote`, {
-      method,
-      headers: { 'x-cb-vid': viewerId },
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return
+  const selectedTypeLabel = useMemo(
+    () => (selectedPin?.item_type || 'item').replace(/_/g, ' '),
+    [selectedPin],
+  )
+  const centerTitle = useMemo(
+    () => selectedPin?.title?.trim() || `${selectedTypeLabel} view`,
+    [selectedPin, selectedTypeLabel],
+  )
+  const centerSubtitle = useMemo(
+    () => `Zoom and inspect ${selectedTypeLabel} placement on the selected board.`,
+    [selectedTypeLabel],
+  )
+  const rightTitle = useMemo(
+    () => `${selectedTypeLabel} details`,
+    [selectedTypeLabel],
+  )
 
-    setPinVotes((prev) => ({
-      ...prev,
-      [pin.event_id]: {
-        upvote_count: Number(data.upvotes || 0),
-        did_upvote: Boolean(data.votedByMe),
-      },
-    }))
+  function getDetailLocation(seenAtLabel: string, eventLocation: string | null) {
+    const eventAt = eventLocation || '—'
+    if (!seenAtLabel) return `Location: ${eventAt}`
+    if (eventAt !== '—' && eventAt !== seenAtLabel) return `Seen at: ${seenAtLabel}`
+    return `Seen at: ${seenAtLabel}`
   }
 
   const leftPanel = (
     <Panel title="Browse" subtitle="Search, filter, and choose a poster board." testId="browse-panel-left">
       <PanelSection>
-        <p className="cbPanelMicroLabel">Found at</p>
+        <p className="cbPanelMicroLabel">Seen at</p>
         <div className="cbTokenWrap">
           <button
             data-variant="secondary"
@@ -381,40 +390,53 @@ export default function BrowseClient({
       </PanelSection>
 
       <div className="cbBrowsePosterList">
-        {posters.map((poster) => (
-          <button
-            key={poster.id}
-            type="button"
-            className={activePosterId === poster.id ? 'cbBrowsePosterCard cbBrowsePosterCardActive' : 'cbBrowsePosterCard'}
-            onClick={() => {
-              setPosterParam(poster.id)
-              setActivePosterId(poster.id)
-              setItemParam('')
-              setSelectedEventId(null)
-              hasAutoCenteredRef.current = false
-              updateUrl({ poster: poster.id, item: '' })
-            }}
-          >
-            {poster.public_url ? (
-              <img src={poster.public_url} alt="Poster thumbnail" className="cbBrowsePosterThumb" />
-            ) : (
-              <div className="cbBrowsePosterThumb cbBrowsePosterThumbEmpty" />
-            )}
-            <div className="cbBrowsePosterMeta">
-              <div className="cbBrowsePosterName">{poster.seen_at_name || 'Unknown'}</div>
-              <div className="cb-muted-text">Captured: {formatCaptureHour(poster.created_at)}</div>
-              <div className="cb-muted-text">Items: {poster.item_count}</div>
-            </div>
-          </button>
-        ))}
-        {posters.length === 0 ? <p className="cb-muted-text">No posters found.</p> : null}
+        {isLoading ? (
+          <>
+            <div className="cbSkeleton cbSkeletonCard" />
+            <div className="cbSkeleton cbSkeletonCard" />
+            <div className="cbSkeleton cbSkeletonCard" />
+          </>
+        ) : (
+          <>
+            {posters.map((poster) => (
+              <button
+                key={poster.id}
+                type="button"
+                className={activePosterId === poster.id ? 'cbBrowsePosterCard cbBrowsePosterCardActive' : 'cbBrowsePosterCard'}
+                onClick={() => {
+                  setPosterParam(poster.id)
+                  setActivePosterId(poster.id)
+                  setItemParam('')
+                  setSelectedEventId(null)
+                  hasAutoCenteredRef.current = false
+                  updateUrl({ poster: poster.id, item: '' })
+                }}
+              >
+                {poster.public_url ? (
+                  <img src={poster.public_url} alt="Poster thumbnail" className="cbBrowsePosterThumb" />
+                ) : (
+                  <div className="cbBrowsePosterThumb cbBrowsePosterThumbEmpty" />
+                )}
+                <div className="cbBrowsePosterMeta">
+                  <div className="cbBrowsePosterName">{poster.seen_at_name || 'Unknown'}</div>
+                  <div className="cb-muted-text">Captured: {formatCaptureHour(poster.created_at)}</div>
+                  <div className="cb-muted-text">Items: {poster.item_count}</div>
+                </div>
+              </button>
+            ))}
+            {posters.length === 0 ? <p className="cb-muted-text">No posters found.</p> : null}
+          </>
+        )}
       </div>
     </Panel>
   )
 
   const centerPanel = (
-    <Panel title="Workspace" subtitle="Zoom and inspect item placement on the selected poster." testId="browse-panel-center">
+    <Panel title={centerTitle} subtitle={centerSubtitle} testId="browse-panel-center">
       {error ? <p className="cbErrorMsg">{error}</p> : null}
+      {isLoading && !imageUrl ? (
+        <div className="cbSkeleton cbSkeletonStage" />
+      ) : null}
       <PosterControls>
         <button data-variant="secondary" onClick={() => {
           const nextZoom = clamp(Number((zoom - 0.2).toFixed(2)), 1, 5)
@@ -478,39 +500,34 @@ export default function BrowseClient({
   )
 
   const rightPanel = (
-    <PosterDetailsRail subtitle="Selected item appears first." testId="browse-panel-right">
+    <PosterDetailsRail title={rightTitle} subtitle="Select any card to center and inspect." testId="browse-panel-right">
       <PosterDetailsList>
-        {orderedPins.map((pin) => {
-          const foundAtLabel = activePoster?.seen_at_name || '—'
+        {isLoading ? (
+          <>
+            <div className="cbSkeleton cbSkeletonItemCard" />
+            <div className="cbSkeleton cbSkeletonItemCard" />
+            <div className="cbSkeleton cbSkeletonItemCard" />
+            <div className="cbSkeleton cbSkeletonItemCard" />
+          </>
+        ) : null}
+        {!isLoading && orderedPins.map((pin) => {
+          const seenAtLabel = activePoster?.seen_at_name || ''
           const eventAtLabel = pin.location || '—'
-          const showBothLocations = foundAtLabel !== '—' && eventAtLabel !== '—' && foundAtLabel !== eventAtLabel
+          const showBothLocations = Boolean(seenAtLabel && eventAtLabel !== '—' && seenAtLabel !== eventAtLabel)
           return (
-            <ItemCard
-              key={pin.link_id}
-              onClick={() => selectPin(pin)}
-              selected={effectiveSelectedEventId === pin.event_id}
-              testId={`browse-item-${pin.event_id}`}
-              title={pin.title?.trim() || '(Untitled item)'}
-              subtitle={pin.start_at ? `Date/time: ${new Date(pin.start_at).toLocaleString()}` : 'Date/time: —'}
-              typeLabel={(pin.item_type || 'event').replace(/_/g, ' ')}
-              location={`Found at: ${foundAtLabel}`}
-            >
-              {showBothLocations ? <div className="cbItemMetaSecondary">Event at: {eventAtLabel}</div> : null}
-
-              <div className="cbItemActionRow">
-                <button
-                  className="cbActionPrimary"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleUpvote(pin)
-                  }}
-                >
-                  Upvote · {pinVotes[pin.event_id]?.upvote_count ?? pin.upvote_count ?? 0}
-                </button>
-              </div>
-
+            <div key={pin.link_id} ref={(el) => { itemCardRefs.current[pin.event_id] = el }}>
+              <ItemCard
+                onClick={() => selectPin(pin)}
+                selected={effectiveSelectedEventId === pin.event_id}
+                testId={`browse-item-${pin.event_id}`}
+                title={pin.title?.trim() || '(Untitled item)'}
+                subtitle={pin.start_at ? `Date/time: ${new Date(pin.start_at).toLocaleString()}` : 'Date/time: —'}
+                typeLabel={(pin.item_type || 'event').replace(/_/g, ' ')}
+                location={getDetailLocation(seenAtLabel, pin.location)}
+              >
+                {showBothLocations ? <div className="cbItemMetaSecondary">Event at: {eventAtLabel}</div> : null}
               {isCalendarType(pin.item_type) && pin.start_at ? (
-                <div className="cbItemActionRow">
+                <div className="cbItemActionRow cbCalendarLinkRow">
                   <a
                     href={toGoogleCalendarUrl({ title: pin.title, start_at: pin.start_at, location: pin.location })}
                     target="_blank"
@@ -525,14 +542,15 @@ export default function BrowseClient({
                     onClick={(e) => e.stopPropagation()}
                     className="cbActionLink cbActionSecondary"
                   >
-                    Download .ics
+                    Download ICS
                   </a>
                 </div>
               ) : null}
-            </ItemCard>
+              </ItemCard>
+            </div>
           )
         })}
-        {orderedPins.length === 0 ? <p className="cbPanelEmptyState">No items yet.</p> : null}
+        {!isLoading && orderedPins.length === 0 ? <p className="cbPanelEmptyState">No items yet.</p> : null}
       </PosterDetailsList>
     </PosterDetailsRail>
   )

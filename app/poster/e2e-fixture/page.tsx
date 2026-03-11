@@ -4,7 +4,7 @@ import PosterViewer from '@/app/poster/[id]/PosterViewer'
 export const dynamic = 'force-static'
 
 export const metadata: Metadata = {
-  title: 'Found at: E2E Community Board',
+  title: 'Seen at: E2E Community Board',
 }
 
 export default function Page() {

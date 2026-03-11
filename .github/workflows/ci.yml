@@ -14,9 +14,44 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+      - name: Emit deploy intent fiber
+        run: npm run trunk:deploy:intent -- --stage ci --status started --target communityboard --provider github-actions --ref "${GITHUB_SHA}" --note "ci run started"
       - run: npm ci
+      - run: npm run trunk:ether:lint-sources
       - run: npm test
       - run: npm run lint
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Emit deploy result fiber (success)
+        if: ${{ success() }}
+        run: npm run trunk:deploy:result -- --stage ci --status success --target communityboard --provider github-actions --ref "${GITHUB_SHA}" --note "ci run passed"
+      - name: Emit deploy result fiber (failure)
+        if: ${{ failure() }}
+        run: npm run trunk:deploy:result -- --stage ci --status failure --target communityboard --provider github-actions --ref "${GITHUB_SHA}" --note "ci run failed"
+      - name: Build deploy readmodel
+        if: ${{ always() }}
+        run: npm run trunk:deploy:readmodels
+      - name: Upload deploy fibers artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-fibers-${{ github.run_id }}
+          path: trunk/fibers/work/deploy_events.jsonl
+          if-no-files-found: ignore
+      - name: Upload deploy readmodel artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-readmodel-${{ github.run_id }}
+          path: |
+            trunk/branches/readmodels/deploy_lifecycle.json
+            trunk/overnight/outputs/readmodel_deploy_summary_*.json
+          if-no-files-found: ignore
+      - name: Upload ether source lint artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ether-source-lint-${{ github.run_id }}
+          path: trunk/overnight/outputs/ether_sources_lint_*.json
+          if-no-files-found: ignore

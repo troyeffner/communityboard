@@ -1,0 +1,16 @@
+{
+  "policy_id": "communityboard_overnight_policy_v1",
+  "updated_at": "2026-03-10",
+  "owner": "TE.ENG_Fiona",
+  "status": "active",
+  "cadence": "hourly",
+  "timezone": "America/New_York",
+  "stable_tag_min_count": 2,
+  "registry_max_tags": 500,
+  "readmodel_refresh": {
+    "mode": "hybrid",
+    "route_write_marker_enabled": true
+  },
+  "notes": "Cadence lock and tag stabilization policy for pass 5 overnight growth."
+}
+

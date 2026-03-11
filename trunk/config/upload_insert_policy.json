@@ -1,0 +1,27 @@
+{
+  "policy_id": "communityboard_upload_insert_policy_v1",
+  "updated_at": "2026-03-10",
+  "owner": "TE.ENG_Fiona",
+  "status": "active",
+  "primary_status_key": "NEW",
+  "fallback_status_key": "UPLOADED",
+  "seen_at_columns": [
+    "seen_at_name",
+    "seen_at_label",
+    "seen_at",
+    "source_place"
+  ],
+  "include_is_done_in_primary": true,
+  "include_terminal_without_seen_at": true,
+  "retry_error": {
+    "enum_mismatch_token": "poster_status",
+    "missing_column_code": "42703",
+    "message_keywords": [
+      "schema cache",
+      "is_done",
+      "done"
+    ]
+  },
+  "notes": "Policy packet for poster_uploads insert fallback ladder used by submit/finalize routes."
+}
+

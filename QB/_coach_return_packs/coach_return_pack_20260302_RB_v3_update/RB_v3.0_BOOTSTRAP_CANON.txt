@@ -1,0 +1,6 @@
+RB_v3.0 Canon (source-of-truth is ChatGPT thread output).
+Stored here for QB/Coach retrieval.
+
+Re-entry command:
+Coach, ingest this return pack and run full re-entry sweep:
+check-updates -> ffa-reconcile -> check -> report -> plan.

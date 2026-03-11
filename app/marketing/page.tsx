@@ -111,7 +111,7 @@ export default function MarketingPage() {
               <li><b>Snap:</b> take a photo of a poster.</li>
               <li><b>Extract:</b> AI suggests title, date/time, location, tags.</li>
               <li><b>Confirm:</b> a human checks it (stewardship beats automation).</li>
-              <li><b>Publish:</b> it lands in a chronological feed with closure.</li>
+              <li><b>Pin to board:</b> it lands in a chronological feed with closure.</li>
             </ol>
           </div>
 

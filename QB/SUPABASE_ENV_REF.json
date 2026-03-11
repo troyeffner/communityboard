@@ -1,0 +1,16 @@
+{
+  "provider": "supabase",
+  "enabled": true,
+  "env_file_path": "/Users/troyeffner/Dropbox/DEV/.secrets/supabase/default.env",
+  "project_ref": "",
+  "required_keys": [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_PROJECT_REF"
+  ],
+  "sync_target": ".env.local",
+  "last_synced_at": ""
+}
