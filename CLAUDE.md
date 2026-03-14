@@ -20,8 +20,7 @@ Run `/qb-start` at the beginning of each session to read QB state and check inbo
 | `QB/WORK_QUEUE.md` | Active task queue |
 | `QB/DECISION_LOG.md` | Append-only decision record |
 | `QB/LATEST.json` | Current bundle pointer |
-| `QB/INBOX/` | Incoming dispatches from Coach |
-| `QB/OUTBOX/` | Responses ready for Coach review |
+| `TRUNK/` | All work routes through ops-hub TRUNK — assigns, returns, sparks |
 | `QB/AUTONOMY_MATRIX.md` | What Claude can do vs. must escalate |
 | `QB/WOW_BASELINE.json` | Ways of working — v3.2.0-troyos |
 
@@ -69,3 +68,12 @@ Schema/runtime blockers and tagging alignment are the current priorities. Escala
 **FFA relationship:** CommunityBoard is the FFA pilot. The JTBD canon data (actors, jobs, steps, outcomes, pages) is the communityboard FFA instance. Merge-back to FFA is a queued cross-project task (wq_433). Do not modify JTBD canon data without checking FFA impact.
 
 **Archive:** `_communityboard_untracked_archive_20260228-124525/` contains three things: (1) JTBD canon data → belongs in FFA as communityboard instance; (2) TypeScript validation engine → may belong in `lib/product-dev/`; (3) SQL migrations → status unknown, verify against DB before touching. Audit task: wq_432.
+
+
+## Vocabulary (synapse lock — 2026-03-13)
+
+- **Synapse** — how fractals recognize each other and connect. Two classes: port (pre-installed) and tag (declared).
+- **Port** — pre-installed synapse. Universal. Every fractal receives at birth. Cannot be removed. Timestamp confirmed.
+- **Tag** — declared synapse. Specific to the fractal. Assigned. Variable.
+- **Timestamp** — pre-installed port. Born with every fiber. Not metadata. First recognition surface.
+- **INBOX/OUTBOX** — retired. Ports are not directional.

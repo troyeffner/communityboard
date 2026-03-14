@@ -1,9 +1,0 @@
-{
-  "enabled": false,
-  "owner": "CommunityBoard PM",
-  "last_updated": "2026-03-01T19:29:54Z",
-  "capture_tool": "playwright",
-  "capture_targets_file": "QB/WEB_CAPTURE_TARGETS.json",
-  "capture_cadence": "per PR and before release",
-  "blockers": []
-}
